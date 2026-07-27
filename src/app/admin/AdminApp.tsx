@@ -11,11 +11,47 @@ type Local = Tables<"locais">;
 type Solic = Tables<"solicitantes">;
 type Usuario = Tables<"usuarios">;
 
-const ABAS = ["Propriedades", "Setores", "Locais", "Solicitantes", "Equipe"] as const;
+const ABAS = [
+  "Locais principais",
+  "Setores",
+  "Sublocais",
+  "Solicitantes",
+  "Equipe",
+] as const;
 type Aba = (typeof ABAS)[number];
 
 const inputCls =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+
+/** Sublocais padrão por local principal (nome normalizado para matching). */
+const SUBLOCAIS_PADRAO: Record<string, string[]> = {
+  aquamania: [
+    "Adrenalina",
+    "Rampa",
+    "Lanchonete",
+    "Bilheteria",
+    "Bar",
+    "3 Torres",
+  ],
+  "vivaz cataratas": [
+    "Restaurante Allegro",
+    "Bar Gaia",
+    "Recepção",
+    "Central de Reservas",
+    "Marketing",
+    "RH",
+    "Financeiro",
+    "Almoxarifado",
+  ],
+};
+
+function normalizarNome(nome: string) {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 export function AdminApp(props: {
   propriedades: Prop[];
@@ -24,13 +60,14 @@ export function AdminApp(props: {
   solicitantes: Solic[];
   usuarios: Usuario[];
 }) {
-  const [aba, setAba] = useState<Aba>("Propriedades");
+  const [aba, setAba] = useState<Aba>("Locais principais");
 
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
       <h1 className="text-xl font-bold">Cadastros</h1>
       <p className="mt-0.5 text-sm text-slate-500">
-        Gerencie propriedades, locais, solicitantes e a equipe.
+        Cadastre locais principais (ex.: Aquamania, Vivaz Cataratas), sublocais,
+        solicitantes e a equipe.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-1 border-b border-slate-200">
@@ -50,11 +87,13 @@ export function AdminApp(props: {
       </div>
 
       <div className="mt-5">
-        {aba === "Propriedades" && <Propriedades itens={props.propriedades} />}
+        {aba === "Locais principais" && (
+          <Propriedades itens={props.propriedades} />
+        )}
         {aba === "Setores" && (
           <Setores itens={props.setores} propriedades={props.propriedades} />
         )}
-        {aba === "Locais" && (
+        {aba === "Sublocais" && (
           <Locais
             itens={props.locais}
             propriedades={props.propriedades}
@@ -143,7 +182,7 @@ function ErroMsg({ erro }: { erro: string | null }) {
   );
 }
 
-// ---------- Propriedades ----------
+// ---------- Locais principais ----------
 function Propriedades({ itens }: { itens: Prop[] }) {
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
@@ -168,10 +207,14 @@ function Propriedades({ itens }: { itens: Prop[] }) {
 
   return (
     <Card>
+      <p className="mb-3 text-sm text-slate-500">
+        Locais principais abrem a lista de sublocais na abertura de demanda
+        (ex.: Aquamania, Vivaz Cataratas).
+      </p>
       <div className="flex gap-2">
         <input
           className={`${inputCls} flex-1`}
-          placeholder="Nova propriedade"
+          placeholder="Novo local principal"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
         />
@@ -199,7 +242,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState("");
   const nomeProp = (id: string | null) =>
-    id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas as propriedades";
+    id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
 
   async function adicionar() {
     if (!nome.trim()) return;
@@ -231,7 +274,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
           onChange={(e) => setNome(e.target.value)}
         />
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
-          <option value="">Todas as propriedades</option>
+          <option value="">Todos os locais principais</option>
           {propriedades.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
@@ -257,7 +300,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
   );
 }
 
-// ---------- Locais ----------
+// ---------- Sublocais ----------
 function Locais({
   itens,
   propriedades,
@@ -271,12 +314,22 @@ function Locais({
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
   const [setorId, setSetorId] = useState("");
+  const [filtroProp, setFiltroProp] = useState<string>("todos");
+  const [populando, setPopulando] = useState(false);
+  const [msgOk, setMsgOk] = useState<string | null>(null);
+
   const nomeProp = (id: string) => propriedades.find((p) => p.id === id)?.nome ?? "?";
   const nomeSetor = (id: string | null) =>
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
 
+  const filtrados =
+    filtroProp === "todos"
+      ? itens
+      : itens.filter((l) => l.propriedade_id === filtroProp);
+
   async function adicionar() {
-    if (!nome.trim() || !propId) return setErro("Informe nome e propriedade.");
+    setMsgOk(null);
+    if (!nome.trim() || !propId) return setErro("Informe nome e local principal.");
     const { error } = await supabase
       .from("locais")
       .insert({ nome: nome.trim(), propriedade_id: propId, setor_id: setorId || null });
@@ -295,12 +348,69 @@ function Locais({
     refresh();
   }
 
+  async function popularPadrao() {
+    setErro(null);
+    setMsgOk(null);
+    setPopulando(true);
+    try {
+      const novos: { nome: string; propriedade_id: string }[] = [];
+      for (const prop of propriedades) {
+        const chave = normalizarNome(prop.nome);
+        const lista =
+          SUBLOCAIS_PADRAO[chave] ??
+          Object.entries(SUBLOCAIS_PADRAO).find(([k]) => chave.includes(k))?.[1];
+        if (!lista) continue;
+        const existentes = new Set(
+          itens
+            .filter((l) => l.propriedade_id === prop.id)
+            .map((l) => normalizarNome(l.nome)),
+        );
+        for (const sub of lista) {
+          if (!existentes.has(normalizarNome(sub))) {
+            novos.push({ nome: sub, propriedade_id: prop.id });
+          }
+        }
+      }
+      if (novos.length === 0) {
+        setMsgOk("Todos os sublocais padrão já estão cadastrados.");
+        return;
+      }
+      const { error } = await supabase.from("locais").insert(novos);
+      if (error) {
+        setErro(error.message);
+        return;
+      }
+      setMsgOk(`${novos.length} sublocal(is) adicionado(s).`);
+      refresh();
+    } finally {
+      setPopulando(false);
+    }
+  }
+
   return (
     <Card>
+      <p className="mb-3 text-sm text-slate-500">
+        Sublocais aparecem depois que o solicitante escolhe o local principal.
+      </p>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={popularPadrao}
+          disabled={populando || propriedades.length === 0}
+          className="rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+        >
+          {populando ? "Populando…" : "Popular sublocais padrão"}
+        </button>
+        <span className="text-xs text-slate-400">
+          Aquamania e Vivaz Cataratas
+        </span>
+      </div>
+
       <div className="grid gap-2 sm:grid-cols-2">
         <input
           className={inputCls}
-          placeholder="Novo local"
+          placeholder="Novo sublocal"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
         />
@@ -322,8 +432,35 @@ function Locais({
         <BtnAdd onClick={adicionar} />
       </div>
       <ErroMsg erro={erro} />
+      {msgOk && (
+        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {msgOk}
+        </p>
+      )}
+
+      <div className="mt-4 flex items-center gap-2">
+        <label className="text-xs font-medium text-slate-500">Filtrar:</label>
+        <select
+          className={inputCls}
+          value={filtroProp}
+          onChange={(e) => setFiltroProp(e.target.value)}
+        >
+          <option value="todos">Todos os locais</option>
+          {propriedades.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="mt-3">
-        {itens.map((l) => (
+        {filtrados.length === 0 && (
+          <p className="py-6 text-center text-sm text-slate-400">
+            Nenhum sublocal cadastrado. Use o botão acima ou adicione manualmente.
+          </p>
+        )}
+        {filtrados.map((l) => (
           <Linha
             key={l.id}
             nome={l.nome}
@@ -359,7 +496,7 @@ function Solicitantes({
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
 
   async function adicionar() {
-    if (!nome.trim() || !propId) return setErro("Informe nome e propriedade.");
+    if (!nome.trim() || !propId) return setErro("Informe nome e local principal.");
     const { error } = await supabase
       .from("solicitantes")
       .insert({ nome: nome.trim(), propriedade_id: propId, setor_id: setorId || null });
@@ -491,7 +628,7 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
           <option value="admin">Administrador</option>
         </select>
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
-          <option value="">Todas as propriedades</option>
+          <option value="">Todos os locais principais</option>
           {propriedades.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}

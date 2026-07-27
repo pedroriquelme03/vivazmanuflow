@@ -4,14 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DEMANDA_SELECT, type DemandaKanban } from "@/lib/demanda-select";
 import {
-  STATUS_LABEL,
-  PRIORIDADE_LABEL,
-  PRIORIDADE_DOT,
   PRAZO_COR,
   calcularUrgencia,
   formatarData,
 } from "@/lib/demanda-ui";
 import type { Enums } from "@/lib/database.types";
+import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { AtribuirModal } from "./AtribuirModal";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
@@ -154,19 +152,19 @@ function Card({
 
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center gap-1.5">
-        <span
-          className={`inline-block h-2 w-2 shrink-0 rounded-full ${PRIORIDADE_DOT[demanda.prioridade]}`}
-          title={`Prioridade ${PRIORIDADE_LABEL[demanda.prioridade]}`}
-        />
+      <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-tight text-slate-800">
           {demanda.titulo}
         </p>
+        <PrioridadeTag prioridade={demanda.prioridade} />
       </div>
 
       <p className="mt-1 text-xs text-slate-500">
-        {demanda.local?.nome ? `${demanda.local.nome} · ` : ""}
-        {demanda.solicitante?.nome ?? "—"}
+        {demanda.propriedade?.nome ? `${demanda.propriedade.nome}` : ""}
+        {demanda.local?.nome ? ` · ${demanda.local.nome}` : ""}
+        {demanda.solicitante?.nome
+          ? `${demanda.propriedade?.nome || demanda.local?.nome ? " · " : ""}${demanda.solicitante.nome}`
+          : ""}
       </p>
 
       {demanda.colaborador?.nome && (

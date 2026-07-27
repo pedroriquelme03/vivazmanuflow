@@ -5,10 +5,9 @@ import { CopiarLink } from "@/components/CopiarLink";
 import {
   STATUS_LABEL,
   STATUS_BADGE,
-  PRIORIDADE_LABEL,
-  PRIORIDADE_DOT,
   formatarData,
 } from "@/lib/demanda-ui";
+import { PrioridadeTag } from "@/components/PrioridadeTag";
 import type { Enums } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -71,11 +70,14 @@ export default async function AcompanharToken({
         <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-lg font-bold">{d.titulo}</h1>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[d.status]}`}
-            >
-              {STATUS_LABEL[d.status]}
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <PrioridadeTag prioridade={d.prioridade} />
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[d.status]}`}
+              >
+                {STATUS_LABEL[d.status]}
+              </span>
+            </div>
           </div>
 
           {d.descricao && (
@@ -83,19 +85,10 @@ export default async function AcompanharToken({
           )}
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <Info titulo="Propriedade" valor={d.propriedade} />
-            <Info titulo="Local" valor={d.local ?? "—"} />
+            <Info titulo="Local principal" valor={d.propriedade} />
+            <Info titulo="Sublocal" valor={d.local ?? "—"} />
             <Info titulo="Solicitante" valor={d.solicitante} />
             <Info titulo="Responsável" valor={d.colaborador ?? "A definir"} />
-            <div>
-              <dt className="text-xs text-slate-400">Prioridade</dt>
-              <dd className="flex items-center gap-1.5 font-medium text-slate-700">
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${PRIORIDADE_DOT[d.prioridade]}`}
-                />
-                {PRIORIDADE_LABEL[d.prioridade]}
-              </dd>
-            </div>
             <Info titulo="Prazo" valor={formatarData(d.prazo)} />
           </dl>
         </div>

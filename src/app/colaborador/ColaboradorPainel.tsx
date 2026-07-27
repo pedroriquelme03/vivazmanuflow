@@ -4,21 +4,37 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { COLAB_SELECT, type DemandaColab } from "@/lib/demanda-select";
-import type { TablesUpdate } from "@/lib/database.types";
-import { calcularUrgencia, PRAZO_COR } from "@/lib/demanda-ui";
+import type { TablesUpdate, Enums } from "@/lib/database.types";
+import {
+  calcularUrgencia,
+  PRIORIDADE_BADGE,
+  formatarData,
+} from "@/lib/demanda-ui";
+import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { logout } from "@/lib/logout";
+import type { Perfil } from "@/lib/auth";
+
+type Aba = "demandas" | "historico" | "perfil";
+
+const ABAS: { id: Aba; rotulo: string; icone: string }[] = [
+  { id: "demandas", rotulo: "Demandas", icone: "🛠️" },
+  { id: "historico", rotulo: "Histórico", icone: "📋" },
+  { id: "perfil", rotulo: "Perfil", icone: "👤" },
+];
 
 export function ColaboradorPainel({
   demandasIniciais,
-  colaboradorId,
-  primeiroNome,
+  perfil,
 }: {
   demandasIniciais: DemandaColab[];
-  colaboradorId: string;
-  primeiroNome: string;
+  perfil: Perfil;
 }) {
+  const colaboradorId = perfil.id;
+  const primeiroNome = perfil.nome.split(" ")[0];
   const supabase = useMemo(() => createClient(), []);
   const [demandas, setDemandas] = useState<DemandaColab[]>(demandasIniciais);
   const [agora, setAgora] = useState(() => Date.now());
+  const [aba, setAba] = useState<Aba>("demandas");
 
   const recarregar = useCallback(async () => {
     const { data } = await supabase
@@ -55,7 +71,75 @@ export function ColaboradorPainel({
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
+    <div className="flex min-h-full flex-1 flex-col">
+      <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-6">
+        {aba === "demandas" && (
+          <ListaDemandas
+            primeiroNome={primeiroNome}
+            demandas={demandas}
+            agora={agora}
+            colaboradorId={colaboradorId}
+            onMudou={recarregar}
+          />
+        )}
+        {aba === "historico" && (
+          <HistoricoColab colaboradorId={colaboradorId} />
+        )}
+        {aba === "perfil" && <PerfilColab perfil={perfil} />}
+      </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <div className="mx-auto flex max-w-md">
+          {ABAS.map((a) => {
+            const ativa = aba === a.id;
+            const badge =
+              a.id === "demandas" && demandas.length > 0
+                ? demandas.length
+                : null;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setAba(a.id)}
+                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition ${
+                  ativa
+                    ? "text-brand-700"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  {a.icone}
+                </span>
+                {a.rotulo}
+                {badge != null && (
+                  <span className="absolute right-[calc(50%-1.75rem)] top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+function ListaDemandas({
+  primeiroNome,
+  demandas,
+  agora,
+  colaboradorId,
+  onMudou,
+}: {
+  primeiroNome: string;
+  demandas: DemandaColab[];
+  agora: number;
+  colaboradorId: string;
+  onMudou: () => void;
+}) {
+  return (
+    <>
       <h1 className="text-xl font-bold">Olá, {primeiroNome} 👋</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         {demandas.length === 0
@@ -74,12 +158,209 @@ export function ColaboradorPainel({
               key={d.id}
               demanda={d}
               agora={agora}
-              onMudou={recarregar}
+              colaboradorId={colaboradorId}
+              onMudou={onMudou}
             />
           ))}
         </div>
       )}
-    </main>
+    </>
+  );
+}
+
+const PERIODOS = [
+  { dias: 1, rotulo: "Hoje" },
+  { dias: 7, rotulo: "7 dias" },
+  { dias: 30, rotulo: "30 dias" },
+  { dias: 90, rotulo: "90 dias" },
+] as const;
+
+type ItemHistorico = {
+  id: string;
+  titulo: string;
+  prioridade: Enums<"demanda_prioridade">;
+  concluido_em: string | null;
+  local: { nome: string } | null;
+};
+
+function inicioPeriodo(dias: number): Date {
+  const fim = new Date();
+  if (dias === 1) {
+    const hoje = new Date(fim);
+    hoje.setHours(0, 0, 0, 0);
+    return hoje;
+  }
+  return new Date(fim.getTime() - dias * 86400_000);
+}
+
+function HistoricoColab({ colaboradorId }: { colaboradorId: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [dias, setDias] = useState(7);
+  const [itens, setItens] = useState<ItemHistorico[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  const carregar = useCallback(
+    async (nDias: number) => {
+      setCarregando(true);
+      const inicio = inicioPeriodo(nDias).toISOString();
+      const { data } = await supabase
+        .from("demandas")
+        .select("id, titulo, prioridade, concluido_em, local:locais(nome)")
+        .eq("colaborador_id", colaboradorId)
+        .eq("status", "concluida")
+        .gte("concluido_em", inicio)
+        .order("concluido_em", { ascending: false });
+      setItens((data as unknown as ItemHistorico[]) ?? []);
+      setCarregando(false);
+    },
+    [supabase, colaboradorId],
+  );
+
+  useEffect(() => {
+    carregar(dias);
+  }, [dias, carregar]);
+
+  const porPrioridade = useMemo(() => {
+    const c = { alta: 0, media: 0, baixa: 0 };
+    for (const i of itens) c[i.prioridade]++;
+    return c;
+  }, [itens]);
+
+  return (
+    <>
+      <h1 className="text-xl font-bold">Histórico</h1>
+      <p className="mt-0.5 text-sm text-slate-500">
+        Demandas que você concluiu no período.
+      </p>
+
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        {PERIODOS.map((p) => (
+          <button
+            key={p.dias}
+            type="button"
+            onClick={() => setDias(p.dias)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+              dias === p.dias
+                ? "bg-brand-600 text-white"
+                : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {p.rotulo}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          Total atendidas
+        </p>
+        <p className="mt-1 text-3xl font-bold text-slate-900">
+          {carregando ? "…" : itens.length}
+        </p>
+        {!carregando && itens.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ["alta", porPrioridade.alta],
+                ["media", porPrioridade.media],
+                ["baixa", porPrioridade.baixa],
+              ] as const
+            )
+              .filter(([, n]) => n > 0)
+              .map(([prio, n]) => (
+                <span key={prio} className="inline-flex items-center gap-1.5">
+                  <PrioridadeTag prioridade={prio} />
+                  <span className="text-xs font-semibold text-slate-500">
+                    {n}
+                  </span>
+                </span>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {carregando ? (
+        <p className="mt-6 text-center text-sm text-slate-400">Carregando…</p>
+      ) : itens.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-400">
+          Nenhuma demanda concluída neste período.
+        </div>
+      ) : (
+        <ul className="mt-4 grid gap-2">
+          {itens.map((i) => (
+            <li
+              key={i.id}
+              className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">
+                  {i.titulo}
+                </p>
+                <PrioridadeTag prioridade={i.prioridade} />
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                {i.local?.nome ? `${i.local.nome} · ` : ""}
+                {formatarData(i.concluido_em)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function PerfilColab({ perfil }: { perfil: Perfil }) {
+  const iniciais = perfil.nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return (
+    <>
+      <h1 className="text-xl font-bold">Perfil</h1>
+      <p className="mt-0.5 text-sm text-slate-500">Seus dados de acesso.</p>
+
+      <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-lg font-bold text-white">
+            {iniciais || "V"}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-slate-900">
+              {perfil.nome}
+            </p>
+            <p className="text-sm text-slate-500">Colaborador</p>
+          </div>
+        </div>
+
+        <dl className="mt-5 grid gap-3 border-t border-slate-100 pt-4 text-sm">
+          <div>
+            <dt className="text-xs text-slate-400">E-mail</dt>
+            <dd className="font-medium text-slate-700">
+              {perfil.email ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-400">Local principal</dt>
+            <dd className="font-medium text-slate-700">
+              {perfil.propriedade_nome ?? "Todos"}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <form action={logout} className="mt-4">
+        <button
+          type="submit"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Sair da conta
+        </button>
+      </form>
+    </>
   );
 }
 
@@ -90,15 +371,18 @@ const MOTIVOS = ["Falta material", "Preciso de ajuda", "Vou continuar depois"];
 function CardColab({
   demanda,
   agora,
+  colaboradorId,
   onMudou,
 }: {
   demanda: DemandaColab;
   agora: number;
+  colaboradorId: string;
   onMudou: () => void;
 }) {
   const supabase = createClient();
   const [passo, setPasso] = useState<Passo>("inicio");
   const [foto, setFoto] = useState<File | null>(null);
+  const [descricaoConclusao, setDescricaoConclusao] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sinalizado, setSinalizado] = useState<string | null>(null);
@@ -121,12 +405,17 @@ function CardColab({
       setOcupado(false);
       return;
     }
+    setOcupado(false);
     onMudou();
   }
 
   async function concluir() {
     if (!foto) {
       setErro("Tire uma foto do serviço concluído.");
+      return;
+    }
+    if (!descricaoConclusao.trim()) {
+      setErro("Descreva o que foi feito.");
       return;
     }
     setOcupado(true);
@@ -158,6 +447,15 @@ function CardColab({
         .eq("id", demanda.id);
       if (updErro) throw new Error();
 
+      // Registra a descrição da conclusão no histórico (melhor esforço).
+      await supabase.from("demanda_historico").insert({
+        demanda_id: demanda.id,
+        status_anterior: "em_andamento",
+        status_novo: "concluida",
+        observacao: descricaoConclusao.trim(),
+        usuario_id: colaboradorId,
+      });
+
       onMudou();
     } catch {
       setErro("Falha ao concluir. Verifique a internet e tente de novo.");
@@ -180,17 +478,27 @@ function CardColab({
     setPasso("inicio");
   }
 
+  function voltar() {
+    setPasso("inicio");
+    setFoto(null);
+    setDescricaoConclusao("");
+    setErro(null);
+  }
+
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {/* Cronômetro */}
+      {/* Prazo — cor pela prioridade (alta vermelha, média laranja, baixa verde) */}
       <div
-        className={`px-4 py-2 text-center text-sm font-bold ${PRAZO_COR[urg.nivel]}`}
+        className={`px-4 py-2 text-center text-sm font-bold ${PRIORIDADE_BADGE[demanda.prioridade]}`}
       >
         ⏱ {urg.label}
       </div>
 
       <div className="p-4">
-        <h2 className="text-lg font-bold leading-tight">{demanda.titulo}</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg font-bold leading-tight">{demanda.titulo}</h2>
+          <PrioridadeTag prioridade={demanda.prioridade} />
+        </div>
         <p className="mt-1 text-sm text-slate-500">
           {demanda.local?.nome ? `📍 ${demanda.local.nome} · ` : ""}
           {demanda.solicitante?.nome}
@@ -247,24 +555,39 @@ function CardColab({
           {demanda.status === "em_andamento" && passo === "foto" && (
             <div className="grid gap-3">
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-base font-medium text-slate-600">
-                {foto ? `📸 ${foto.name}` : "📷 Tirar foto do serviço concluído"}
+                {foto ? `📸 ${foto.name}` : "📷 Tirar foto do serviço concluído *"}
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    setFoto(e.target.files?.[0] ?? null);
+                    setErro(null);
+                  }}
                 />
               </label>
+              <div className="grid gap-1.5">
+                <label className="text-sm font-medium text-slate-700">
+                  O que foi feito? <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={descricaoConclusao}
+                  onChange={(e) => {
+                    setDescricaoConclusao(e.target.value);
+                    setErro(null);
+                  }}
+                  rows={3}
+                  placeholder="Descreva o serviço realizado…"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+                  maxLength={500}
+                />
+              </div>
               <BotaoGrande cor="verde" onClick={concluir} disabled={ocupado}>
                 {ocupado ? "Concluindo…" : "Confirmar conclusão"}
               </BotaoGrande>
               <button
-                onClick={() => {
-                  setPasso("inicio");
-                  setFoto(null);
-                  setErro(null);
-                }}
+                onClick={voltar}
                 className="text-center text-sm text-slate-400"
               >
                 Voltar

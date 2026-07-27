@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPerfil } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Topbar } from "@/components/Topbar";
 import { COLAB_SELECT } from "@/lib/demanda-select";
 import { ColaboradorPainel } from "./ColaboradorPainel";
 
@@ -20,13 +19,9 @@ export default async function ColaboradorHome() {
     .order("prazo_confirmado", { ascending: true, nullsFirst: false });
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <Topbar perfil={perfil} />
-      <ColaboradorPainel
-        demandasIniciais={demandas ?? []}
-        colaboradorId={perfil.id}
-        primeiroNome={perfil.nome.split(" ")[0]}
-      />
-    </div>
+    <ColaboradorPainel
+      demandasIniciais={demandas ?? []}
+      perfil={perfil}
+    />
   );
 }

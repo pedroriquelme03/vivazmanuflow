@@ -12,7 +12,7 @@ type Prioridade = Enums<"demanda_prioridade">;
 
 const PRIORIDADES: { valor: Prioridade; rotulo: string; cor: string }[] = [
   { valor: "alta", rotulo: "Alta", cor: "bg-red-500" },
-  { valor: "media", rotulo: "Média", cor: "bg-amber-500" },
+  { valor: "media", rotulo: "Média", cor: "bg-orange-500" },
   { valor: "baixa", rotulo: "Baixa", cor: "bg-emerald-500" },
 ];
 
@@ -114,21 +114,62 @@ export function FormAbrir({
 
   return (
     <form onSubmit={enviar} className="grid gap-4">
-      {propriedades.length > 1 && (
-        <Campo label="Propriedade">
-          <select
-            value={propriedadeId}
-            onChange={(e) => trocarPropriedade(e.target.value)}
-            className={inputCls}
-          >
-            {propriedades.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
-        </Campo>
-      )}
+      <Campo label="Prioridade">
+        <div className="grid grid-cols-3 gap-2">
+          {PRIORIDADES.map((p) => (
+            <button
+              key={p.valor}
+              type="button"
+              onClick={() => setPrioridade(p.valor)}
+              className={`rounded-lg border px-3 py-2.5 text-sm font-semibold uppercase tracking-wide transition ${
+                prioridade === p.valor
+                  ? "border-transparent text-white " + p.cor
+                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {p.rotulo}
+            </button>
+          ))}
+        </div>
+      </Campo>
+
+      <Campo label="Local principal">
+        <select
+          value={propriedadeId}
+          onChange={(e) => trocarPropriedade(e.target.value)}
+          className={inputCls}
+          required
+        >
+          {propriedades.length === 0 && (
+            <option value="">Nenhum local cadastrado</option>
+          )}
+          {propriedades.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nome}
+            </option>
+          ))}
+        </select>
+      </Campo>
+
+      <Campo label="Sublocal">
+        <select
+          value={localId}
+          onChange={(e) => setLocalId(e.target.value)}
+          className={inputCls}
+          disabled={!propriedadeId || locaisFiltrados.length === 0}
+        >
+          <option value="">
+            {locaisFiltrados.length === 0
+              ? "Nenhum sublocal cadastrado"
+              : "Selecione o sublocal…"}
+          </option>
+          {locaisFiltrados.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.nome}
+            </option>
+          ))}
+        </select>
+      </Campo>
 
       <Campo label="Quem está solicitando?">
         <select
@@ -141,21 +182,6 @@ export function FormAbrir({
           {solicitantesFiltrados.map((s) => (
             <option key={s.id} value={s.id}>
               {s.nome}
-            </option>
-          ))}
-        </select>
-      </Campo>
-
-      <Campo label="Local" opcional>
-        <select
-          value={localId}
-          onChange={(e) => setLocalId(e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Não sei / não se aplica</option>
-          {locaisFiltrados.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.nome}
             </option>
           ))}
         </select>
@@ -180,25 +206,6 @@ export function FormAbrir({
           placeholder="Qualquer informação que ajude a equipe."
           className={inputCls}
         />
-      </Campo>
-
-      <Campo label="Prioridade">
-        <div className="grid grid-cols-3 gap-2">
-          {PRIORIDADES.map((p) => (
-            <button
-              key={p.valor}
-              type="button"
-              onClick={() => setPrioridade(p.valor)}
-              className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
-                prioridade === p.valor
-                  ? "border-transparent text-white " + p.cor
-                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {p.rotulo}
-            </button>
-          ))}
-        </div>
       </Campo>
 
       <Campo label="Foto ou vídeo" opcional>

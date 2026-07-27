@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPerfil } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Topbar } from "@/components/Topbar";
+import { PainelShell } from "@/components/AdminSidebar";
 import { DEMANDA_SELECT } from "@/lib/demanda-select";
 import { KanbanLider } from "./KanbanLider";
 
@@ -35,26 +34,12 @@ export default async function LiderHome() {
   for (const s of sla ?? []) slaHoras[s.prioridade] = s.horas_padrao;
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <Topbar perfil={perfil} />
-      <div className="border-b border-slate-200 bg-white px-4">
-        <nav className="mx-auto flex max-w-5xl gap-1 text-sm">
-          <span className="border-b-2 border-brand-600 px-3 py-2.5 font-semibold text-brand-700">
-            Quadro
-          </span>
-          <Link
-            href="/lider/metricas"
-            className="px-3 py-2.5 font-medium text-slate-500 hover:text-brand-700"
-          >
-            Métricas
-          </Link>
-        </nav>
-      </div>
+    <PainelShell perfil={perfil}>
       <KanbanLider
         demandasIniciais={demandas ?? []}
         colaboradores={colaboradores ?? []}
         slaHoras={slaHoras}
       />
-    </div>
+    </PainelShell>
   );
 }

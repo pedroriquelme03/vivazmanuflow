@@ -30,8 +30,15 @@ export const PRIORIDADE_LABEL: Record<Prioridade, string> = {
 
 export const PRIORIDADE_DOT: Record<Prioridade, string> = {
   alta: "bg-red-500",
-  media: "bg-amber-500",
+  media: "bg-orange-500",
   baixa: "bg-emerald-500",
+};
+
+/** Badge colorido da prioridade (alta vermelha, média laranja, baixa verde). */
+export const PRIORIDADE_BADGE: Record<Prioridade, string> = {
+  alta: "bg-red-100 text-red-700 ring-1 ring-inset ring-red-600/20",
+  media: "bg-orange-100 text-orange-700 ring-1 ring-inset ring-orange-600/20",
+  baixa: "bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
 };
 
 const FMT = new Intl.DateTimeFormat("pt-BR", {

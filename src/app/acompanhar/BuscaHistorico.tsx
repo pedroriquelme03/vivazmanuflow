@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STATUS_LABEL, STATUS_BADGE, formatarData } from "@/lib/demanda-ui";
+import { PrioridadeTag } from "@/components/PrioridadeTag";
 import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
@@ -55,23 +56,21 @@ export function BuscaHistorico({
 
   return (
     <div className="grid gap-4">
-      {propriedades.length > 1 && (
-        <select
-          value={propriedadeId}
-          onChange={(e) => {
-            setPropriedadeId(e.target.value);
-            setSolicitanteId("");
-            setPedidos(null);
-          }}
-          className={inputCls}
-        >
-          {propriedades.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
-      )}
+      <select
+        value={propriedadeId}
+        onChange={(e) => {
+          setPropriedadeId(e.target.value);
+          setSolicitanteId("");
+          setPedidos(null);
+        }}
+        className={inputCls}
+      >
+        {propriedades.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.nome}
+          </option>
+        ))}
+      </select>
 
       <select
         value={solicitanteId}
@@ -106,11 +105,14 @@ export function BuscaHistorico({
               >
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-medium text-slate-800">{p.titulo}</p>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[p.status]}`}
-                  >
-                    {STATUS_LABEL[p.status]}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <PrioridadeTag prioridade={p.prioridade} />
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[p.status]}`}
+                    >
+                      {STATUS_LABEL[p.status]}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-1 text-xs text-slate-400">
                   {p.local ? `${p.local} · ` : ""}Aberta em{" "}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getPerfil } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Topbar } from "@/components/Topbar";
+import { PainelShell } from "@/components/AdminSidebar";
 import { AdminApp } from "./AdminApp";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin");
-  if (perfil.role !== "admin") redirect(perfil.role === "colaborador" ? "/colaborador" : "/lider");
+  if (perfil.role !== "admin")
+    redirect(perfil.role === "colaborador" ? "/colaborador" : "/lider");
 
   const supabase = await createClient();
   const [
@@ -27,8 +28,7 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <Topbar perfil={perfil} />
+    <PainelShell perfil={perfil}>
       <AdminApp
         propriedades={propriedades ?? []}
         setores={setores ?? []}
@@ -36,6 +36,6 @@ export default async function AdminPage() {
         solicitantes={solicitantes ?? []}
         usuarios={usuarios ?? []}
       />
-    </div>
+    </PainelShell>
   );
 }
