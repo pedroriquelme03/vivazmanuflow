@@ -24,7 +24,11 @@ const NAV: NavItem[] = [
     href: "/admin",
     rotulo: "Cadastros",
     soAdmin: true,
-    match: (p) => p.startsWith("/admin"),
+    match: (p) =>
+      p === "/admin" ||
+      (p.startsWith("/admin/") &&
+        !p.startsWith("/admin/eventos") &&
+        !p.startsWith("/admin/areas")),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h10" />
@@ -33,11 +37,38 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/admin/eventos",
+    rotulo: "Eventos",
+    soAdmin: true,
+    match: (p) => p.startsWith("/admin/eventos"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path strokeLinecap="round" d="M8 3v4M16 3v4M3 11h18" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/areas",
+    rotulo: "Áreas",
+    soAdmin: true,
+    match: (p) => p.startsWith("/admin/areas"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-6h6v6"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/lider",
     rotulo: "Quadro",
-            match: (p) =>
-              p === "/lider" ||
-              (p.startsWith("/lider/") && !p.startsWith("/lider/metricas")),
+    match: (p) =>
+      p === "/lider" ||
+      (p.startsWith("/lider/") && !p.startsWith("/lider/metricas")),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
         <rect x="3" y="4" width="7" height="16" rx="1.5" />

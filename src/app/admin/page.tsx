@@ -19,12 +19,16 @@ export default async function AdminPage() {
     { data: locais },
     { data: solicitantes },
     { data: usuarios },
+    predefRes,
+    pesoRes,
   ] = await Promise.all([
     supabase.from("propriedades").select("*").order("nome"),
     supabase.from("setores").select("*").order("nome"),
     supabase.from("locais").select("*").order("nome"),
     supabase.from("solicitantes").select("*").order("nome"),
     supabase.from("usuarios").select("*").order("nome"),
+    supabase.from("demandas_predefinidas").select("*").order("titulo"),
+    supabase.from("peso_config").select("*").eq("id", 1).maybeSingle(),
   ]);
 
   return (
@@ -35,6 +39,8 @@ export default async function AdminPage() {
         locais={locais ?? []}
         solicitantes={solicitantes ?? []}
         usuarios={usuarios ?? []}
+        predefinidas={predefRes.data ?? []}
+        pesoConfig={pesoRes.data ?? null}
       />
     </PainelShell>
   );

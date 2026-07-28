@@ -15,9 +15,9 @@ export default async function LiderHome() {
   const supabase = await createClient();
   const [{ data: demandas }, { data: colaboradores }, { data: sla }] =
     await Promise.all([
-      supabase.from("demandas").select(DEMANDA_SELECT).order("criado_em", {
+      supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
         ascending: false,
-      }),
+      }).order("criado_em", { ascending: true }),
       supabase
         .from("usuarios")
         .select("id, nome, propriedade_id")

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { DEMANDA_SELECT, type DemandaKanban } from "@/lib/demanda-select";
+import { DEMANDA_SELECT, type DemandaKanban, ordenarFilaPorPeso } from "@/lib/demanda-select";
 import {
   PRAZO_COR,
   calcularUrgencia,
@@ -19,6 +19,7 @@ const COLUNAS: { status: Status; titulo: string }[] = [
   { status: "aberta", titulo: "Abertas" },
   { status: "atribuida", titulo: "Atribuídas" },
   { status: "em_andamento", titulo: "Em andamento" },
+  { status: "aguardando_validacao", titulo: "Validação" },
   { status: "concluida", titulo: "Concluídas" },
 ];
 
@@ -40,7 +41,8 @@ export function KanbanLider({
     const { data } = await supabase
       .from("demandas")
       .select(DEMANDA_SELECT)
-      .order("criado_em", { ascending: false });
+      .order("peso", { ascending: false })
+      .order("criado_em", { ascending: true });
     if (data) setDemandas(data as unknown as DemandaKanban[]);
   }, [supabase]);
 
@@ -65,8 +67,9 @@ export function KanbanLider({
     return () => clearInterval(t);
   }, []);
 
-  const porStatus = (s: Status) => demandas.filter((d) => d.status === s);
-  const canceladas = porStatus("cancelada").length;
+  const porStatus = (s: Status) =>
+    ordenarFilaPorPeso(demandas.filter((d) => d.status === s));
+  const canceladas = demandas.filter((d) => d.status === "cancelada").length;
 
   return (
     <main className="flex-1 overflow-x-auto p-4">
@@ -150,14 +153,44 @@ function Card({
       ? null
       : calcularUrgencia(demanda.prazo_confirmado, demanda.atribuido_em, agora);
 
+  const pesoMax =
+    demanda.afeta_experiencia || (demanda.peso ?? 0) >= 10;
+
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <article
+      className={`rounded-lg border bg-white p-3 shadow-sm ${
+        pesoMax ? "card-peso-max" : "border-slate-200"
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold leading-tight text-slate-800">
           {demanda.titulo}
         </p>
-        <PrioridadeTag prioridade={demanda.prioridade} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <PrioridadeTag prioridade={demanda.prioridade} />
+          <span
+            className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              pesoMax
+                ? "bg-red-100 text-red-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            Peso {demanda.peso ?? "—"}
+          </span>
+        </div>
       </div>
+
+      {pesoMax && (
+        <p className="mt-1 text-[11px] font-semibold text-red-600">
+          Afeta experiência do hóspede
+        </p>
+      )}
+
+      {demanda.evento?.nome && (
+        <p className="mt-1 text-[11px] font-semibold text-violet-700">
+          🎉 Evento: {demanda.evento.nome}
+        </p>
+      )}
 
       <p className="mt-1 text-xs text-slate-500">
         {demanda.propriedade?.nome ? `${demanda.propriedade.nome}` : ""}

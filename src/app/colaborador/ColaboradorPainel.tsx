@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
-import { COLAB_SELECT, type DemandaColab } from "@/lib/demanda-select";
+import { COLAB_SELECT, GERAIS_SELECT, type DemandaColab, type DemandaGeral, ordenarFilaPorPeso } from "@/lib/demanda-select";
 import type { TablesUpdate, Enums } from "@/lib/database.types";
 import {
   calcularUrgencia,
@@ -14,25 +14,33 @@ import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 
-type Aba = "demandas" | "historico" | "perfil";
+type Aba = "demandas" | "gerais" | "historico" | "perfil";
 
 const ABAS: { id: Aba; rotulo: string; icone: string }[] = [
-  { id: "demandas", rotulo: "Demandas", icone: "🛠️" },
+  { id: "demandas", rotulo: "Minhas", icone: "🛠️" },
+  { id: "gerais", rotulo: "Gerais", icone: "📥" },
   { id: "historico", rotulo: "Histórico", icone: "📋" },
   { id: "perfil", rotulo: "Perfil", icone: "👤" },
 ];
 
 export function ColaboradorPainel({
   demandasIniciais,
+  geraisIniciais,
   perfil,
 }: {
   demandasIniciais: DemandaColab[];
+  geraisIniciais: DemandaGeral[];
   perfil: Perfil;
 }) {
   const colaboradorId = perfil.id;
   const primeiroNome = perfil.nome.split(" ")[0];
   const supabase = useMemo(() => createClient(), []);
-  const [demandas, setDemandas] = useState<DemandaColab[]>(demandasIniciais);
+  const [demandas, setDemandas] = useState<DemandaColab[]>(() =>
+    ordenarFilaPorPeso(demandasIniciais),
+  );
+  const [gerais, setGerais] = useState<DemandaGeral[]>(() =>
+    ordenarFilaPorPeso(geraisIniciais),
+  );
   const [agora, setAgora] = useState(() => Date.now());
   const [aba, setAba] = useState<Aba>("demandas");
 
@@ -42,9 +50,31 @@ export function ColaboradorPainel({
       .select(COLAB_SELECT)
       .eq("colaborador_id", colaboradorId)
       .in("status", ["atribuida", "em_andamento"])
-      .order("prazo_confirmado", { ascending: true, nullsFirst: false });
-    if (data) setDemandas(data as unknown as DemandaColab[]);
+      .order("peso", { ascending: false })
+      .order("criado_em", { ascending: true });
+    if (data) {
+      setDemandas(ordenarFilaPorPeso(data as unknown as DemandaColab[]));
+    }
   }, [supabase, colaboradorId]);
+
+  const recarregarGerais = useCallback(async () => {
+    let q = supabase
+      .from("demandas")
+      .select(GERAIS_SELECT)
+      .eq("status", "aberta")
+      .is("colaborador_id", null)
+      .order("peso", { ascending: false })
+      .order("criado_em", { ascending: true });
+
+    if (perfil.propriedade_id) {
+      q = q.eq("propriedade_id", perfil.propriedade_id);
+    }
+
+    const { data } = await q;
+    if (data) {
+      setGerais(ordenarFilaPorPeso(data as unknown as DemandaGeral[]));
+    }
+  }, [supabase, perfil.propriedade_id]);
 
   useEffect(() => {
     const canal = supabase
@@ -55,15 +85,17 @@ export function ColaboradorPainel({
           event: "*",
           schema: "public",
           table: "demandas",
-          filter: `colaborador_id=eq.${colaboradorId}`,
         },
-        () => recarregar(),
+        () => {
+          recarregar();
+          recarregarGerais();
+        },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [supabase, colaboradorId, recarregar]);
+  }, [supabase, recarregar, recarregarGerais]);
 
   useEffect(() => {
     const t = setInterval(() => setAgora(Date.now()), 30000);
@@ -82,6 +114,17 @@ export function ColaboradorPainel({
             onMudou={recarregar}
           />
         )}
+        {aba === "gerais" && (
+          <DemandasGerais
+            itens={gerais}
+            onPegou={() => {
+              recarregarGerais();
+              recarregar();
+              setAba("demandas");
+            }}
+            onAtualizar={recarregarGerais}
+          />
+        )}
         {aba === "historico" && (
           <HistoricoColab colaboradorId={colaboradorId} />
         )}
@@ -95,7 +138,9 @@ export function ColaboradorPainel({
             const badge =
               a.id === "demandas" && demandas.length > 0
                 ? demandas.length
-                : null;
+                : a.id === "gerais" && gerais.length > 0
+                  ? gerais.length
+                  : null;
             return (
               <button
                 key={a.id}
@@ -162,6 +207,112 @@ function ListaDemandas({
               onMudou={onMudou}
             />
           ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function DemandasGerais({
+  itens,
+  onPegou,
+  onAtualizar,
+}: {
+  itens: DemandaGeral[];
+  onPegou: () => void;
+  onAtualizar: () => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [pegandoId, setPegandoId] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function pegar(id: string) {
+    setErro(null);
+    setPegandoId(id);
+    const { error } = await supabase.rpc("pegar_demanda", {
+      p_demanda_id: id,
+    });
+    setPegandoId(null);
+    if (error) {
+      setErro(
+        error.message.includes("já foi atribuída")
+          ? "Outro colaborador pegou esta demanda primeiro."
+          : error.message,
+      );
+      onAtualizar();
+      return;
+    }
+    onPegou();
+  }
+
+  return (
+    <>
+      <h1 className="text-xl font-bold">Demandas Gerais</h1>
+      <p className="mt-0.5 text-sm text-slate-500">
+        Demandas ainda sem responsável. Qualquer colaborador pode pegar.
+      </p>
+
+      {erro && (
+        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {erro}
+        </p>
+      )}
+
+      {itens.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
+          Nenhuma demanda disponível no momento.
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-4">
+          {itens.map((d) => {
+            const pesoMax = d.afeta_experiencia || (d.peso ?? 0) >= 10;
+            return (
+              <article
+                key={d.id}
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                  pesoMax ? "card-peso-max" : "border-slate-200"
+                }`}
+              >
+                <div
+                  className={`px-4 py-2 text-center text-sm font-bold ${PRIORIDADE_BADGE[d.prioridade]}`}
+                >
+                  {pesoMax
+                    ? "Experiência do hóspede"
+                    : `Peso ${d.peso ?? "—"}`}
+                  {" · "}
+                  Aberta {formatarData(d.criado_em)}
+                </div>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className="text-lg font-bold leading-tight">
+                      {d.titulo}
+                    </h2>
+                    <PrioridadeTag prioridade={d.prioridade} />
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {d.local?.nome ? `📍 ${d.local.nome} · ` : ""}
+                    {d.solicitante?.nome}
+                  </p>
+                  {d.evento?.nome && (
+                    <p className="mt-1 text-xs font-semibold text-violet-700">
+                      🎉 Evento: {d.evento.nome}
+                    </p>
+                  )}
+                  {d.descricao && (
+                    <p className="mt-2 text-sm text-slate-600">{d.descricao}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => pegar(d.id)}
+                    disabled={pegandoId === d.id}
+                    className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                  >
+                    {pegandoId === d.id ? "Pegando…" : "Pegar esta demanda"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </>
@@ -438,8 +589,8 @@ function CardColab({
       if (anxErro) throw new Error();
 
       const updates: TablesUpdate<"demandas"> = {
-        status: "concluida",
-        concluido_em: new Date().toISOString(),
+        status: "aguardando_validacao",
+        concluido_em: null,
       };
       const { error: updErro } = await supabase
         .from("demandas")
@@ -447,11 +598,10 @@ function CardColab({
         .eq("id", demanda.id);
       if (updErro) throw new Error();
 
-      // Registra a descrição da conclusão no histórico (melhor esforço).
       await supabase.from("demanda_historico").insert({
         demanda_id: demanda.id,
         status_anterior: "em_andamento",
-        status_novo: "concluida",
+        status_novo: "aguardando_validacao",
         observacao: descricaoConclusao.trim(),
         usuario_id: colaboradorId,
       });
@@ -485,13 +635,21 @@ function CardColab({
     setErro(null);
   }
 
+  const pesoMax =
+    demanda.afeta_experiencia || (demanda.peso ?? 0) >= 10;
+
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <article
+      className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+        pesoMax ? "card-peso-max" : "border-slate-200"
+      }`}
+    >
       {/* Prazo — cor pela prioridade (alta vermelha, média laranja, baixa verde) */}
       <div
         className={`px-4 py-2 text-center text-sm font-bold ${PRIORIDADE_BADGE[demanda.prioridade]}`}
       >
         ⏱ {urg.label}
+        {pesoMax ? " · Experiência do hóspede" : ` · Peso ${demanda.peso ?? "—"}`}
       </div>
 
       <div className="p-4">
@@ -503,6 +661,11 @@ function CardColab({
           {demanda.local?.nome ? `📍 ${demanda.local.nome} · ` : ""}
           {demanda.solicitante?.nome}
         </p>
+        {demanda.evento?.nome && (
+          <p className="mt-1 text-xs font-semibold text-violet-700">
+            🎉 Evento: {demanda.evento.nome}
+          </p>
+        )}
         {demanda.descricao && (
           <p className="mt-2 text-sm text-slate-600">{demanda.descricao}</p>
         )}
@@ -584,7 +747,7 @@ function CardColab({
                 />
               </div>
               <BotaoGrande cor="verde" onClick={concluir} disabled={ocupado}>
-                {ocupado ? "Concluindo…" : "Confirmar conclusão"}
+                {ocupado ? "Enviando…" : "Enviar para validação"}
               </BotaoGrande>
               <button
                 onClick={voltar}

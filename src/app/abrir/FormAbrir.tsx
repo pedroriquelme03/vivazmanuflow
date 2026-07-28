@@ -8,6 +8,20 @@ import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
 type OpcaoProp = { id: string; nome: string; propriedade_id: string };
+type Predefinida = {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  prioridade: Enums<"demanda_prioridade">;
+  propriedade_id: string | null;
+};
+type EventoOpcao = {
+  id: string;
+  nome: string;
+  propriedade_id: string | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+};
 type Prioridade = Enums<"demanda_prioridade">;
 
 const PRIORIDADES: { valor: Prioridade; rotulo: string; cor: string }[] = [
@@ -20,10 +34,14 @@ export function FormAbrir({
   propriedades,
   solicitantes,
   locais,
+  predefinidas,
+  eventos,
 }: {
   propriedades: Opcao[];
   solicitantes: OpcaoProp[];
   locais: OpcaoProp[];
+  predefinidas: Predefinida[];
+  eventos: EventoOpcao[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -31,9 +49,12 @@ export function FormAbrir({
   const [propriedadeId, setPropriedadeId] = useState(propriedades[0]?.id ?? "");
   const [solicitanteId, setSolicitanteId] = useState("");
   const [localId, setLocalId] = useState("");
+  const [predefinidaId, setPredefinidaId] = useState("");
+  const [eventoId, setEventoId] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [prioridade, setPrioridade] = useState<Prioridade>("media");
+  const [afetaExperiencia, setAfetaExperiencia] = useState(false);
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -46,11 +67,47 @@ export function FormAbrir({
     () => locais.filter((l) => l.propriedade_id === propriedadeId),
     [locais, propriedadeId],
   );
+  const predefinidasFiltradas = useMemo(
+    () =>
+      predefinidas.filter(
+        (p) => p.propriedade_id === null || p.propriedade_id === propriedadeId,
+      ),
+    [predefinidas, propriedadeId],
+  );
+  const eventosFiltrados = useMemo(
+    () =>
+      eventos.filter(
+        (e) => e.propriedade_id === null || e.propriedade_id === propriedadeId,
+      ),
+    [eventos, propriedadeId],
+  );
+
+  const usandoPredefinida = Boolean(predefinidaId);
 
   function trocarPropriedade(id: string) {
     setPropriedadeId(id);
     setSolicitanteId("");
     setLocalId("");
+    setPredefinidaId("");
+    setEventoId("");
+    setTitulo("");
+    setDescricao("");
+    setPrioridade("media");
+  }
+
+  function trocarPredefinida(id: string) {
+    setPredefinidaId(id);
+    if (!id) {
+      setTitulo("");
+      setDescricao("");
+      setPrioridade("media");
+      return;
+    }
+    const pred = predefinidas.find((p) => p.id === id);
+    if (!pred) return;
+    setTitulo(pred.titulo);
+    setDescricao(pred.descricao ?? "");
+    setPrioridade(pred.prioridade);
   }
 
   function adicionarArquivos(lista: FileList | null) {
@@ -67,11 +124,11 @@ export function FormAbrir({
     setErro(null);
 
     if (!solicitanteId) return setErro("Selecione quem está solicitando.");
-    if (!titulo.trim()) return setErro("Descreva em poucas palavras o que precisa.");
+    if (!titulo.trim())
+      return setErro("Selecione uma demanda ou descreva o que precisa.");
 
     setEnviando(true);
     try {
-      // 1) upload dos anexos (com compressão de imagem)
       const anexos: { url: string; tipo: "foto" | "video" }[] = [];
       for (const original of arquivos) {
         const arquivo = await comprimirImagem(original);
@@ -88,10 +145,9 @@ export function FormAbrir({
         anexos.push({ url: pub.publicUrl, tipo: ehVideo ? "video" : "foto" });
       }
 
-      // 2) cria a demanda via RPC pública
       const { data, error } = await supabase.rpc("abrir_demanda", {
         p_solicitante_id: solicitanteId,
-        p_titulo: titulo,
+        p_titulo: titulo.trim(),
         p_descricao: descricao || undefined,
         p_local_id: localId || undefined,
         p_prioridade: prioridade,
@@ -101,6 +157,26 @@ export function FormAbrir({
 
       const token = data?.[0]?.token;
       if (!token) throw new Error("Não foi possível gerar o acompanhamento.");
+
+      if (afetaExperiencia) {
+        const { error: pesoErro } = await supabase.rpc(
+          "aplicar_experiencia_hospede",
+          { p_token: token, p_afeta: true },
+        );
+        if (pesoErro) {
+          console.warn("Falha ao aplicar peso de experiência:", pesoErro.message);
+        }
+      }
+
+      if (eventoId) {
+        const { error: evErro } = await supabase.rpc("vincular_evento_demanda", {
+          p_token: token,
+          p_evento_id: eventoId,
+        });
+        if (evErro) {
+          console.warn("Falha ao vincular evento:", evErro.message);
+        }
+      }
 
       router.push(`/acompanhar/${token}?nova=1`);
     } catch (err) {
@@ -120,12 +196,13 @@ export function FormAbrir({
             <button
               key={p.valor}
               type="button"
-              onClick={() => setPrioridade(p.valor)}
+              onClick={() => !usandoPredefinida && setPrioridade(p.valor)}
+              disabled={usandoPredefinida}
               className={`rounded-lg border px-3 py-2.5 text-sm font-semibold uppercase tracking-wide transition ${
                 prioridade === p.valor
                   ? "border-transparent text-white " + p.cor
                   : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-80`}
             >
               {p.rotulo}
             </button>
@@ -187,6 +264,90 @@ export function FormAbrir({
         </select>
       </Campo>
 
+      <Campo label="É demanda de evento?" opcional>
+        <select
+          value={eventoId}
+          onChange={(e) => setEventoId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Não — manutenção de rotina</option>
+          {eventosFiltrados.map((ev) => (
+            <option key={ev.id} value={ev.id}>
+              {ev.nome}
+              {ev.data_inicio ? ` (${ev.data_inicio})` : ""}
+            </option>
+          ))}
+        </select>
+        {eventoId && (
+          <p className="mt-1 text-xs text-brand-700">
+            Esta demanda entra na fila normal e fica marcada para métricas de
+            evento.
+          </p>
+        )}
+        {eventosFiltrados.length === 0 && (
+          <p className="mt-1 text-xs text-slate-400">
+            Nenhum evento ativo cadastrado para este local.
+          </p>
+        )}
+      </Campo>
+
+      <Campo label="Tipo de demanda">
+        <select
+          value={predefinidaId}
+          onChange={(e) => trocarPredefinida(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Outra / personalizada…</option>
+          {predefinidasFiltradas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.titulo}
+            </option>
+          ))}
+        </select>
+        {usandoPredefinida ? (
+          <p className="mt-1 text-xs text-brand-700">
+            Esta demanda será atribuída automaticamente ao responsável cadastrado.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-slate-500">
+            Demanda personalizada: fica disponível em Demandas Gerais para um
+            colaborador pegar.
+          </p>
+        )}
+      </Campo>
+
+      <Campo label="Afeta a experiência do hóspede?">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setAfetaExperiencia(true)}
+            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+              afetaExperiencia
+                ? "border-red-500 bg-red-500 text-white"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Sim
+          </button>
+          <button
+            type="button"
+            onClick={() => setAfetaExperiencia(false)}
+            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+              !afetaExperiencia
+                ? "border-slate-600 bg-slate-700 text-white"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Não
+          </button>
+        </div>
+        {afetaExperiencia && (
+          <p className="mt-1.5 text-xs font-medium text-red-600">
+            Peso 10 — vai para o topo da fila com destaque urgente.
+          </p>
+        )}
+      </Campo>
+
       <Campo label="O que precisa ser feito?">
         <input
           value={titulo}
@@ -195,6 +356,7 @@ export function FormAbrir({
           className={inputCls}
           maxLength={120}
           required
+          readOnly={usandoPredefinida}
         />
       </Campo>
 

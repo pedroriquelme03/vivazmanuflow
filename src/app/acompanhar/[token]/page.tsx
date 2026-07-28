@@ -8,6 +8,7 @@ import {
   formatarData,
 } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { ValidacaoSolicitante } from "./ValidacaoSolicitante";
 import type { Enums } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,10 @@ export default async function AcompanharToken({
             <Info titulo="Prazo" valor={formatarData(d.prazo)} />
           </dl>
         </div>
+
+        {d.status === "aguardando_validacao" && (
+          <ValidacaoSolicitante token={token} />
+        )}
 
         {d.anexos.length > 0 && (
           <div className="mt-4">

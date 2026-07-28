@@ -7,7 +7,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   aberta: "Aberta",
   atribuida: "Atribuída",
   em_andamento: "Em andamento",
-  aguardando_validacao: "Aguardando validação",
+  aguardando_validacao: "Aguardando sua confirmação",
   concluida: "Concluída",
   cancelada: "Cancelada",
 };
