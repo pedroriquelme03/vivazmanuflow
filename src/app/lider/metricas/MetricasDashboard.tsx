@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Enums } from "@/lib/database.types";
+import type { Database, Enums } from "@/lib/database.types";
+
+type MetricasArgs = Database["public"]["Functions"]["metricas"]["Args"];
 
 type Metricas = {
   total_criadas: number;
@@ -138,7 +140,7 @@ export function MetricasDashboard({
     const fim = new Date();
     const inicio = new Date(fim.getTime() - filtros.dias * 86400_000);
 
-    const args: Record<string, unknown> = {
+    const args: MetricasArgs = {
       p_inicio: inicio.toISOString(),
       p_fim: fim.toISOString(),
     };
