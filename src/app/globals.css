@@ -35,3 +35,33 @@ body {
   border-color: rgb(239 68 68);
   animation: card-peso-pisca 1.1s ease-in-out infinite;
 }
+
+@keyframes nav-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.nav-progress {
+  width: 35%;
+  animation: nav-progress 1.05s ease-in-out infinite;
+}
+
+@keyframes page-loading-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.94);
+    opacity: 0.82;
+  }
+}
+
+.page-loading-mark {
+  animation: page-loading-pulse 1.15s ease-in-out infinite;
+}

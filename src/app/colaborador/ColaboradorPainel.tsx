@@ -50,6 +50,7 @@ export function ColaboradorPainel({
       .select(COLAB_SELECT)
       .eq("colaborador_id", colaboradorId)
       .in("status", ["atribuida", "em_andamento"])
+      .eq("arquivado", false)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });
     if (data) {
@@ -62,6 +63,7 @@ export function ColaboradorPainel({
       .from("demandas")
       .select(GERAIS_SELECT)
       .eq("status", "aberta")
+      .eq("arquivado", false)
       .is("colaborador_id", null)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });

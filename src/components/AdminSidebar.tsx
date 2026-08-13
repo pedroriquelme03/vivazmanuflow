@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
+import { BrandMark } from "@/components/BrandMark";
 
 const ROLE_BADGE: Record<Perfil["role"], string> = {
   admin: "ADMIN",
@@ -95,12 +96,10 @@ export function AdminSidebar({ perfil }: { perfil: Perfil }) {
   return (
     <aside className="flex w-64 shrink-0 flex-col bg-[#063b45] text-white">
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-sm font-bold shadow-inner">
-          V
-        </div>
+        <BrandMark className="h-10 w-10 rounded-xl bg-brand-500 shadow-inner" />
         <div className="leading-tight">
           <p className="text-sm font-bold tracking-wide">VIVAZ CATARATAS</p>
-          <p className="text-xs text-white/55">ManuFlow · Manutenção</p>
+          <p className="text-xs text-white/55">Manutenção</p>
         </div>
       </div>
 
@@ -197,7 +196,7 @@ function MobileBar({ perfil }: { perfil: Perfil }) {
     <div className="border-b border-slate-200 bg-[#063b45] text-white md:hidden">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="leading-tight">
-          <p className="text-sm font-bold">VivazManuFlow</p>
+          <p className="text-sm font-bold">Manutenção Vivaz</p>
           <p className="text-xs text-white/55">{perfil.nome}</p>
         </div>
         <form action={logout}>

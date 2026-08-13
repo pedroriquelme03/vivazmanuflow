@@ -1,4 +1,4 @@
--- Validação pelo solicitante: confirmar ou contestar finalização do colaborador.
+-- token_acompanhamento é uuid; as RPCs recebiam text → "operator does not exist: uuid = text".
 
 CREATE OR REPLACE FUNCTION public.confirmar_finalizacao(p_token text)
 RETURNS void
@@ -76,14 +76,12 @@ BEGIN
 
   v_obs := 'Contestação do solicitante: ' || trim(p_descricao);
 
-  -- Volta para a fila do mesmo colaborador, mantendo o peso
   UPDATE public.demandas
   SET
     status = 'atribuida',
     concluido_em = NULL,
     iniciado_em = NULL,
     motivo_nao_conclusao = NULL
-    -- colaborador_id e peso permanecem iguais
   WHERE id = v_dem.id;
 
   IF p_foto_url IS NOT NULL AND trim(p_foto_url) <> '' THEN

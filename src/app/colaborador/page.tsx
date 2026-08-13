@@ -17,6 +17,7 @@ export default async function ColaboradorHome() {
     .select(COLAB_SELECT)
     .eq("colaborador_id", perfil.id)
     .in("status", ["atribuida", "em_andamento"])
+    .eq("arquivado", false)
     .order("peso", { ascending: false })
     .order("criado_em", { ascending: true });
 
@@ -24,6 +25,7 @@ export default async function ColaboradorHome() {
     .from("demandas")
     .select(GERAIS_SELECT)
     .eq("status", "aberta")
+    .eq("arquivado", false)
     .is("colaborador_id", null)
     .order("peso", { ascending: false })
     .order("criado_em", { ascending: true });

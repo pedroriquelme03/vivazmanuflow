@@ -24,12 +24,6 @@ type EventoOpcao = {
 };
 type Prioridade = Enums<"demanda_prioridade">;
 
-const PRIORIDADES: { valor: Prioridade; rotulo: string; cor: string }[] = [
-  { valor: "alta", rotulo: "Alta", cor: "bg-red-500" },
-  { valor: "media", rotulo: "Média", cor: "bg-orange-500" },
-  { valor: "baixa", rotulo: "Baixa", cor: "bg-emerald-500" },
-];
-
 export function FormAbrir({
   propriedades,
   solicitantes,
@@ -53,7 +47,6 @@ export function FormAbrir({
   const [eventoId, setEventoId] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [prioridade, setPrioridade] = useState<Prioridade>("media");
   const [afetaExperiencia, setAfetaExperiencia] = useState(false);
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -92,7 +85,6 @@ export function FormAbrir({
     setEventoId("");
     setTitulo("");
     setDescricao("");
-    setPrioridade("media");
   }
 
   function trocarPredefinida(id: string) {
@@ -100,14 +92,12 @@ export function FormAbrir({
     if (!id) {
       setTitulo("");
       setDescricao("");
-      setPrioridade("media");
       return;
     }
     const pred = predefinidas.find((p) => p.id === id);
     if (!pred) return;
     setTitulo(pred.titulo);
     setDescricao(pred.descricao ?? "");
-    setPrioridade(pred.prioridade);
   }
 
   function adicionarArquivos(lista: FileList | null) {
@@ -150,7 +140,7 @@ export function FormAbrir({
         p_titulo: titulo.trim(),
         p_descricao: descricao || undefined,
         p_local_id: localId || undefined,
-        p_prioridade: prioridade,
+        p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
         p_anexos: anexos,
       });
       if (error) throw new Error(error.message);
@@ -190,24 +180,65 @@ export function FormAbrir({
 
   return (
     <form onSubmit={enviar} className="grid gap-4">
-      <Campo label="Prioridade">
-        <div className="grid grid-cols-3 gap-2">
-          {PRIORIDADES.map((p) => (
-            <button
-              key={p.valor}
-              type="button"
-              onClick={() => !usandoPredefinida && setPrioridade(p.valor)}
-              disabled={usandoPredefinida}
-              className={`rounded-lg border px-3 py-2.5 text-sm font-semibold uppercase tracking-wide transition ${
-                prioridade === p.valor
-                  ? "border-transparent text-white " + p.cor
-                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              } disabled:cursor-not-allowed disabled:opacity-80`}
-            >
-              {p.rotulo}
-            </button>
-          ))}
+      <Campo label="Afeta a experiência do hóspede?">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setAfetaExperiencia(true)}
+            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+              afetaExperiencia
+                ? "border-red-500 bg-red-500 text-white"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Sim
+          </button>
+          <button
+            type="button"
+            onClick={() => setAfetaExperiencia(false)}
+            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+              !afetaExperiencia
+                ? "border-slate-600 bg-slate-700 text-white"
+                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Não
+          </button>
         </div>
+        <p
+          className={`mt-1.5 text-xs font-medium ${
+            afetaExperiencia ? "text-red-600" : "text-slate-500"
+          }`}
+        >
+          {afetaExperiencia
+            ? "Prioridade alta e peso 10 — vai para o topo da fila."
+            : "Prioridade média — fila normal."}
+        </p>
+      </Campo>
+
+      <Campo label="Demanda Frequente">
+        <select
+          value={predefinidaId}
+          onChange={(e) => trocarPredefinida(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Outra / personalizada…</option>
+          {predefinidasFiltradas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.titulo}
+            </option>
+          ))}
+        </select>
+        {usandoPredefinida ? (
+          <p className="mt-1 text-xs text-brand-700">
+            Esta demanda será atribuída automaticamente ao responsável cadastrado.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-slate-500">
+            Demanda personalizada: fica disponível em Demandas Gerais para um
+            colaborador pegar.
+          </p>
+        )}
       </Campo>
 
       <Campo label="Local principal">
@@ -287,63 +318,6 @@ export function FormAbrir({
         {eventosFiltrados.length === 0 && (
           <p className="mt-1 text-xs text-slate-400">
             Nenhum evento ativo cadastrado para este local.
-          </p>
-        )}
-      </Campo>
-
-      <Campo label="Tipo de demanda">
-        <select
-          value={predefinidaId}
-          onChange={(e) => trocarPredefinida(e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Outra / personalizada…</option>
-          {predefinidasFiltradas.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.titulo}
-            </option>
-          ))}
-        </select>
-        {usandoPredefinida ? (
-          <p className="mt-1 text-xs text-brand-700">
-            Esta demanda será atribuída automaticamente ao responsável cadastrado.
-          </p>
-        ) : (
-          <p className="mt-1 text-xs text-slate-500">
-            Demanda personalizada: fica disponível em Demandas Gerais para um
-            colaborador pegar.
-          </p>
-        )}
-      </Campo>
-
-      <Campo label="Afeta a experiência do hóspede?">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setAfetaExperiencia(true)}
-            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
-              afetaExperiencia
-                ? "border-red-500 bg-red-500 text-white"
-                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            Sim
-          </button>
-          <button
-            type="button"
-            onClick={() => setAfetaExperiencia(false)}
-            className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
-              !afetaExperiencia
-                ? "border-slate-600 bg-slate-700 text-white"
-                : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            Não
-          </button>
-        </div>
-        {afetaExperiencia && (
-          <p className="mt-1.5 text-xs font-medium text-red-600">
-            Peso 10 — vai para o topo da fila com destaque urgente.
           </p>
         )}
       </Campo>

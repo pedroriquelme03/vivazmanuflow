@@ -65,14 +65,14 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 pb-20">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <Link
             href="/"
             className="text-sm text-slate-400 hover:text-brand-700"
           >
-            ← VivazManuFlow
+            ← Manutenção Vivaz
           </Link>
           <h1 className="mt-2 text-xl font-bold">Entrar</h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -86,6 +86,18 @@ export default function LoginPage() {
           </Suspense>
         </div>
       </div>
+
+      <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-slate-50/95 px-4 py-3 text-center text-xs text-slate-500 backdrop-blur-sm">
+        © 2026 Vivaz Cataratas Resort • Dev by{" "}
+        <a
+          href="https://pedroriquelme.com.br/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-brand-700 hover:underline"
+        >
+          Pedro Riquelme
+        </a>
+      </footer>
     </main>
   );
 }

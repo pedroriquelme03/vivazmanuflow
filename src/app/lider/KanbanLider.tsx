@@ -11,6 +11,7 @@ import {
 import type { Enums } from "@/lib/database.types";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { AtribuirModal } from "./AtribuirModal";
+import { DetalheDemandaModal } from "./DetalheDemandaModal";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
 type Status = Enums<"demanda_status">;
@@ -36,6 +37,7 @@ export function KanbanLider({
   const [demandas, setDemandas] = useState<DemandaKanban[]>(demandasIniciais);
   const [agora, setAgora] = useState(() => Date.now());
   const [editando, setEditando] = useState<DemandaKanban | null>(null);
+  const [detalhe, setDetalhe] = useState<DemandaKanban | null>(null);
 
   const recarregar = useCallback(async () => {
     const { data } = await supabase
@@ -68,8 +70,15 @@ export function KanbanLider({
   }, []);
 
   const porStatus = (s: Status) =>
-    ordenarFilaPorPeso(demandas.filter((d) => d.status === s));
-  const canceladas = demandas.filter((d) => d.status === "cancelada").length;
+    ordenarFilaPorPeso(
+      demandas.filter((d) => d.status === s && !d.arquivado),
+    );
+  const arquivadas = ordenarFilaPorPeso(
+    demandas.filter((d) => Boolean(d.arquivado)),
+  );
+  const canceladas = demandas.filter(
+    (d) => d.status === "cancelada" && !d.arquivado,
+  ).length;
 
   return (
     <main className="flex-1 overflow-x-auto p-4">
@@ -105,6 +114,7 @@ export function KanbanLider({
                     key={d.id}
                     demanda={d}
                     agora={agora}
+                    onAbrir={() => setDetalhe(d)}
                     onEditar={() => setEditando(d)}
                   />
                 ))}
@@ -117,7 +127,47 @@ export function KanbanLider({
             </section>
           );
         })}
+
+        <section className="flex w-72 shrink-0 flex-col rounded-xl bg-slate-200/70 p-2">
+          <header className="flex items-center justify-between px-2 py-1.5">
+            <h2 className="text-sm font-semibold text-slate-700">Arquivado</h2>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
+              {arquivadas.length}
+            </span>
+          </header>
+          <div className="flex flex-col gap-2">
+            {arquivadas.map((d) => (
+              <Card
+                key={d.id}
+                demanda={d}
+                agora={agora}
+                onAbrir={() => setDetalhe(d)}
+                onEditar={() => setEditando(d)}
+              />
+            ))}
+            {arquivadas.length === 0 && (
+              <p className="px-2 py-6 text-center text-xs text-slate-400">
+                Nada aqui.
+              </p>
+            )}
+          </div>
+        </section>
       </div>
+
+      {detalhe && !editando && (
+        <DetalheDemandaModal
+          demanda={detalhe}
+          agora={agora}
+          onFechar={() => setDetalhe(null)}
+          onAtribuir={() => {
+            setEditando(detalhe);
+          }}
+          onAtualizou={() => {
+            setDetalhe(null);
+            recarregar();
+          }}
+        />
+      )}
 
       {editando && (
         <AtribuirModal
@@ -127,6 +177,7 @@ export function KanbanLider({
           onFechar={() => setEditando(null)}
           onSalvo={() => {
             setEditando(null);
+            setDetalhe(null);
             recarregar();
           }}
         />
@@ -138,16 +189,19 @@ export function KanbanLider({
 function Card({
   demanda,
   agora,
+  onAbrir,
   onEditar,
 }: {
   demanda: DemandaKanban;
   agora: number;
+  onAbrir: () => void;
   onEditar: () => void;
 }) {
   const podeAtribuir =
-    demanda.status === "aberta" ||
-    demanda.status === "atribuida" ||
-    demanda.status === "em_andamento";
+    !demanda.arquivado &&
+    (demanda.status === "aberta" ||
+      demanda.status === "atribuida" ||
+      demanda.status === "em_andamento");
   const urgencia =
     demanda.status === "concluida" || demanda.status === "cancelada"
       ? null
@@ -158,7 +212,16 @@ function Card({
 
   return (
     <article
-      className={`rounded-lg border bg-white p-3 shadow-sm ${
+      role="button"
+      tabIndex={0}
+      onClick={onAbrir}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onAbrir();
+        }
+      }}
+      className={`cursor-pointer rounded-lg border bg-white p-3 shadow-sm transition hover:border-brand-400 hover:shadow-md ${
         pesoMax ? "card-peso-max" : "border-slate-200"
       }`}
     >
@@ -222,7 +285,11 @@ function Card({
 
       {podeAtribuir && (
         <button
-          onClick={onEditar}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditar();
+          }}
           className="mt-2.5 w-full rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
         >
           {demanda.status === "aberta"

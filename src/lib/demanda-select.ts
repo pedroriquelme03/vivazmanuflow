@@ -5,6 +5,7 @@ export const DEMANDA_SELECT = `
   id, titulo, descricao, prioridade, status, criado_em, atribuido_em,
   iniciado_em, concluido_em, prazo_confirmado, colaborador_id,
   propriedade_id, motivo_nao_conclusao, peso, afeta_experiencia, evento_id,
+  arquivado, token_acompanhamento,
   solicitante:solicitantes(nome),
   local:locais(nome),
   propriedade:propriedades(nome),
@@ -31,6 +32,8 @@ export type DemandaKanban = {
   peso: number;
   afeta_experiencia: boolean;
   evento_id: string | null;
+  arquivado: boolean;
+  token_acompanhamento: string;
   solicitante: Rel;
   local: Rel;
   propriedade: Rel;

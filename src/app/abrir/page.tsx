@@ -41,7 +41,7 @@ export default async function AbrirPage() {
     <main className="flex-1 px-4 py-8">
       <div className="mx-auto w-full max-w-md">
         <Link href="/" className="text-sm text-slate-400 hover:text-brand-700">
-          ← VivazManuFlow
+          ← Manutenção Vivaz
         </Link>
         <h1 className="mt-2 text-xl font-bold">Abrir uma demanda</h1>
         <p className="mt-1 text-sm text-slate-500">

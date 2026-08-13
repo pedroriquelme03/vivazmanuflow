@@ -20,7 +20,7 @@ export default async function AcompanharPage() {
     <main className="flex-1 px-4 py-8">
       <div className="mx-auto w-full max-w-lg">
         <Link href="/" className="text-sm text-slate-400 hover:text-brand-700">
-          ← VivazManuFlow
+          ← Manutenção Vivaz
         </Link>
         <h1 className="mt-2 text-xl font-bold">Acompanhar meus pedidos</h1>
         <p className="mt-1 text-sm text-slate-500">

@@ -26,6 +26,11 @@ type Opcao = { id: string; nome: string };
 type LocalOpcao = { id: string; nome: string; propriedade_id: string };
 type SetorOpcao = { id: string; nome: string; propriedade_id: string | null };
 
+type ColunaQuadro =
+  | ""
+  | Enums<"demanda_status">
+  | "arquivado";
+
 type Filtros = {
   dias: number;
   colaboradorId: string;
@@ -35,6 +40,7 @@ type Filtros = {
   prioridade: "" | Enums<"demanda_prioridade">;
   eventoId: string;
   somenteEventos: "" | "sim" | "nao";
+  status: ColunaQuadro;
 };
 
 const PERIODOS = [
@@ -48,6 +54,20 @@ const PERIODOS = [
 const DOW = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const PRIO_LABEL: Record<string, string> = { alta: "Alta", media: "Média", baixa: "Baixa" };
 
+const COLUNAS_STATUS: { valor: ColunaQuadro; rotulo: string }[] = [
+  { valor: "aberta", rotulo: "Abertas" },
+  { valor: "atribuida", rotulo: "Atribuídas" },
+  { valor: "em_andamento", rotulo: "Em andamento" },
+  { valor: "aguardando_validacao", rotulo: "Validação" },
+  { valor: "concluida", rotulo: "Concluídas" },
+  { valor: "arquivado", rotulo: "Arquivado" },
+  { valor: "cancelada", rotulo: "Canceladas" },
+];
+
+const STATUS_FILTRO_LABEL: Record<string, string> = Object.fromEntries(
+  COLUNAS_STATUS.map((c) => [c.valor, c.rotulo]),
+);
+
 const FILTROS_VAZIOS: Filtros = {
   dias: 30,
   colaboradorId: "",
@@ -57,6 +77,7 @@ const FILTROS_VAZIOS: Filtros = {
   prioridade: "",
   eventoId: "",
   somenteEventos: "",
+  status: "",
 };
 
 function fmtMin(min: number | null): string {
@@ -131,6 +152,9 @@ export function MetricasDashboard({
     }
     if (filtros.somenteEventos === "sim") tags.push("Somente eventos");
     if (filtros.somenteEventos === "nao") tags.push("Somente rotina");
+    if (filtros.status) {
+      tags.push(`Status: ${STATUS_FILTRO_LABEL[filtros.status] ?? filtros.status}`);
+    }
     return tags;
   }, [filtros, colaboradores, setores, propriedades, locais, eventos]);
 
@@ -152,12 +176,18 @@ export function MetricasDashboard({
     if (filtros.eventoId) args.p_evento_id = filtros.eventoId;
     if (filtros.somenteEventos === "sim") args.p_somente_eventos = true;
     if (filtros.somenteEventos === "nao") args.p_somente_eventos = false;
+    if (filtros.status === "arquivado") {
+      args.p_arquivado = true;
+    } else if (filtros.status) {
+      args.p_status = filtros.status;
+      args.p_arquivado = false;
+    }
 
     const { data, error } = await supabase.rpc("metricas", args);
     if (error) {
       setErro(
         error.message.includes("Could not find") || error.message.includes("function")
-          ? "Rode a migration supabase/migrations/20260728180000_metricas_filtros.sql no Supabase."
+          ? "Rode o SQL em supabase/migrations/20260813200000_metricas_filtro_status.sql no Supabase."
           : error.message,
       );
       setDados(null);
@@ -270,6 +300,21 @@ export function MetricasDashboard({
             {colaboradores.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nome}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className={selectCls}
+            value={filtros.status}
+            onChange={(e) =>
+              setFiltro("status", e.target.value as Filtros["status"])
+            }
+          >
+            <option value="">Todos os status</option>
+            {COLUNAS_STATUS.map((c) => (
+              <option key={c.valor} value={c.valor}>
+                {c.rotulo}
               </option>
             ))}
           </select>

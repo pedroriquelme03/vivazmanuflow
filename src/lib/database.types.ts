@@ -114,6 +114,7 @@ export type Database = {
           peso: number
           afeta_experiencia: boolean
           evento_id: string | null
+          arquivado: boolean
         }
         Insert: {
           atribuido_em?: string | null
@@ -136,6 +137,7 @@ export type Database = {
           peso?: number
           afeta_experiencia?: boolean
           evento_id?: string | null
+          arquivado?: boolean
         }
         Update: {
           atribuido_em?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           peso?: number
           afeta_experiencia?: boolean
           evento_id?: string | null
+          arquivado?: boolean
         }
         Relationships: [
           {
@@ -690,6 +693,10 @@ export type Database = {
         }
         Returns: string
       }
+      apagar_demanda: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       acompanhar_demanda: { Args: { p_token: string }; Returns: Json }
       admin_criar_usuario: {
         Args: {
@@ -716,6 +723,8 @@ export type Database = {
           p_prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
           p_evento_id?: string
           p_somente_eventos?: boolean
+          p_status?: Database["public"]["Enums"]["demanda_status"]
+          p_arquivado?: boolean
         }
         Returns: Json
       }

@@ -53,7 +53,7 @@ export default async function EquipamentoPage({
     <main className="flex-1 px-4 py-8">
       <div className="mx-auto w-full max-w-lg">
         <Link href="/" className="text-sm text-slate-400 hover:text-brand-700">
-          ← VivazManuFlow
+          ← Manutenção Vivaz
         </Link>
 
         <EquipamentoPainel
