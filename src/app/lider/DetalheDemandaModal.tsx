@@ -214,7 +214,10 @@ export function DetalheDemandaModal({
 
           <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
             <Info rotulo="Solicitante" valor={demanda.solicitante?.nome} />
-            <Info rotulo="Colaborador" valor={demanda.colaborador?.nome} />
+            <Info
+              rotulo="Colaborador"
+              valor={demanda.colaborador?.nome ?? "Sem responsável"}
+            />
             <Info rotulo="Aberta em" valor={formatarData(demanda.criado_em)} />
             <Info
               rotulo="Atribuída em"

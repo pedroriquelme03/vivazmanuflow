@@ -263,9 +263,13 @@ function Card({
           : ""}
       </p>
 
-      {demanda.colaborador?.nome && (
+      {demanda.colaborador?.nome ? (
         <p className="mt-1.5 text-xs font-medium text-slate-600">
           👤 {demanda.colaborador.nome}
+        </p>
+      ) : (
+        <p className="mt-1.5 text-xs font-medium text-amber-600">
+          👤 Sem responsável
         </p>
       )}
 
