@@ -59,7 +59,8 @@ export function ColaboradorPainel({
   }, [supabase, colaboradorId]);
 
   const recarregarGerais = useCallback(async () => {
-    let q = supabase
+    // Pool visível para todos os colaboradores, sem filtro por local.
+    const { data } = await supabase
       .from("demandas")
       .select(GERAIS_SELECT)
       .eq("status", "aberta")
@@ -67,16 +68,10 @@ export function ColaboradorPainel({
       .is("colaborador_id", null)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });
-
-    if (perfil.propriedade_id) {
-      q = q.eq("propriedade_id", perfil.propriedade_id);
-    }
-
-    const { data } = await q;
     if (data) {
       setGerais(ordenarFilaPorPeso(data as unknown as DemandaGeral[]));
     }
-  }, [supabase, perfil.propriedade_id]);
+  }, [supabase]);
 
   useEffect(() => {
     const canal = supabase

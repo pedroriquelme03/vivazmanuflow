@@ -21,7 +21,9 @@ export default async function ColaboradorHome() {
     .order("peso", { ascending: false })
     .order("criado_em", { ascending: true });
 
-  let geraisQ = supabase
+  // Pool "Demandas Gerais": todas as demandas abertas sem responsável,
+  // visíveis para todos os colaboradores independentemente do local.
+  const geraisQ = supabase
     .from("demandas")
     .select(GERAIS_SELECT)
     .eq("status", "aberta")
@@ -29,10 +31,6 @@ export default async function ColaboradorHome() {
     .is("colaborador_id", null)
     .order("peso", { ascending: false })
     .order("criado_em", { ascending: true });
-
-  if (perfil.propriedade_id) {
-    geraisQ = geraisQ.eq("propriedade_id", perfil.propriedade_id);
-  }
 
   const [{ data: demandas }, { data: gerais }] = await Promise.all([
     minhasQ,
