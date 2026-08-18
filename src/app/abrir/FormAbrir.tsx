@@ -24,19 +24,27 @@ type EventoOpcao = {
 };
 type Prioridade = Enums<"demanda_prioridade">;
 
+export type FormAbrirProps = {
+  propriedades: Opcao[];
+  solicitantes: OpcaoProp[];
+  locais: OpcaoProp[];
+  predefinidas: Predefinida[];
+  eventos: EventoOpcao[];
+  /**
+   * Se informado, é chamado após criar a demanda (com o token) em vez de
+   * redirecionar para o acompanhamento. Usado no modal "Nova demanda" do quadro.
+   */
+  onSucesso?: (token: string) => void;
+};
+
 export function FormAbrir({
   propriedades,
   solicitantes,
   locais,
   predefinidas,
   eventos,
-}: {
-  propriedades: Opcao[];
-  solicitantes: OpcaoProp[];
-  locais: OpcaoProp[];
-  predefinidas: Predefinida[];
-  eventos: EventoOpcao[];
-}) {
+  onSucesso,
+}: FormAbrirProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -166,6 +174,11 @@ export function FormAbrir({
         if (evErro) {
           console.warn("Falha ao vincular evento:", evErro.message);
         }
+      }
+
+      if (onSucesso) {
+        onSucesso(token);
+        return;
       }
 
       router.push(`/acompanhar/${token}?nova=1`);

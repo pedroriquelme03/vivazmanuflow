@@ -585,9 +585,11 @@ function CardColab({
       });
       if (anxErro) throw new Error();
 
+      // Conclusão automática: ao enviar a foto, a demanda fecha direto
+      // (status "concluida"), sem passar por validação do solicitante.
       const updates: TablesUpdate<"demandas"> = {
-        status: "aguardando_validacao",
-        concluido_em: null,
+        status: "concluida",
+        concluido_em: new Date().toISOString(),
       };
       const { error: updErro } = await supabase
         .from("demandas")
@@ -598,7 +600,7 @@ function CardColab({
       await supabase.from("demanda_historico").insert({
         demanda_id: demanda.id,
         status_anterior: "em_andamento",
-        status_novo: "aguardando_validacao",
+        status_novo: "concluida",
         observacao: descricaoConclusao.trim(),
         usuario_id: colaboradorId,
       });
@@ -744,7 +746,7 @@ function CardColab({
                 />
               </div>
               <BotaoGrande cor="verde" onClick={concluir} disabled={ocupado}>
-                {ocupado ? "Enviando…" : "Enviar para validação"}
+                {ocupado ? "Concluindo…" : "Concluir demanda"}
               </BotaoGrande>
               <button
                 onClick={voltar}

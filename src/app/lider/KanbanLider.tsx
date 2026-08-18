@@ -12,6 +12,7 @@ import type { Enums } from "@/lib/database.types";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { AtribuirModal } from "./AtribuirModal";
 import { DetalheDemandaModal } from "./DetalheDemandaModal";
+import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
 type Status = Enums<"demanda_status">;
@@ -28,16 +29,20 @@ export function KanbanLider({
   demandasIniciais,
   colaboradores,
   slaHoras,
+  opcoesNovaDemanda,
 }: {
   demandasIniciais: DemandaKanban[];
   colaboradores: Colaborador[];
   slaHoras: Record<string, number>;
+  opcoesNovaDemanda: OpcoesNovaDemanda;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [demandas, setDemandas] = useState<DemandaKanban[]>(demandasIniciais);
   const [agora, setAgora] = useState(() => Date.now());
   const [editando, setEditando] = useState<DemandaKanban | null>(null);
   const [detalhe, setDetalhe] = useState<DemandaKanban | null>(null);
+  const [criando, setCriando] = useState(false);
+  const [sucesso, setSucesso] = useState<string | null>(null);
 
   const recarregar = useCallback(async () => {
     const { data } = await supabase
@@ -82,14 +87,38 @@ export function KanbanLider({
 
   return (
     <main className="flex-1 overflow-x-auto p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold">Demandas</h1>
-        {canceladas > 0 && (
-          <span className="text-xs text-slate-400">
-            {canceladas} cancelada(s)
-          </span>
-        )}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold">Demandas</h1>
+          {canceladas > 0 && (
+            <span className="text-xs text-slate-400">
+              {canceladas} cancelada(s)
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setCriando(true)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <span className="text-base leading-none">＋</span>
+          Nova demanda
+        </button>
       </div>
+
+      {sucesso && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+          <span>✅ {sucesso}</span>
+          <button
+            type="button"
+            onClick={() => setSucesso(null)}
+            className="shrink-0 text-emerald-600 hover:text-emerald-800"
+            aria-label="Fechar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-4 pb-4" style={{ minWidth: "min-content" }}>
         {COLUNAS.map((col) => {
@@ -179,6 +208,19 @@ export function KanbanLider({
             setEditando(null);
             setDetalhe(null);
             recarregar();
+          }}
+        />
+      )}
+
+      {criando && (
+        <NovaDemandaModal
+          opcoes={opcoesNovaDemanda}
+          onFechar={() => setCriando(false)}
+          onSucesso={() => {
+            setCriando(false);
+            setSucesso("Demanda criada com sucesso!");
+            recarregar();
+            window.setTimeout(() => setSucesso(null), 5000);
           }}
         />
       )}

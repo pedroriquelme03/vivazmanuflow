@@ -13,22 +13,51 @@ export default async function LiderHome() {
   if (perfil.role === "colaborador") redirect("/colaborador");
 
   const supabase = await createClient();
-  const [{ data: demandas }, { data: colaboradores }, { data: sla }] =
-    await Promise.all([
-      supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
-        ascending: false,
-      }).order("criado_em", { ascending: true }),
-      supabase
-        .from("usuarios")
-        .select("id, nome, propriedade_id")
-        .eq("role", "colaborador")
-        .eq("ativo", true)
-        .order("nome"),
-      supabase.from("sla_config").select("prioridade, horas_padrao").is(
-        "propriedade_id",
-        null,
-      ),
-    ]);
+  const [
+    { data: demandas },
+    { data: colaboradores },
+    { data: sla },
+    { data: propriedades },
+    { data: solicitantes },
+    { data: locais },
+    predefRes,
+    eventosRes,
+  ] = await Promise.all([
+    supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
+      ascending: false,
+    }).order("criado_em", { ascending: true }),
+    supabase
+      .from("usuarios")
+      .select("id, nome, propriedade_id")
+      .eq("role", "colaborador")
+      .eq("ativo", true)
+      .order("nome"),
+    supabase.from("sla_config").select("prioridade, horas_padrao").is(
+      "propriedade_id",
+      null,
+    ),
+    supabase.from("propriedades").select("id, nome").eq("ativo", true).order("nome"),
+    supabase
+      .from("solicitantes")
+      .select("id, nome, propriedade_id")
+      .eq("ativo", true)
+      .order("nome"),
+    supabase
+      .from("locais")
+      .select("id, nome, propriedade_id")
+      .eq("ativo", true)
+      .order("nome"),
+    supabase
+      .from("demandas_predefinidas")
+      .select("id, titulo, descricao, prioridade, propriedade_id")
+      .eq("ativo", true)
+      .order("titulo"),
+    supabase
+      .from("eventos")
+      .select("id, nome, propriedade_id, data_inicio, data_fim")
+      .eq("ativo", true)
+      .order("data_inicio", { ascending: false, nullsFirst: false }),
+  ]);
 
   const slaHoras: Record<string, number> = {};
   for (const s of sla ?? []) slaHoras[s.prioridade] = s.horas_padrao;
@@ -39,6 +68,13 @@ export default async function LiderHome() {
         demandasIniciais={demandas ?? []}
         colaboradores={colaboradores ?? []}
         slaHoras={slaHoras}
+        opcoesNovaDemanda={{
+          propriedades: propriedades ?? [],
+          solicitantes: solicitantes ?? [],
+          locais: locais ?? [],
+          predefinidas: predefRes.data ?? [],
+          eventos: eventosRes.data ?? [],
+        }}
       />
     </PainelShell>
   );
