@@ -10,8 +10,6 @@ export default async function AbrirPage() {
   const [
     { data: propriedades },
     { data: solicitantes },
-    { data: locais },
-    predefRes,
     eventosRes,
   ] = await Promise.all([
     supabase.from("propriedades").select("id, nome").eq("ativo", true).order("nome"),
@@ -20,16 +18,6 @@ export default async function AbrirPage() {
       .select("id, nome, propriedade_id")
       .eq("ativo", true)
       .order("nome"),
-    supabase
-      .from("locais")
-      .select("id, nome, propriedade_id")
-      .eq("ativo", true)
-      .order("nome"),
-    supabase
-      .from("demandas_predefinidas")
-      .select("id, titulo, descricao, prioridade, propriedade_id")
-      .eq("ativo", true)
-      .order("titulo"),
     supabase
       .from("eventos")
       .select("id, nome, propriedade_id, data_inicio, data_fim")
@@ -52,8 +40,6 @@ export default async function AbrirPage() {
           <FormAbrir
             propriedades={propriedades ?? []}
             solicitantes={solicitantes ?? []}
-            locais={locais ?? []}
-            predefinidas={predefRes.data ?? []}
             eventos={eventosRes.data ?? []}
           />
         </div>

@@ -115,6 +115,8 @@ export type Database = {
           afeta_experiencia: boolean
           evento_id: string | null
           arquivado: boolean
+          sublocal: string | null
+          mensagem_devolucao: string | null
         }
         Insert: {
           atribuido_em?: string | null
@@ -138,6 +140,8 @@ export type Database = {
           afeta_experiencia?: boolean
           evento_id?: string | null
           arquivado?: boolean
+          sublocal?: string | null
+          mensagem_devolucao?: string | null
         }
         Update: {
           atribuido_em?: string | null
@@ -161,6 +165,8 @@ export type Database = {
           afeta_experiencia?: boolean
           evento_id?: string | null
           arquivado?: boolean
+          sublocal?: string | null
+          mensagem_devolucao?: string | null
         }
         Relationships: [
           {
@@ -676,6 +682,10 @@ export type Database = {
         Args: { p_demanda_id: string }
         Returns: undefined
       }
+      definir_sublocal: {
+        Args: { p_token: string; p_sublocal: string }
+        Returns: undefined
+      }
       vincular_evento_demanda: {
         Args: { p_token: string; p_evento_id: string }
         Returns: undefined
@@ -697,6 +707,7 @@ export type Database = {
         Args: { p_id: string }
         Returns: undefined
       }
+      rotulo_sublocal: { Args: { p_token: string }; Returns: string }
       acompanhar_demanda: { Args: { p_token: string }; Returns: Json }
       admin_criar_usuario: {
         Args: {

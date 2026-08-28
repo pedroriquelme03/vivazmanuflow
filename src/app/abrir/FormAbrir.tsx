@@ -8,13 +8,6 @@ import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
 type OpcaoProp = { id: string; nome: string; propriedade_id: string };
-type Predefinida = {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  prioridade: Enums<"demanda_prioridade">;
-  propriedade_id: string | null;
-};
 type EventoOpcao = {
   id: string;
   nome: string;
@@ -24,11 +17,13 @@ type EventoOpcao = {
 };
 type Prioridade = Enums<"demanda_prioridade">;
 
+function semAquamania(lista: Opcao[]) {
+  return lista.filter((p) => !p.nome.toLowerCase().includes("aquamania"));
+}
+
 export type FormAbrirProps = {
   propriedades: Opcao[];
   solicitantes: OpcaoProp[];
-  locais: OpcaoProp[];
-  predefinidas: Predefinida[];
   eventos: EventoOpcao[];
   /**
    * Se informado, é chamado após criar a demanda (com o token) em vez de
@@ -40,18 +35,22 @@ export type FormAbrirProps = {
 export function FormAbrir({
   propriedades,
   solicitantes,
-  locais,
-  predefinidas,
   eventos,
   onSucesso,
 }: FormAbrirProps) {
   const router = useRouter();
   const supabase = createClient();
 
-  const [propriedadeId, setPropriedadeId] = useState(propriedades[0]?.id ?? "");
+  const propriedadesVisiveis = useMemo(
+    () => semAquamania(propriedades),
+    [propriedades],
+  );
+
+  const [propriedadeId, setPropriedadeId] = useState(
+    () => semAquamania(propriedades)[0]?.id ?? "",
+  );
   const [solicitanteId, setSolicitanteId] = useState("");
-  const [localId, setLocalId] = useState("");
-  const [predefinidaId, setPredefinidaId] = useState("");
+  const [sublocal, setSublocal] = useState("");
   const [eventoId, setEventoId] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -64,17 +63,6 @@ export function FormAbrir({
     () => solicitantes.filter((s) => s.propriedade_id === propriedadeId),
     [solicitantes, propriedadeId],
   );
-  const locaisFiltrados = useMemo(
-    () => locais.filter((l) => l.propriedade_id === propriedadeId),
-    [locais, propriedadeId],
-  );
-  const predefinidasFiltradas = useMemo(
-    () =>
-      predefinidas.filter(
-        (p) => p.propriedade_id === null || p.propriedade_id === propriedadeId,
-      ),
-    [predefinidas, propriedadeId],
-  );
   const eventosFiltrados = useMemo(
     () =>
       eventos.filter(
@@ -83,29 +71,13 @@ export function FormAbrir({
     [eventos, propriedadeId],
   );
 
-  const usandoPredefinida = Boolean(predefinidaId);
+  const mostrarLocalPrincipal = propriedadesVisiveis.length > 1;
 
   function trocarPropriedade(id: string) {
     setPropriedadeId(id);
     setSolicitanteId("");
-    setLocalId("");
-    setPredefinidaId("");
+    setSublocal("");
     setEventoId("");
-    setTitulo("");
-    setDescricao("");
-  }
-
-  function trocarPredefinida(id: string) {
-    setPredefinidaId(id);
-    if (!id) {
-      setTitulo("");
-      setDescricao("");
-      return;
-    }
-    const pred = predefinidas.find((p) => p.id === id);
-    if (!pred) return;
-    setTitulo(pred.titulo);
-    setDescricao(pred.descricao ?? "");
   }
 
   function adicionarArquivos(lista: FileList | null) {
@@ -122,8 +94,7 @@ export function FormAbrir({
     setErro(null);
 
     if (!solicitanteId) return setErro("Selecione quem está solicitando.");
-    if (!titulo.trim())
-      return setErro("Selecione uma demanda ou descreva o que precisa.");
+    if (!titulo.trim()) return setErro("Descreva o que precisa ser feito.");
 
     setEnviando(true);
     try {
@@ -147,7 +118,6 @@ export function FormAbrir({
         p_solicitante_id: solicitanteId,
         p_titulo: titulo.trim(),
         p_descricao: descricao || undefined,
-        p_local_id: localId || undefined,
         p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
         p_anexos: anexos,
       });
@@ -155,6 +125,18 @@ export function FormAbrir({
 
       const token = data?.[0]?.token;
       if (!token) throw new Error("Não foi possível gerar o acompanhamento.");
+
+      if (sublocal.trim()) {
+        const { error: subErro } = await supabase.rpc("definir_sublocal", {
+          p_token: String(token),
+          p_sublocal: sublocal.trim(),
+        });
+        if (subErro) {
+          throw new Error(
+            "Demanda criada, mas o sublocal não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
+          );
+        }
+      }
 
       if (afetaExperiencia) {
         const { error: pesoErro } = await supabase.rpc(
@@ -181,7 +163,9 @@ export function FormAbrir({
         return;
       }
 
-      router.push(`/acompanhar/${token}?nova=1`);
+      const q = new URLSearchParams({ nova: "1" });
+      if (sublocal.trim()) q.set("sublocal", sublocal.trim());
+      router.push(`/acompanhar/${token}?${q.toString()}`);
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Erro inesperado.");
       setEnviando(false);
@@ -229,67 +213,34 @@ export function FormAbrir({
         </p>
       </Campo>
 
-      <Campo label="Demanda Frequente">
-        <select
-          value={predefinidaId}
-          onChange={(e) => trocarPredefinida(e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Outra / personalizada…</option>
-          {predefinidasFiltradas.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.titulo}
-            </option>
-          ))}
-        </select>
-        {usandoPredefinida ? (
-          <p className="mt-1 text-xs text-brand-700">
-            Esta demanda será atribuída automaticamente ao responsável cadastrado.
-          </p>
-        ) : (
-          <p className="mt-1 text-xs text-slate-500">
-            Demanda personalizada: fica disponível em Demandas Gerais para um
-            colaborador pegar.
-          </p>
-        )}
-      </Campo>
+      {mostrarLocalPrincipal && (
+        <Campo label="Local principal">
+          <select
+            value={propriedadeId}
+            onChange={(e) => trocarPropriedade(e.target.value)}
+            className={inputCls}
+            required
+          >
+            {propriedadesVisiveis.length === 0 && (
+              <option value="">Nenhum local cadastrado</option>
+            )}
+            {propriedadesVisiveis.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        </Campo>
+      )}
 
-      <Campo label="Local principal">
-        <select
-          value={propriedadeId}
-          onChange={(e) => trocarPropriedade(e.target.value)}
+      <Campo label="Sublocal" opcional>
+        <input
+          value={sublocal}
+          onChange={(e) => setSublocal(e.target.value)}
+          placeholder="Ex.: Quarto 204, piscina, recepção…"
           className={inputCls}
-          required
-        >
-          {propriedades.length === 0 && (
-            <option value="">Nenhum local cadastrado</option>
-          )}
-          {propriedades.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
-      </Campo>
-
-      <Campo label="Sublocal">
-        <select
-          value={localId}
-          onChange={(e) => setLocalId(e.target.value)}
-          className={inputCls}
-          disabled={!propriedadeId || locaisFiltrados.length === 0}
-        >
-          <option value="">
-            {locaisFiltrados.length === 0
-              ? "Nenhum sublocal cadastrado"
-              : "Selecione o sublocal…"}
-          </option>
-          {locaisFiltrados.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.nome}
-            </option>
-          ))}
-        </select>
+          maxLength={120}
+        />
       </Campo>
 
       <Campo label="Quem está solicitando?">
@@ -343,7 +294,6 @@ export function FormAbrir({
           className={inputCls}
           maxLength={120}
           required
-          readOnly={usandoPredefinida}
         />
       </Campo>
 
@@ -364,7 +314,6 @@ export function FormAbrir({
             <input
               type="file"
               accept="image/*,video/*"
-              capture="environment"
               multiple
               className="hidden"
               onChange={(e) => {

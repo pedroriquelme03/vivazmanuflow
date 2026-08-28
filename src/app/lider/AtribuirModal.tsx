@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { DemandaKanban } from "@/lib/demanda-select";
 import type { TablesUpdate } from "@/lib/database.types";
-import { PRIORIDADE_LABEL } from "@/lib/demanda-ui";
+import { PRIORIDADE_LABEL, nomeSublocal } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
@@ -111,7 +111,7 @@ export function AtribuirModal({
             <h2 className="text-base font-bold">Atribuir demanda</h2>
             <p className="mt-0.5 text-sm text-slate-500">{demanda.titulo}</p>
             <p className="mt-1 text-xs text-slate-400">
-              {[demanda.propriedade?.nome, demanda.local?.nome]
+              {[demanda.propriedade?.nome, nomeSublocal(demanda.sublocal, demanda.local?.nome)]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

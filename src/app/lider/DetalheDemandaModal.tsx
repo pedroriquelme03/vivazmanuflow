@@ -10,7 +10,15 @@ import {
   formatarData,
   calcularUrgencia,
   PRAZO_COR,
+  nomeSublocal,
+  ehMotivoNaoPerturbe,
 } from "@/lib/demanda-ui";
+import {
+  aprovarConclusaoGestor,
+  devolverDemandaGestor,
+  arquivarDemandaGestor,
+  apagarDemandaGestor,
+} from "@/lib/demanda-gestor";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import type { Enums } from "@/lib/database.types";
 
@@ -51,6 +59,8 @@ export function DetalheDemandaModal({
   const [erro, setErro] = useState<string | null>(null);
   const [confirmandoApagar, setConfirmandoApagar] = useState(false);
   const [textoApagar, setTextoApagar] = useState("");
+  const [msgDevolucao, setMsgDevolucao] = useState("");
+  const [confirmandoDevolver, setConfirmandoDevolver] = useState(false);
 
   const arquivado = Boolean(demanda.arquivado);
   const podeAtribuir =
@@ -96,45 +106,53 @@ export function DetalheDemandaModal({
   async function arquivar(valor: boolean) {
     setErro(null);
     setOcupado(true);
-    const { error } = await supabase
-      .from("demandas")
-      .update({ arquivado: valor })
-      .eq("id", demanda.id);
+    const erroArq = await arquivarDemandaGestor(supabase, demanda.id, valor);
     setOcupado(false);
-    if (error) {
-      if (
-        error.message.includes("arquivado") ||
-        error.message.includes("schema cache")
-      ) {
-        setErro(
-          "Rode o SQL em supabase/migrations/20260813190000_demandas_arquivar_apagar.sql no Supabase.",
-        );
-        return;
-      }
-      setErro(error.message);
+    if (erroArq) {
+      setErro(erroArq);
       return;
     }
     onAtualizou();
+  }
+
+  async function aprovarConclusao() {
+    setErro(null);
+    setOcupado(true);
+    const erroAprovar = await aprovarConclusaoGestor(supabase, demanda.id);
+    setOcupado(false);
+    if (erroAprovar) {
+      setErro(erroAprovar);
+      return;
+    }
+    onAtualizou();
+    onFechar();
+  }
+
+  async function devolverParaAndamento() {
+    setErro(null);
+    setOcupado(true);
+    const erroDev = await devolverDemandaGestor(
+      supabase,
+      demanda.id,
+      msgDevolucao,
+    );
+    setOcupado(false);
+    if (erroDev) {
+      setErro(erroDev);
+      return;
+    }
+    onAtualizou();
+    onFechar();
   }
 
   async function apagar() {
     if (textoApagar !== "APAGAR") return;
     setErro(null);
     setOcupado(true);
-    const { error } = await supabase.rpc("apagar_demanda", { p_id: demanda.id });
+    const erroAp = await apagarDemandaGestor(supabase, demanda.id);
     setOcupado(false);
-    if (error) {
-      if (
-        error.message.includes("Could not find") ||
-        error.message.includes("function") ||
-        error.message.includes("schema cache")
-      ) {
-        setErro(
-          "Rode o SQL em supabase/migrations/20260813190000_demandas_arquivar_apagar.sql no Supabase.",
-        );
-        return;
-      }
-      setErro(error.message);
+    if (erroAp) {
+      setErro(erroAp);
       return;
     }
     onAtualizou();
@@ -155,7 +173,7 @@ export function DetalheDemandaModal({
               {demanda.titulo}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              {[demanda.propriedade?.nome, demanda.local?.nome]
+              {[demanda.propriedade?.nome, nomeSublocal(demanda.sublocal, demanda.local?.nome)]
                 .filter(Boolean)
                 .join(" · ") || "Sem local"}
             </p>
@@ -262,9 +280,31 @@ export function DetalheDemandaModal({
           )}
 
           {demanda.motivo_nao_conclusao && (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Motivo de não conclusão: {demanda.motivo_nao_conclusao}
-            </p>
+            <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <p>Motivo de não conclusão: {demanda.motivo_nao_conclusao}</p>
+              {ehMotivoNaoPerturbe(demanda.motivo_nao_conclusao) &&
+                anexos
+                  .filter(
+                    (a) => a.tipo === "foto" && a.enviado_por === "colaborador",
+                  )
+                  .slice(-1)
+                  .map((a) => (
+                    <a
+                      key={a.id}
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={a.url}
+                        alt="Foto do não perturbe"
+                        className="max-h-48 w-full rounded-lg object-cover"
+                      />
+                    </a>
+                  ))}
+            </div>
           )}
 
           <h3 className="mt-5 text-sm font-semibold text-slate-800">
@@ -355,6 +395,54 @@ export function DetalheDemandaModal({
         </div>
 
         <div className="grid gap-2 border-t border-slate-100 px-5 py-4">
+          {demanda.status === "aguardando_validacao" && !arquivado && (
+            <div className="grid gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={aprovarConclusao}
+                  disabled={ocupado}
+                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {ocupado ? "Salvando…" : "Aprovar conclusão"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoDevolver(true);
+                    setErro(null);
+                  }}
+                  disabled={ocupado}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Devolver
+                </button>
+              </div>
+              {confirmandoDevolver && (
+                <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <label className="text-xs font-medium text-slate-700">
+                    Motivo da devolução <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={msgDevolucao}
+                    onChange={(e) => setMsgDevolucao(e.target.value)}
+                    rows={3}
+                    placeholder="Explique o que falta ou o que precisa ser refeito…"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={devolverParaAndamento}
+                    disabled={ocupado}
+                    className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+                  >
+                    {ocupado ? "Devolvendo…" : "Confirmar devolução"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {podeAtribuir && (
             <button
               type="button"

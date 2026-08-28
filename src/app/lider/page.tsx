@@ -19,8 +19,6 @@ export default async function LiderHome() {
     { data: sla },
     { data: propriedades },
     { data: solicitantes },
-    { data: locais },
-    predefRes,
     eventosRes,
   ] = await Promise.all([
     supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
@@ -43,16 +41,6 @@ export default async function LiderHome() {
       .eq("ativo", true)
       .order("nome"),
     supabase
-      .from("locais")
-      .select("id, nome, propriedade_id")
-      .eq("ativo", true)
-      .order("nome"),
-    supabase
-      .from("demandas_predefinidas")
-      .select("id, titulo, descricao, prioridade, propriedade_id")
-      .eq("ativo", true)
-      .order("titulo"),
-    supabase
       .from("eventos")
       .select("id, nome, propriedade_id, data_inicio, data_fim")
       .eq("ativo", true)
@@ -71,8 +59,6 @@ export default async function LiderHome() {
         opcoesNovaDemanda={{
           propriedades: propriedades ?? [],
           solicitantes: solicitantes ?? [],
-          locais: locais ?? [],
-          predefinidas: predefRes.data ?? [],
           eventos: eventosRes.data ?? [],
         }}
       />

@@ -7,7 +7,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   aberta: "Aberta",
   atribuida: "Atribuída",
   em_andamento: "Em andamento",
-  aguardando_validacao: "Aguardando sua confirmação",
+  aguardando_validacao: "Aguardando validação",
   concluida: "Concluída",
   cancelada: "Cancelada",
 };
@@ -17,7 +17,7 @@ export const STATUS_BADGE: Record<Status, string> = {
   aberta: "bg-slate-100 text-slate-700",
   atribuida: "bg-blue-100 text-blue-700",
   em_andamento: "bg-amber-100 text-amber-800",
-  aguardando_validacao: "bg-purple-100 text-purple-700",
+  aguardando_validacao: "bg-sky-100 text-sky-800",
   concluida: "bg-emerald-100 text-emerald-700",
   cancelada: "bg-red-100 text-red-700",
 };
@@ -51,6 +51,16 @@ export function formatarData(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "—" : FMT.format(d);
+}
+
+/** Texto livre do form; se vazio, usa o cadastro antigo de sublocal. */
+export function nomeSublocal(
+  sublocal?: string | null,
+  cadastro?: string | null,
+) {
+  const t = sublocal?.trim();
+  if (t) return t;
+  return cadastro?.trim() || "";
 }
 
 function formatarDuracao(ms: number): string {
@@ -92,4 +102,61 @@ export function calcularUrgencia(
   const decorrido = total > 0 ? (agora - inicio) / total : 0;
   const nivel: NivelPrazo = decorrido >= 0.7 ? "atencao" : "ok";
   return { nivel, label: `Faltam ${formatarDuracao(restante)}` };
+}
+
+export const MOTIVO_NAO_PERTURBE = "Não perturbe";
+
+export function ehMotivoNaoPerturbe(motivo: string | null | undefined): boolean {
+  return (motivo ?? "").trim().toLocaleLowerCase("pt-BR") === "não perturbe";
+}
+
+export function urlFotoNaoPerturbe(
+  motivo: string | null | undefined,
+  anexos:
+    | { url: string; tipo: string; enviado_por: string; criado_em?: string }[]
+    | null
+    | undefined,
+): string | null {
+  if (!ehMotivoNaoPerturbe(motivo) || !anexos?.length) return null;
+  const fotos = anexos
+    .filter((a) => a.tipo === "foto" && a.enviado_por === "colaborador")
+    .sort((a, b) => (a.criado_em ?? "").localeCompare(b.criado_em ?? ""));
+  return fotos.at(-1)?.url ?? null;
+}
+
+export function urlFotoColaboradorMaisRecente(
+  anexos:
+    | { url: string; tipo: string; enviado_por: string; criado_em?: string }[]
+    | null
+    | undefined,
+): string | null {
+  if (!anexos?.length) return null;
+  const fotos = anexos
+    .filter((a) => a.tipo === "foto" && a.enviado_por === "colaborador")
+    .sort((a, b) => (a.criado_em ?? "").localeCompare(b.criado_em ?? ""));
+  return fotos.at(-1)?.url ?? null;
+}
+
+export function mensagemDevolucaoGestor(
+  historico:
+    | {
+        observacao: string | null;
+        status_anterior: string | null;
+        status_novo: string;
+        criado_em?: string;
+      }[]
+    | null
+    | undefined,
+): string | null {
+  const itens = (historico ?? [])
+    .filter(
+      (h) =>
+        h.status_anterior === "aguardando_validacao" &&
+        h.status_novo === "em_andamento" &&
+        (h.observacao ?? "").trim(),
+    )
+    .sort((a, b) => (a.criado_em ?? "").localeCompare(b.criado_em ?? ""));
+  const texto = itens.at(-1)?.observacao?.trim();
+  if (!texto) return null;
+  return texto.replace(/^Devolução do gestor:\s*/i, "");
 }

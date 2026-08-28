@@ -5,12 +5,13 @@ export const DEMANDA_SELECT = `
   id, titulo, descricao, prioridade, status, criado_em, atribuido_em,
   iniciado_em, concluido_em, prazo_confirmado, colaborador_id,
   propriedade_id, motivo_nao_conclusao, peso, afeta_experiencia, evento_id,
-  arquivado, token_acompanhamento,
+  arquivado, token_acompanhamento, sublocal,
   solicitante:solicitantes(nome),
   local:locais(nome),
   propriedade:propriedades(nome),
   colaborador:usuarios(nome),
-  evento:eventos(nome)
+  evento:eventos(nome),
+  anexos:demanda_anexos(url, tipo, enviado_por, criado_em)
 `;
 
 type Rel = { nome: string } | null;
@@ -34,27 +35,32 @@ export type DemandaKanban = {
   evento_id: string | null;
   arquivado: boolean;
   token_acompanhamento: string;
+  sublocal: string | null;
   solicitante: Rel;
   local: Rel;
   propriedade: Rel;
   colaborador: Rel;
   evento: Rel;
+  anexos: AnexoDemanda[];
 };
 
 /** Select do painel do colaborador (inclui anexos para foto de referência). */
 export const COLAB_SELECT = `
   id, titulo, descricao, prioridade, status, prazo_confirmado,
   atribuido_em, iniciado_em, criado_em, peso, afeta_experiencia, evento_id,
+  sublocal,
   local:locais(nome),
   solicitante:solicitantes(nome),
   evento:eventos(nome),
-  anexos:demanda_anexos(url, tipo, enviado_por)
+  anexos:demanda_anexos(url, tipo, enviado_por),
+  historico:demanda_historico(observacao, status_anterior, status_novo, criado_em)
 `;
 
 export type AnexoDemanda = {
   url: string;
   tipo: Enums<"anexo_tipo">;
   enviado_por: Enums<"anexo_autor">;
+  criado_em?: string;
 };
 
 export type DemandaColab = {
@@ -70,22 +76,31 @@ export type DemandaColab = {
   peso: number;
   afeta_experiencia: boolean;
   evento_id: string | null;
+  sublocal: string | null;
   local: Rel;
   solicitante: Rel;
   evento: Rel;
   anexos: AnexoDemanda[];
+  historico?: {
+    observacao: string | null;
+    status_anterior: Enums<"demanda_status"> | null;
+    status_novo: Enums<"demanda_status">;
+    criado_em: string;
+  }[];
 };
 
-/** Demandas abertas sem colaborador (pool geral). */
+/** Demandas abertas sem colaborador (pool geral) — mesmos campos, sem histórico. */
 export const GERAIS_SELECT = `
   id, titulo, descricao, prioridade, status, prazo_confirmado,
   atribuido_em, iniciado_em, criado_em, peso, afeta_experiencia, evento_id,
+  sublocal,
   local:locais(nome),
   solicitante:solicitantes(nome),
-  evento:eventos(nome)
+  evento:eventos(nome),
+  anexos:demanda_anexos(url, tipo, enviado_por)
 `;
 
-export type DemandaGeral = Omit<DemandaColab, "anexos">;
+export type DemandaGeral = DemandaColab;
 
 /** Ordena a fila: maior peso primeiro; empate → mais antiga primeiro. */
 export function ordenarFilaPorPeso<
