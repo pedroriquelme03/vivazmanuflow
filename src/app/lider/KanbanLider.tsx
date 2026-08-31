@@ -7,6 +7,9 @@ import {
   PRAZO_COR,
   calcularUrgencia,
   formatarData,
+  nomeSublocal,
+  urlFotoNaoPerturbe,
+  urlFotoColaboradorMaisRecente,
 } from "@/lib/demanda-ui";
 import type { Enums } from "@/lib/database.types";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
@@ -251,6 +254,14 @@ function Card({
 
   const pesoMax =
     demanda.afeta_experiencia || (demanda.peso ?? 0) >= 10;
+  const fotoNaoPerturbe = urlFotoNaoPerturbe(
+    demanda.motivo_nao_conclusao,
+    demanda.anexos,
+  );
+  const fotoConclusao =
+    demanda.status === "aguardando_validacao"
+      ? urlFotoColaboradorMaisRecente(demanda.anexos)
+      : null;
 
   return (
     <article
@@ -299,9 +310,11 @@ function Card({
 
       <p className="mt-1 text-xs text-slate-500">
         {demanda.propriedade?.nome ? `${demanda.propriedade.nome}` : ""}
-        {demanda.local?.nome ? ` · ${demanda.local.nome}` : ""}
+        {nomeSublocal(demanda.sublocal, demanda.local?.nome)
+          ? ` · ${nomeSublocal(demanda.sublocal, demanda.local?.nome)}`
+          : ""}
         {demanda.solicitante?.nome
-          ? `${demanda.propriedade?.nome || demanda.local?.nome ? " · " : ""}${demanda.solicitante.nome}`
+          ? `${demanda.propriedade?.nome || nomeSublocal(demanda.sublocal, demanda.local?.nome) ? " · " : ""}${demanda.solicitante.nome}`
           : ""}
       </p>
 
@@ -321,6 +334,48 @@ function Card({
         >
           {urgencia.label}
         </span>
+      )}
+
+      {demanda.motivo_nao_conclusao && (
+        <div className="mt-2 rounded-md bg-amber-50 px-2 py-1.5">
+          <p className="text-xs font-semibold text-amber-900">
+            Motivo: {demanda.motivo_nao_conclusao}
+          </p>
+          {fotoNaoPerturbe && (
+              <a
+                href={fotoNaoPerturbe}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1.5 block"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={fotoNaoPerturbe}
+                  alt="Foto do não perturbe"
+                  className="h-24 w-full rounded object-cover"
+                />
+              </a>
+            )}
+        </div>
+      )}
+
+      {demanda.status === "aguardando_validacao" && (
+        <div className="mt-2 rounded-md bg-sky-50 px-2 py-1.5">
+          <p className="text-xs font-semibold text-sky-800">
+            Aguardando conferência
+          </p>
+          {fotoConclusao && (
+            <span className="mt-1.5 block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={fotoConclusao}
+                alt="Foto da conclusão"
+                className="h-24 w-full rounded object-cover"
+              />
+            </span>
+          )}
+        </div>
       )}
 
       {demanda.status === "concluida" && (

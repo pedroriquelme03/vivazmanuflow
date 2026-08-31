@@ -37,15 +37,24 @@ export default async function AcompanharToken({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ nova?: string }>;
+  searchParams: Promise<{ nova?: string; sublocal?: string }>;
 }) {
   const { token } = await params;
-  const { nova } = await searchParams;
+  const { nova, sublocal: sublocalQuery } = await searchParams;
 
   const supabase = await createClient();
-  const { data } = await supabase.rpc("acompanhar_demanda", { p_token: token });
+  const [{ data }, sublocalRpc] = await Promise.all([
+    supabase.rpc("acompanhar_demanda", { p_token: token }),
+    supabase.rpc("rotulo_sublocal", { p_token: token }),
+  ]);
   const d = data as Detalhe | null;
   if (!d || !d.id) notFound();
+
+  const sublocalExibido =
+    textoLivre(sublocalRpc.data) ||
+    sublocalQuery?.trim() ||
+    d.local ||
+    "—";
 
   return (
     <main className="flex-1 px-4 py-8">
@@ -87,7 +96,7 @@ export default async function AcompanharToken({
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <Info titulo="Local principal" valor={d.propriedade} />
-            <Info titulo="Sublocal" valor={d.local ?? "—"} />
+            <Info titulo="Sublocal" valor={sublocalExibido} />
             <Info titulo="Solicitante" valor={d.solicitante} />
             <Info titulo="Responsável" valor={d.colaborador ?? "A definir"} />
             <Info titulo="Prazo" valor={formatarData(d.prazo)} />
@@ -148,6 +157,12 @@ export default async function AcompanharToken({
       </div>
     </main>
   );
+}
+
+function textoLivre(valor: unknown): string {
+  if (typeof valor === "string") return valor.trim();
+  if (Array.isArray(valor) && typeof valor[0] === "string") return valor[0].trim();
+  return "";
 }
 
 function Info({ titulo, valor }: { titulo: string; valor: string }) {

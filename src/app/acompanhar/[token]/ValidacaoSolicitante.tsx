@@ -76,11 +76,11 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
   }
 
   return (
-    <div className="mt-4 rounded-2xl border border-purple-200 bg-purple-50 p-5">
-      <h2 className="text-base font-bold text-purple-900">
+    <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-5">
+      <h2 className="text-base font-bold text-sky-900">
         O serviço foi concluído?
       </h2>
-      <p className="mt-1 text-sm text-purple-800">
+      <p className="mt-1 text-sm text-sky-800">
         O colaborador enviou a demanda para sua validação. Confirme se está tudo
         certo ou conteste se ainda falta algo.
       </p>
@@ -109,7 +109,7 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
       {modo === "contestar" && (
         <div className="mt-4 grid gap-3">
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium text-purple-900">
+            <span className="font-medium text-sky-900">
               O que falta? <span className="text-red-500">*</span>
             </span>
             <textarea
@@ -117,12 +117,12 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
               onChange={(e) => setDescricao(e.target.value)}
               rows={3}
               placeholder="Ex.: A pia ainda está pingando do lado esquerdo."
-              className="w-full rounded-xl border border-purple-200 bg-white px-3 py-2.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+              className="w-full rounded-xl border border-sky-200 bg-white px-3 py-2.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
               maxLength={500}
             />
           </label>
 
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-purple-300 bg-white px-3 py-5 text-sm font-medium text-purple-800">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-sky-300 bg-white px-3 py-5 text-sm font-medium text-sky-800">
             {foto ? `📸 ${foto.name}` : "📷 Foto do problema *"}
             <input
               type="file"
@@ -147,7 +147,7 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
               setModo("escolha");
               setErro(null);
             }}
-            className="text-center text-sm text-purple-600"
+            className="text-center text-sm text-sky-700"
           >
             Voltar
           </button>
