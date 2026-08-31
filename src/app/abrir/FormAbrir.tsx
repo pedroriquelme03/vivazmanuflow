@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { idUnico } from "@/lib/id-unico";
+import { uploadAnexo } from "@/lib/upload-anexo";
+import { EscolherMidia } from "@/components/EscolherMidia";
 import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
@@ -80,9 +83,19 @@ export function FormAbrir({
     setEventoId("");
   }
 
-  function adicionarArquivos(lista: FileList | null) {
-    if (!lista) return;
-    setArquivos((atual) => [...atual, ...Array.from(lista)].slice(0, 5));
+  function adicionarArquivos(lista: File[]) {
+    if (lista.length === 0) return;
+    setArquivos((atual) => [...atual, ...lista].slice(0, 5));
+  }
+
+  function nomeVisivel(arquivo: File, indice: number) {
+    const n = arquivo.name?.trim();
+    if (n && n !== "image.jpg" && n !== "image.jpeg" && n !== "blob") {
+      return n;
+    }
+    return arquivo.type.startsWith("video/")
+      ? `Vídeo ${indice + 1}`
+      : `Foto ${indice + 1}`;
   }
 
   function removerArquivo(indice: number) {
@@ -102,13 +115,19 @@ export function FormAbrir({
       for (const original of arquivos) {
         const arquivo = await comprimirImagem(original);
         const ehVideo = arquivo.type.startsWith("video/");
-        const ext = arquivo.name.split(".").pop() || (ehVideo ? "mp4" : "jpg");
-        const caminho = `abertura/${crypto.randomUUID()}.${ext}`;
-
-        const { error: upErro } = await supabase.storage
-          .from("anexos")
-          .upload(caminho, arquivo, { contentType: arquivo.type });
-        if (upErro) throw new Error("Falha ao enviar o anexo. Tente novamente.");
+        const tipo = ehVideo
+          ? arquivo.type || "video/mp4"
+          : "image/jpeg";
+        const caminho = `abertura/${idUnico()}.${ehVideo ? "mp4" : "jpg"}`;
+        const { error: upErro } = await uploadAnexo(
+          supabase,
+          caminho,
+          arquivo,
+          tipo,
+        );
+        if (upErro) {
+          throw new Error(`Falha ao enviar o anexo: ${upErro.message}`);
+        }
 
         const { data: pub } = supabase.storage.from("anexos").getPublicUrl(caminho);
         anexos.push({ url: pub.publicUrl, tipo: ehVideo ? "video" : "foto" });
@@ -309,28 +328,21 @@ export function FormAbrir({
 
       <Campo label="Foto ou vídeo" opcional>
         <div className="grid gap-2">
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            📷 Tirar foto / escolher arquivo
-            <input
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                adicionarArquivos(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          <EscolherMidia
+            accept="image/*,video/*"
+            multiple
+            onEscolheu={adicionarArquivos}
+          />
+          <p className="text-xs text-slate-400">Até 5 arquivos. Pode misturar câmera e galeria.</p>
 
           {arquivos.length > 0 && (
             <ul className="grid gap-1.5">
               {arquivos.map((a, i) => (
                 <li
-                  key={i}
+                  key={`${nomeVisivel(a, i)}-${i}-${a.size}-${a.lastModified}`}
                   className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-2 text-sm"
                 >
-                  <span className="truncate">{a.name}</span>
+                  <span className="truncate">{nomeVisivel(a, i)}</span>
                   <button
                     type="button"
                     onClick={() => removerArquivo(i)}

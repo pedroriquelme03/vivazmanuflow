@@ -20,6 +20,7 @@ import {
   apagarDemandaGestor,
 } from "@/lib/demanda-gestor";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { VideoAnexo } from "@/components/VideoAnexo";
 import type { Enums } from "@/lib/database.types";
 
 type HistoricoItem = {
@@ -370,14 +371,7 @@ export function DetalheDemandaModal({
                       />
                     </a>
                   ) : (
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex h-28 items-center justify-center rounded-lg bg-slate-100 text-xs font-medium text-slate-600"
-                    >
-                      Ver vídeo
-                    </a>
+                    <VideoAnexo url={a.url} />
                   )}
                   <p className="mt-1 text-[10px] text-slate-400">
                     {a.enviado_por} · {formatarData(a.criado_em)}

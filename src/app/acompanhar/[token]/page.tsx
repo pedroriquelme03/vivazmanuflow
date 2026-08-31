@@ -8,6 +8,7 @@ import {
   formatarData,
 } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { VideoAnexo } from "@/components/VideoAnexo";
 import { ValidacaoSolicitante } from "./ValidacaoSolicitante";
 import type { Enums } from "@/lib/database.types";
 
@@ -111,29 +112,34 @@ export default async function AcompanharToken({
           <div className="mt-4">
             <h2 className="mb-2 text-sm font-semibold text-slate-600">Anexos</h2>
             <div className="grid grid-cols-3 gap-2">
-              {d.anexos.map((a, i) => (
-                <a
-                  key={i}
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
-                >
-                  {a.tipo === "foto" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+              {d.anexos
+                .filter((a) => a.tipo === "foto")
+                .map((a, i) => (
+                  <a
+                    key={i}
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={a.url}
                       alt="Anexo"
                       className="aspect-square w-full object-cover"
                     />
-                  ) : (
-                    <div className="flex aspect-square w-full items-center justify-center text-2xl">
-                      🎬
-                    </div>
-                  )}
-                </a>
-              ))}
+                  </a>
+                ))}
             </div>
+            {d.anexos.some((a) => a.tipo === "video") && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {d.anexos
+                  .filter((a) => a.tipo === "video")
+                  .map((a, i) => (
+                    <VideoAnexo key={i} url={a.url} />
+                  ))}
+              </div>
+            )}
           </div>
         )}
 

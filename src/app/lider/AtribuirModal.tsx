@@ -54,7 +54,41 @@ export function AtribuirModal({
 
   async function salvar() {
     setErro(null);
-    if (!colaboradorId) return setErro("Escolha um colaborador.");
+
+    if (!colaboradorId) {
+      if (demanda.status === "aberta" && !demanda.colaborador_id) {
+        return setErro("Escolha um colaborador, ou volte sem atribuir.");
+      }
+
+      setSalvando(true);
+      const { error } = await supabase
+        .from("demandas")
+        .update({
+          colaborador_id: null,
+          status: "aberta",
+          prazo_confirmado: null,
+          atribuido_em: null,
+          iniciado_em: null,
+          motivo_nao_conclusao: null,
+        })
+        .eq("id", demanda.id);
+
+      if (error) {
+        setErro("Não foi possível tirar o responsável. Tente novamente.");
+        setSalvando(false);
+        return;
+      }
+
+      await supabase.from("demanda_historico").insert({
+        demanda_id: demanda.id,
+        status_anterior: demanda.status,
+        status_novo: "aberta",
+        observacao: "Gestor tirou o responsável — demanda voltou para Abertas",
+      });
+      onSalvo();
+      return;
+    }
+
     if (!prazo) return setErro("Defina o prazo.");
 
     setSalvando(true);
@@ -129,13 +163,23 @@ export function AtribuirModal({
               onChange={(e) => setColaboradorId(e.target.value)}
               className={inputCls}
             >
-              <option value="">Selecione…</option>
+              <option value="">
+                {demanda.colaborador_id
+                  ? "Sem responsável (volta para Abertas)"
+                  : "Selecione…"}
+              </option>
               {disponiveis.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nome}
                 </option>
               ))}
             </select>
+            {demanda.colaborador_id && !colaboradorId && (
+              <p className="text-xs text-slate-500">
+                Sem responsável a demanda volta para Abertas, para outro
+                colaborador pegar.
+              </p>
+            )}
             {disponiveis.length === 0 && (
               <p className="text-xs text-amber-600">
                 Nenhum colaborador cadastrado para esta propriedade.
@@ -143,6 +187,7 @@ export function AtribuirModal({
             )}
           </div>
 
+          {colaboradorId && (
           <div className="grid gap-1.5">
             <label className="text-sm font-medium text-slate-700">
               Prazo (o cronômetro passa a valer a partir daqui)
@@ -159,6 +204,7 @@ export function AtribuirModal({
               {slaHoras[demanda.prioridade] ?? 24}h).
             </p>
           </div>
+          )}
 
           {erro && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -179,7 +225,11 @@ export function AtribuirModal({
               disabled={salvando}
               className="flex-1 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
-              {salvando ? "Salvando…" : "Confirmar"}
+              {salvando
+                ? "Salvando…"
+                : !colaboradorId && demanda.colaborador_id
+                  ? "Tirar responsável"
+                  : "Confirmar"}
             </button>
           </div>
 

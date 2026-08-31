@@ -1,13 +1,14 @@
 /**
  * Reduz uma imagem no próprio navegador antes do upload (redimensiona e
- * recomprime como JPEG). Vídeos e formatos não suportados voltam sem alteração.
+ * recomprime como JPEG). Vídeos voltam sem alteração.
+ * No Android a câmera às vezes manda o arquivo sem MIME type — ainda tentamos comprimir.
  */
 export async function comprimirImagem(
   file: File,
   maxLado = 1600,
   qualidade = 0.7,
 ): Promise<File> {
-  if (!file.type.startsWith("image/")) return file;
+  if (file.type.startsWith("video/")) return file;
 
   try {
     const bitmap = await createImageBitmap(file);
@@ -29,10 +30,9 @@ export async function comprimirImagem(
     );
     if (!blob) return file;
 
-    const nome = file.name.replace(/\.[^.]+$/, "") + ".jpg";
-    return new File([blob], nome, { type: "image/jpeg" });
+    const base = (file.name || "foto").replace(/\.[^.]+$/, "") || "foto";
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
   } catch {
-    // Se o navegador não conseguir decodificar (ex.: HEIC antigo), envia o original.
     return file;
   }
 }

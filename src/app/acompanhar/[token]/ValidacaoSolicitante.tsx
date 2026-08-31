@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { idUnico } from "@/lib/id-unico";
+import { uploadAnexo } from "@/lib/upload-anexo";
+import { EscolherMidia } from "@/components/EscolherMidia";
 
 export function ValidacaoSolicitante({ token }: { token: string }) {
   const router = useRouter();
@@ -43,10 +46,13 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
     setOcupado(true);
     try {
       const arquivo = await comprimirImagem(foto);
-      const caminho = `contestacao/${crypto.randomUUID()}.jpg`;
-      const { error: upErro } = await supabase.storage
-        .from("anexos")
-        .upload(caminho, arquivo, { contentType: arquivo.type });
+      const caminho = `contestacao/${idUnico()}.jpg`;
+      const { error: upErro } = await uploadAnexo(
+        supabase,
+        caminho,
+        arquivo,
+        arquivo.type || "image/jpeg",
+      );
       if (upErro) throw new Error("Falha ao enviar a foto.");
 
       const url = supabase.storage.from("anexos").getPublicUrl(caminho).data
@@ -122,16 +128,10 @@ export function ValidacaoSolicitante({ token }: { token: string }) {
             />
           </label>
 
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-sky-300 bg-white px-3 py-5 text-sm font-medium text-sky-800">
-            {foto ? `📸 ${foto.name}` : "📷 Foto do problema *"}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          <EscolherMidia
+            arquivoNome={foto?.name}
+            onEscolheu={(files) => setFoto(files[0] ?? null)}
+          />
 
           <button
             type="button"

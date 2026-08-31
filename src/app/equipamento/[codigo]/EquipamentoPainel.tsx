@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TIPOS_MANUTENCAO } from "@/lib/equipamento";
+import { EscolherMidia } from "@/components/EscolherMidia";
+import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { idUnico } from "@/lib/id-unico";
+import { uploadAnexo } from "@/lib/upload-anexo";
 
 type Equipamento = {
   id: string;
@@ -78,11 +82,14 @@ export function EquipamentoPainel({
 
     let fotoUrl: string | undefined;
     if (foto) {
-      const ext = foto.name.split(".").pop() || "jpg";
-      const caminho = `equipamentos/${equipamento.codigo}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("anexos")
-        .upload(caminho, foto, { contentType: foto.type });
+      const arquivo = await comprimirImagem(foto);
+      const caminho = `equipamentos/${equipamento.codigo}/${idUnico()}.jpg`;
+      const { error: upErr } = await uploadAnexo(
+        supabase,
+        caminho,
+        arquivo,
+        arquivo.type || "image/jpeg",
+      );
       if (upErr) {
         setSalvando(false);
         return setErro(`Falha no upload da foto: ${upErr.message}`);
@@ -184,16 +191,15 @@ export function EquipamentoPainel({
                 onChange={(e) => setDescricao(e.target.value)}
               />
             </label>
-            <label className="block text-xs font-medium text-slate-500">
+            <div className="block text-xs font-medium text-slate-500">
               Foto (opcional)
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="mt-1 block w-full text-sm"
-                onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-              />
-            </label>
+              <div className="mt-1">
+                <EscolherMidia
+                  arquivoNome={foto?.name}
+                  onEscolheu={(files) => setFoto(files[0] ?? null)}
+                />
+              </div>
+            </div>
             <button
               type="button"
               onClick={registrar}

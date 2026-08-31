@@ -56,6 +56,7 @@ export default async function LiderHome() {
         demandasIniciais={demandas ?? []}
         colaboradores={colaboradores ?? []}
         slaHoras={slaHoras}
+        agoraInicial={Date.now()}
         opcoesNovaDemanda={{
           propriedades: propriedades ?? [],
           solicitantes: solicitantes ?? [],

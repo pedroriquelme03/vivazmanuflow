@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { idUnico } from "@/lib/id-unico";
+import { uploadAnexo } from "@/lib/upload-anexo";
+import { EscolherMidia } from "@/components/EscolherMidia";
+import { VideoAnexo } from "@/components/VideoAnexo";
 import {
   COLAB_SELECT,
   GERAIS_SELECT,
@@ -635,6 +639,7 @@ function CardColab({
   const supabase = createClient();
   const [passo, setPasso] = useState<Passo>("inicio");
   const [foto, setFoto] = useState<File | null>(null);
+  const [fotosConclusao, setFotosConclusao] = useState<File[]>([]);
   const [descricaoConclusao, setDescricaoConclusao] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -662,11 +667,10 @@ function CardColab({
 
   async function enviarFotoColaborador(pasta: string, arquivoOrigem: File) {
     const arquivo = await comprimirImagem(arquivoOrigem);
-    const caminho = `${pasta}/${crypto.randomUUID()}.jpg`;
-    const { error: upErro } = await supabase.storage
-      .from("anexos")
-      .upload(caminho, arquivo, { contentType: arquivo.type });
-    if (upErro) throw new Error();
+    const caminho = `${pasta}/${idUnico()}.jpg`;
+    const tipo = arquivo.type && arquivo.type !== "" ? arquivo.type : "image/jpeg";
+    const { error: upErro } = await uploadAnexo(supabase, caminho, arquivo, tipo);
+    if (upErro) throw new Error(upErro.message);
 
     const url = supabase.storage.from("anexos").getPublicUrl(caminho).data.publicUrl;
     const { error: anxErro } = await supabase.from("demanda_anexos").insert({
@@ -675,12 +679,12 @@ function CardColab({
       url,
       enviado_por: "colaborador",
     });
-    if (anxErro) throw new Error();
+    if (anxErro) throw new Error(anxErro.message);
   }
 
   async function concluir() {
-    if (!foto) {
-      setErro("Envie uma foto do serviço concluído.");
+    if (fotosConclusao.length === 0) {
+      setErro("Envie pelo menos uma foto do serviço concluído.");
       return;
     }
     if (!descricaoConclusao.trim()) {
@@ -690,7 +694,9 @@ function CardColab({
     setOcupado(true);
     setErro(null);
     try {
-      await enviarFotoColaborador("conclusao", foto);
+      for (const arquivo of fotosConclusao) {
+        await enviarFotoColaborador("conclusao", arquivo);
+      }
 
       const updates: TablesUpdate<"demandas"> = {
         status: "aguardando_validacao",
@@ -711,8 +717,12 @@ function CardColab({
       });
 
       onMudou();
-    } catch {
-      setErro("Falha ao concluir. Verifique a internet e tente de novo.");
+    } catch (err) {
+      setErro(
+        err instanceof Error && err.message
+          ? `Não deu para enviar: ${err.message}`
+          : "Falha ao concluir. Verifique a internet e tente de novo.",
+      );
       setOcupado(false);
     }
   }
@@ -747,7 +757,7 @@ function CardColab({
     setOcupado(true);
     setErro(null);
     try {
-      await enviarFotoColaborador("nao-perturbe", foto);
+      await enviarFotoColaborador("conclusao", foto);
       const { error } = await supabase
         .from("demandas")
         .update({ motivo_nao_conclusao: MOTIVO_NAO_PERTURBE })
@@ -757,8 +767,12 @@ function CardColab({
       setFoto(null);
       setPasso("inicio");
       onMudou();
-    } catch {
-      setErro("Falha ao enviar a foto. Verifique a internet e tente de novo.");
+    } catch (err) {
+      setErro(
+        err instanceof Error && err.message
+          ? `Não deu para enviar: ${err.message}`
+          : "Falha ao enviar a foto. Verifique a internet e tente de novo.",
+      );
     } finally {
       setOcupado(false);
     }
@@ -767,6 +781,7 @@ function CardColab({
   function voltar() {
     setPasso("inicio");
     setFoto(null);
+    setFotosConclusao([]);
     setDescricaoConclusao("");
     setErro(null);
   }
@@ -861,18 +876,49 @@ function CardColab({
 
           {demanda.status === "em_andamento" && passo === "foto" && (
             <div className="grid gap-3">
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-base font-medium text-slate-600">
-                {foto ? `📸 ${foto.name}` : "📷 Tirar foto / escolher da galeria *"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    setFoto(e.target.files?.[0] ?? null);
-                    setErro(null);
-                  }}
-                />
-              </label>
+              <EscolherMidia
+                multiple
+                arquivoNome={
+                  fotosConclusao.length > 0
+                    ? `${fotosConclusao.length} foto(s)`
+                    : null
+                }
+                onEscolheu={(files) => {
+                  setFotosConclusao((atual) =>
+                    [...atual, ...files].slice(0, 5),
+                  );
+                  setErro(null);
+                }}
+              />
+              {fotosConclusao.length > 0 && (
+                <ul className="grid gap-1.5">
+                  {fotosConclusao.map((a, i) => (
+                    <li
+                      key={`${a.name}-${i}-${a.size}`}
+                      className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-2 text-sm"
+                    >
+                      <span className="truncate">
+                        {a.name?.trim() || `Foto ${i + 1}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFotosConclusao((atual) =>
+                            atual.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        className="ml-2 shrink-0 text-slate-400 hover:text-red-600"
+                        aria-label="Remover"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-center text-xs text-slate-400">
+                Até 5 fotos. Pode tirar de novo ou pegar da galeria.
+              </p>
               <div className="grid gap-1.5">
                 <label className="text-sm font-medium text-slate-700">
                   O que foi feito? <span className="text-red-500">*</span>
@@ -930,18 +976,13 @@ function CardColab({
               <p className="text-center text-sm font-medium text-slate-600">
                 Envie uma foto do aviso de não perturbe.
               </p>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-base font-medium text-slate-600">
-                {foto ? `📸 ${foto.name}` : "📷 Tirar foto / escolher da galeria *"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    setFoto(e.target.files?.[0] ?? null);
-                    setErro(null);
-                  }}
-                />
-              </label>
+              <EscolherMidia
+                arquivoNome={foto?.name}
+                onEscolheu={(files) => {
+                  setFoto(files[0] ?? null);
+                  setErro(null);
+                }}
+              />
               <BotaoGrande
                 cor="cinza"
                 onClick={confirmarNaoPerturbe}
@@ -975,13 +1016,7 @@ function AnexosDoSolicitante({ anexos }: { anexos?: AnexoDemanda[] | null }) {
     <div className="mt-3 grid grid-cols-1 gap-2">
       {itens.map((a, i) =>
         a.tipo === "video" ? (
-          <video
-            key={`${a.url}-${i}`}
-            src={a.url}
-            controls
-            playsInline
-            className="max-h-56 w-full rounded-lg bg-black"
-          />
+          <VideoAnexo key={`${a.url}-${i}`} url={a.url} />
         ) : (
           <a
             key={`${a.url}-${i}`}
