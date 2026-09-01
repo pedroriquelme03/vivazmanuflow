@@ -7,6 +7,7 @@ import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
 import { uploadAnexo } from "@/lib/upload-anexo";
 import { EscolherMidia } from "@/components/EscolherMidia";
+import { solicitantesUnicos } from "@/lib/solicitante-gestor";
 import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
@@ -63,7 +64,10 @@ export function FormAbrir({
   const [erro, setErro] = useState<string | null>(null);
 
   const solicitantesFiltrados = useMemo(
-    () => solicitantes.filter((s) => s.propriedade_id === propriedadeId),
+    () =>
+      solicitantesUnicos(
+        solicitantes.filter((s) => s.propriedade_id === propriedadeId),
+      ),
     [solicitantes, propriedadeId],
   );
   const eventosFiltrados = useMemo(
@@ -106,6 +110,7 @@ export function FormAbrir({
     e.preventDefault();
     setErro(null);
 
+    if (!sublocal.trim()) return setErro("Informe o local.");
     if (!solicitanteId) return setErro("Selecione quem está solicitando.");
     if (!titulo.trim()) return setErro("Descreva o que precisa ser feito.");
 
@@ -145,14 +150,14 @@ export function FormAbrir({
       const token = data?.[0]?.token;
       if (!token) throw new Error("Não foi possível gerar o acompanhamento.");
 
-      if (sublocal.trim()) {
+      {
         const { error: subErro } = await supabase.rpc("definir_sublocal", {
           p_token: String(token),
           p_sublocal: sublocal.trim(),
         });
         if (subErro) {
           throw new Error(
-            "Demanda criada, mas o sublocal não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
+            "Demanda criada, mas o local não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
           );
         }
       }
@@ -252,13 +257,14 @@ export function FormAbrir({
         </Campo>
       )}
 
-      <Campo label="Sublocal" opcional>
+      <Campo label="Local">
         <input
           value={sublocal}
           onChange={(e) => setSublocal(e.target.value)}
           placeholder="Ex.: Quarto 204, piscina, recepção…"
           className={inputCls}
           maxLength={120}
+          required
         />
       </Campo>
 

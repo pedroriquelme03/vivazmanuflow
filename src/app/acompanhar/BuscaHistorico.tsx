@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { STATUS_LABEL, STATUS_BADGE, formatarData } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { solicitantesUnicos } from "@/lib/solicitante-gestor";
 import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
@@ -35,7 +36,10 @@ export function BuscaHistorico({
   const [carregando, setCarregando] = useState(false);
 
   const solicitantesFiltrados = useMemo(
-    () => solicitantes.filter((s) => s.propriedade_id === propriedadeId),
+    () =>
+      solicitantesUnicos(
+        solicitantes.filter((s) => s.propriedade_id === propriedadeId),
+      ),
     [solicitantes, propriedadeId],
   );
 

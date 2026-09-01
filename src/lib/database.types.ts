@@ -709,6 +709,7 @@ export type Database = {
       }
       rotulo_sublocal: { Args: { p_token: string }; Returns: string }
       acompanhar_demanda: { Args: { p_token: string }; Returns: Json }
+      demandas_quadro_tv: { Args: Record<string, never>; Returns: Json }
       admin_criar_usuario: {
         Args: {
           p_email: string

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, Enums } from "@/lib/database.types";
+import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
 
 type Prop = Tables<"propriedades">;
 type Setor = Tables<"setores">;
@@ -122,7 +123,10 @@ export function AdminApp(props: {
         )}
         {aba === "Peso" && <PesoConfiguracao inicial={props.pesoConfig} />}
         {aba === "Equipe" && (
-          <Equipe itens={props.usuarios} propriedades={props.propriedades} />
+          <Equipe
+            itens={props.usuarios}
+            propriedades={props.propriedades}
+          />
         )}
       </div>
     </div>
@@ -917,7 +921,18 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
       p_propriedade_id: propId || undefined,
     });
     if (error) return setErro(error.message);
-    setOk(`Usuário ${email} criado.`);
+    if (role === "admin" || role === "lider") {
+      await garantirSolicitantesGestor(supabase, {
+        nome,
+        propriedadeId: propId || null,
+        propriedades,
+      });
+    }
+    setOk(
+      role === "admin" || role === "lider"
+        ? `Usuário ${email} criado e incluído como solicitante.`
+        : `Usuário ${email} criado.`,
+    );
     setNome("");
     setEmail("");
     setSenha("");
@@ -941,6 +956,11 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
   return (
     <Card>
       <p className="mb-2 text-sm font-semibold text-slate-600">Novo membro da equipe</p>
+      <p className="mb-3 text-xs text-slate-500">
+        Líder e administrador só entram na lista de solicitantes se o nome
+        ainda não existir naquele local. Quem já está cadastrado continua o
+        mesmo registro.
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <input className={inputCls} placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
         <input className={inputCls} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
