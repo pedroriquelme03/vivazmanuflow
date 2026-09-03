@@ -217,7 +217,7 @@ export function QuadroTv() {
   };
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-slate-100">
+    <div className="flex h-dvh w-dvw max-w-full flex-col overflow-hidden bg-slate-100">
       <header className="shrink-0 bg-[#063b45] text-white">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-4">
           <div className="min-w-0">
@@ -255,7 +255,7 @@ export function QuadroTv() {
         </p>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto p-3">
+      <div className="flex min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto p-4 xl:grid xl:grid-cols-5 xl:overflow-hidden">
         {COLUNAS.map((col) => (
           <ColunaTv
             key={col.status}
@@ -360,35 +360,52 @@ function ColunaTv({
     const el = listaRef.current;
     if (!el) return;
 
-    let pausando = false;
-    let volta: number | undefined;
-    const id = window.setInterval(() => {
+    const PX_POR_SEGUNDO = 12;
+    const PAUSA_MS = 900;
+    let dir = 1;
+    let pausaAte = 0;
+    let ultimo = performance.now();
+    let raf = 0;
+
+    const tick = (agora: number) => {
+      const dt = Math.min(0.05, (agora - ultimo) / 1000);
+      ultimo = agora;
+
       if (el.scrollHeight <= el.clientHeight + 8) {
         el.scrollTop = 0;
-        return;
-      }
-      if (pausando) return;
-
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
-        pausando = true;
-        volta = window.setTimeout(() => {
-          el.scrollTop = 0;
-          pausando = false;
-        }, 2800);
+        dir = 1;
+        raf = requestAnimationFrame(tick);
         return;
       }
 
-      el.scrollTop += 1;
-    }, 50);
+      if (agora < pausaAte) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
 
-    return () => {
-      clearInterval(id);
-      if (volta) clearTimeout(volta);
+      el.scrollTop += dir * PX_POR_SEGUNDO * dt;
+      const noFim = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      const noTopo = el.scrollTop <= 0;
+
+      if (dir > 0 && noFim) {
+        el.scrollTop = el.scrollHeight - el.clientHeight;
+        dir = -1;
+        pausaAte = agora + PAUSA_MS;
+      } else if (dir < 0 && noTopo) {
+        el.scrollTop = 0;
+        dir = 1;
+        pausaAte = agora + PAUSA_MS;
+      }
+
+      raf = requestAnimationFrame(tick);
     };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   return (
-    <section className="flex h-full min-w-[17.5rem] flex-1 flex-col overflow-hidden rounded-xl bg-slate-200/80 p-2">
+    <section className="flex h-full min-h-0 w-[min(20rem,88vw)] shrink-0 flex-col overflow-hidden rounded-xl bg-slate-200/80 p-2 xl:w-auto xl:min-w-0">
       <header className="relative z-[1] shrink-0 px-2 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-baseline gap-1.5 text-sm font-semibold text-slate-700">
