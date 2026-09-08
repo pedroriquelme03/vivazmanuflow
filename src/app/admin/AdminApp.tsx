@@ -996,7 +996,11 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
             key={u.id}
             nome={u.nome}
             ativo={u.ativo}
-            extra={`${ROLE_LABEL[u.role]} · ${nomeProp(u.propriedade_id)}`}
+            extra={[
+              u.email || "Sem e-mail",
+              ROLE_LABEL[u.role],
+              nomeProp(u.propriedade_id),
+            ].join(" · ")}
             onToggle={() => toggle(u)}
             acoes={
               <button

@@ -613,6 +613,7 @@ export type Database = {
         Row: {
           ativo: boolean
           criado_em: string
+          email: string | null
           foto_url: string | null
           id: string
           nome: string
@@ -622,6 +623,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           criado_em?: string
+          email?: string | null
           foto_url?: string | null
           id: string
           nome: string
@@ -631,6 +633,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           criado_em?: string
+          email?: string | null
           foto_url?: string | null
           id?: string
           nome?: string
