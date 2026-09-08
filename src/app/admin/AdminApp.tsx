@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, Enums } from "@/lib/database.types";
 import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
+import {
+  ListaCadastroControles,
+  useListaCadastro,
+} from "@/components/ListaCadastroControles";
 
 type Prop = Tables<"propriedades">;
 type Setor = Tables<"setores">;
@@ -204,6 +208,9 @@ function ErroMsg({ erro }: { erro: string | null }) {
 function Propriedades({ itens }: { itens: Prop[] }) {
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
+  const getTexto = useCallback((p: Prop) => p.nome, []);
+  const getAtivo = useCallback((p: Prop) => p.ativo, []);
+  const lista = useListaCadastro(itens, getTexto, { getAtivo });
 
   async function adicionar() {
     if (!nome.trim()) return;
@@ -239,8 +246,12 @@ function Propriedades({ itens }: { itens: Prop[] }) {
         <BtnAdd onClick={adicionar} />
       </div>
       <ErroMsg erro={erro} />
-      <div className="mt-3">
-        {itens.map((p) => (
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar local principal…"
+      />
+      <div className="mt-1">
+        {lista.itens.map((p) => (
           <Linha
             key={p.id}
             nome={p.nome}
@@ -259,8 +270,21 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState("");
+  const [filtroProp, setFiltroProp] = useState("");
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
+
+  const getTexto = useCallback(
+    (s: Setor) => `${s.nome} ${nomeProp(s.propriedade_id)}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [propriedades],
+  );
+  const getAtivo = useCallback((s: Setor) => s.ativo, []);
+  const filtro = useCallback(
+    (s: Setor) => !filtroProp || s.propriedade_id === filtroProp,
+    [filtroProp],
+  );
+  const lista = useListaCadastro(itens, getTexto, { getAtivo, filtro });
 
   async function adicionar() {
     if (!nome.trim()) return;
@@ -302,8 +326,26 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
         <BtnAdd onClick={adicionar} />
       </div>
       <ErroMsg erro={erro} />
-      <div className="mt-3">
-        {itens.map((s) => (
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar setor…"
+        filtrosExtras={
+          <select
+            className={inputCls}
+            value={filtroProp}
+            onChange={(e) => setFiltroProp(e.target.value)}
+          >
+            <option value="">Todos os locais</option>
+            {propriedades.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        }
+      />
+      <div className="mt-1">
+        {lista.itens.map((s) => (
           <Linha
             key={s.id}
             nome={s.nome}
@@ -332,7 +374,8 @@ function Locais({
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
   const [setorId, setSetorId] = useState("");
-  const [filtroProp, setFiltroProp] = useState<string>("todos");
+  const [filtroProp, setFiltroProp] = useState<string>("");
+  const [filtroSetor, setFiltroSetor] = useState("");
   const [populando, setPopulando] = useState(false);
   const [msgOk, setMsgOk] = useState<string | null>(null);
 
@@ -340,10 +383,20 @@ function Locais({
   const nomeSetor = (id: string | null) =>
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
 
-  const filtrados =
-    filtroProp === "todos"
-      ? itens
-      : itens.filter((l) => l.propriedade_id === filtroProp);
+  const getTexto = useCallback(
+    (l: Local) =>
+      `${l.nome} ${nomeProp(l.propriedade_id)} ${nomeSetor(l.setor_id)}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [propriedades, setores],
+  );
+  const getAtivo = useCallback((l: Local) => l.ativo, []);
+  const filtro = useCallback(
+    (l: Local) =>
+      (!filtroProp || l.propriedade_id === filtroProp) &&
+      (!filtroSetor || l.setor_id === filtroSetor),
+    [filtroProp, filtroSetor],
+  );
+  const lista = useListaCadastro(itens, getTexto, { getAtivo, filtro });
 
   async function adicionar() {
     setMsgOk(null);
@@ -374,16 +427,16 @@ function Locais({
       const novos: { nome: string; propriedade_id: string }[] = [];
       for (const prop of propriedades) {
         const chave = normalizarNome(prop.nome);
-        const lista =
+        const padrao =
           SUBLOCAIS_PADRAO[chave] ??
           Object.entries(SUBLOCAIS_PADRAO).find(([k]) => chave.includes(k))?.[1];
-        if (!lista) continue;
+        if (!padrao) continue;
         const existentes = new Set(
           itens
             .filter((l) => l.propriedade_id === prop.id)
             .map((l) => normalizarNome(l.nome)),
         );
-        for (const sub of lista) {
+        for (const sub of padrao) {
           if (!existentes.has(normalizarNome(sub))) {
             novos.push({ nome: sub, propriedade_id: prop.id });
           }
@@ -456,29 +509,46 @@ function Locais({
         </p>
       )}
 
-      <div className="mt-4 flex items-center gap-2">
-        <label className="text-xs font-medium text-slate-500">Filtrar:</label>
-        <select
-          className={inputCls}
-          value={filtroProp}
-          onChange={(e) => setFiltroProp(e.target.value)}
-        >
-          <option value="todos">Todos os locais</option>
-          {propriedades.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
-      </div>
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar sublocal…"
+        filtrosExtras={
+          <>
+            <select
+              className={inputCls}
+              value={filtroProp}
+              onChange={(e) => setFiltroProp(e.target.value)}
+            >
+              <option value="">Todos os locais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filtroSetor}
+              onChange={(e) => setFiltroSetor(e.target.value)}
+            >
+              <option value="">Todos os setores</option>
+              {setores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
 
-      <div className="mt-3">
-        {filtrados.length === 0 && (
+      <div className="mt-1">
+        {lista.itens.length === 0 && (
           <p className="py-6 text-center text-sm text-slate-400">
-            Nenhum sublocal cadastrado. Use o botão acima ou adicione manualmente.
+            Nenhum sublocal encontrado.
           </p>
         )}
-        {filtrados.map((l) => (
+        {lista.itens.map((l) => (
           <Linha
             key={l.id}
             nome={l.nome}
@@ -509,9 +579,26 @@ function Solicitantes({
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
   const [setorId, setSetorId] = useState("");
+  const [filtroProp, setFiltroProp] = useState("");
+  const [filtroSetor, setFiltroSetor] = useState("");
   const nomeProp = (id: string) => propriedades.find((p) => p.id === id)?.nome ?? "?";
   const nomeSetor = (id: string | null) =>
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
+
+  const getTexto = useCallback(
+    (s: Solic) =>
+      `${s.nome} ${nomeProp(s.propriedade_id)} ${nomeSetor(s.setor_id)}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [propriedades, setores],
+  );
+  const getAtivo = useCallback((s: Solic) => s.ativo, []);
+  const filtro = useCallback(
+    (s: Solic) =>
+      (!filtroProp || s.propriedade_id === filtroProp) &&
+      (!filtroSetor || s.setor_id === filtroSetor),
+    [filtroProp, filtroSetor],
+  );
+  const lista = useListaCadastro(itens, getTexto, { getAtivo, filtro });
 
   async function adicionar() {
     if (!nome.trim() || !propId) return setErro("Informe nome e local principal.");
@@ -560,8 +647,40 @@ function Solicitantes({
         <BtnAdd onClick={adicionar} />
       </div>
       <ErroMsg erro={erro} />
-      <div className="mt-3">
-        {itens.map((s) => (
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar solicitante…"
+        filtrosExtras={
+          <>
+            <select
+              className={inputCls}
+              value={filtroProp}
+              onChange={(e) => setFiltroProp(e.target.value)}
+            >
+              <option value="">Todos os locais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filtroSetor}
+              onChange={(e) => setFiltroSetor(e.target.value)}
+            >
+              <option value="">Todos os setores</option>
+              {setores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
+      <div className="mt-1">
+        {lista.itens.map((s) => (
           <Linha
             key={s.id}
             nome={s.nome}
@@ -595,6 +714,9 @@ function Predefinidas({
     useState<Enums<"demanda_prioridade">>("media");
   const [colaboradorId, setColaboradorId] = useState("");
   const [propId, setPropId] = useState("");
+  const [filtroProp, setFiltroProp] = useState("");
+  const [filtroColab, setFiltroColab] = useState("");
+  const [filtroPrio, setFiltroPrio] = useState("");
 
   const colaboradores = usuarios.filter(
     (u) => u.role === "colaborador" && u.ativo,
@@ -604,6 +726,22 @@ function Predefinidas({
     usuarios.find((u) => u.id === id)?.nome ?? "?";
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
+
+  const getTexto = useCallback(
+    (p: Pred) =>
+      `${p.titulo} ${p.descricao ?? ""} ${nomeColab(p.colaborador_id)} ${nomeProp(p.propriedade_id)} ${p.prioridade}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [usuarios, propriedades],
+  );
+  const getAtivo = useCallback((p: Pred) => p.ativo, []);
+  const filtro = useCallback(
+    (p: Pred) =>
+      (!filtroProp || p.propriedade_id === filtroProp) &&
+      (!filtroColab || p.colaborador_id === filtroColab) &&
+      (!filtroPrio || p.prioridade === filtroPrio),
+    [filtroProp, filtroColab, filtroPrio],
+  );
+  const lista = useListaCadastro(itens, getTexto, { getAtivo, filtro });
 
   async function adicionar() {
     setErro(null);
@@ -717,13 +855,57 @@ function Predefinidas({
           pré-definidas.
         </p>
       )}
-      <div className="mt-3">
-        {itens.length === 0 && (
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar demanda pré-definida…"
+        filtrosExtras={
+          <>
+            <select
+              className={inputCls}
+              value={filtroProp}
+              onChange={(e) => setFiltroProp(e.target.value)}
+            >
+              <option value="">Todos os locais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filtroColab}
+              onChange={(e) => setFiltroColab(e.target.value)}
+            >
+              <option value="">Todos os colaboradores</option>
+              {usuarios
+                .filter((u) => u.role === "colaborador")
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+            </select>
+            <select
+              className={inputCls}
+              value={filtroPrio}
+              onChange={(e) => setFiltroPrio(e.target.value)}
+            >
+              <option value="">Todas as prioridades</option>
+              <option value="alta">Alta</option>
+              <option value="media">Média</option>
+              <option value="baixa">Baixa</option>
+            </select>
+          </>
+        }
+      />
+      <div className="mt-1">
+        {lista.itens.length === 0 && (
           <p className="py-6 text-center text-sm text-slate-400">
-            Nenhuma demanda pré-definida ainda.
+            Nenhuma demanda pré-definida encontrada.
           </p>
         )}
-        {itens.map((p) => (
+        {lista.itens.map((p) => (
           <Linha
             key={p.id}
             nome={p.titulo}
@@ -906,9 +1088,26 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
   const [senha, setSenha] = useState("");
   const [role, setRole] = useState<Enums<"user_role">>("colaborador");
   const [propId, setPropId] = useState("");
+  const [filtroRole, setFiltroRole] = useState("");
+  const [filtroProp, setFiltroProp] = useState("");
   const [ok, setOk] = useState<string | null>(null);
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas";
+
+  const getTexto = useCallback(
+    (u: Usuario) =>
+      `${u.nome} ${u.email ?? ""} ${ROLE_LABEL[u.role]} ${nomeProp(u.propriedade_id)}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [propriedades],
+  );
+  const getAtivo = useCallback((u: Usuario) => u.ativo, []);
+  const filtro = useCallback(
+    (u: Usuario) =>
+      (!filtroRole || u.role === filtroRole) &&
+      (!filtroProp || u.propriedade_id === filtroProp),
+    [filtroRole, filtroProp],
+  );
+  const lista = useListaCadastro(itens, getTexto, { getAtivo, filtro });
 
   async function criar() {
     setErro(null);
@@ -990,8 +1189,39 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
         <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</p>
       )}
 
-      <div className="mt-4">
-        {itens.map((u) => (
+      <ListaCadastroControles
+        {...lista}
+        placeholder="Pesquisar por nome ou e-mail…"
+        filtrosExtras={
+          <>
+            <select
+              className={inputCls}
+              value={filtroRole}
+              onChange={(e) => setFiltroRole(e.target.value)}
+            >
+              <option value="">Todos os papéis</option>
+              <option value="colaborador">Colaborador</option>
+              <option value="lider">Líder</option>
+              <option value="admin">Administrador</option>
+            </select>
+            <select
+              className={inputCls}
+              value={filtroProp}
+              onChange={(e) => setFiltroProp(e.target.value)}
+            >
+              <option value="">Todos os locais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
+
+      <div className="mt-1">
+        {lista.itens.map((u) => (
           <Linha
             key={u.id}
             nome={u.nome}
