@@ -51,6 +51,7 @@ BEGIN
   UPDATE public.usuarios
   SET
     nome = v_nome,
+    email = v_email,
     ativo = p_ativo,
     propriedade_id = p_propriedade_id,
     atualizado_em = now()

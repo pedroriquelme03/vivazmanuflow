@@ -614,6 +614,7 @@ export type Database = {
           ativo: boolean
           criado_em: string
           atualizado_em: string | null
+          email: string | null
           foto_url: string | null
           id: string
           nome: string
@@ -624,6 +625,7 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           atualizado_em?: string | null
+          email?: string | null
           foto_url?: string | null
           id: string
           nome: string
@@ -634,6 +636,7 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           atualizado_em?: string | null
+          email?: string | null
           foto_url?: string | null
           id?: string
           nome?: string

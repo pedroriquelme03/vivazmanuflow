@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 
-export type Perfil = Tables<"usuarios"> & {
-  email: string | undefined;
+export type Perfil = Omit<Tables<"usuarios">, "email"> & {
+  email: string | null;
   propriedade_nome: string | null;
 };
 
@@ -30,7 +30,7 @@ export async function getPerfil(): Promise<Perfil | null> {
   };
   return {
     ...usuario,
-    email: user.email,
+    email: user.email ?? usuario.email ?? null,
     propriedade_nome: propriedades?.nome ?? null,
   };
 }
