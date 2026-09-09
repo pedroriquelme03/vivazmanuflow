@@ -613,6 +613,7 @@ export type Database = {
         Row: {
           ativo: boolean
           criado_em: string
+          atualizado_em: string | null
           foto_url: string | null
           id: string
           nome: string
@@ -622,6 +623,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           criado_em?: string
+          atualizado_em?: string | null
           foto_url?: string | null
           id: string
           nome: string
@@ -631,6 +633,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           criado_em?: string
+          atualizado_em?: string | null
           foto_url?: string | null
           id?: string
           nome?: string
@@ -722,6 +725,21 @@ export type Database = {
       }
       admin_redefinir_senha: {
         Args: { p_user_id: string; p_senha: string }
+        Returns: undefined
+      }
+      admin_emails_equipe: {
+        Args: Record<string, never>
+        Returns: { id: string; email: string }[]
+      }
+      admin_atualizar_usuario: {
+        Args: {
+          p_user_id: string
+          p_nome: string
+          p_email: string
+          p_ativo: boolean
+          p_propriedade_id?: string | null
+          p_senha?: string | null
+        }
         Returns: undefined
       }
       metricas: {

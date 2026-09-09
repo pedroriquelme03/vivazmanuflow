@@ -12,11 +12,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  org: "vivazcataratas",
-  project: "vivazmanuflow",
-  silent: !process.env.CI,
-  sourcemaps: {
-    disable: !process.env.SENTRY_AUTH_TOKEN,
-  },
-});
+export default process.env.NODE_ENV === "development"
+  ? nextConfig
+  : withSentryConfig(nextConfig, {
+      org: "vivazcataratas",
+      project: "vivazmanuflow",
+      silent: !process.env.CI,
+      sourcemaps: {
+        disable: !process.env.SENTRY_AUTH_TOKEN,
+      },
+    });

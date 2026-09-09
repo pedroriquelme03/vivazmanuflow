@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, Enums } from "@/lib/database.types";
+import { formatarData } from "@/lib/demanda-ui";
 import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
+import {
+  payloadAtualizarUsuario,
+  rotuloUltimaAlteracao,
+  validarEdicaoEquipe,
+} from "@/lib/equipe-edicao";
 
 type Prop = Tables<"propriedades">;
 type Setor = Tables<"setores">;
@@ -65,6 +71,7 @@ export function AdminApp(props: {
   locais: Local[];
   solicitantes: Solic[];
   usuarios: Usuario[];
+  emailsEquipe: Record<string, string>;
   predefinidas: Pred[];
   pesoConfig: PesoCfg | null;
 }) {
@@ -125,6 +132,7 @@ export function AdminApp(props: {
         {aba === "Equipe" && (
           <Equipe
             itens={props.usuarios}
+            emails={props.emailsEquipe}
             propriedades={props.propriedades}
           />
         )}
@@ -153,13 +161,15 @@ function Linha({
   extra,
   onRenomear,
   onToggle,
+  onEditar,
   acoes,
 }: {
   nome: string;
   ativo: boolean;
   extra?: string;
   onRenomear?: () => void;
-  onToggle: () => void;
+  onToggle?: () => void;
+  onEditar?: () => void;
   acoes?: React.ReactNode;
 }) {
   return (
@@ -169,6 +179,15 @@ function Linha({
         {extra && <p className="text-xs text-slate-400">{extra}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-1">
+        {onEditar && (
+          <button
+            type="button"
+            onClick={onEditar}
+            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+          >
+            Editar
+          </button>
+        )}
         {acoes}
         {onRenomear && (
           <button
@@ -178,16 +197,255 @@ function Linha({
             Renomear
           </button>
         )}
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            className={`rounded-md px-2 py-1 text-xs font-medium ${
+              ativo
+                ? "text-slate-500 hover:bg-slate-100"
+                : "text-emerald-600 hover:bg-emerald-50"
+            }`}
+          >
+            {ativo ? "Desativar" : "Reativar"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalVer({
+  titulo,
+  campos,
+  onFechar,
+}: {
+  titulo: string;
+  campos: { rotulo: string; valor: string }[];
+  onFechar: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onFechar}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-base font-bold text-slate-900">{titulo}</h2>
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+        <dl className="mt-4 grid gap-3">
+          {campos.map((c) => (
+            <div key={c.rotulo}>
+              <dt className="text-xs font-medium text-slate-400">{c.rotulo}</dt>
+              <dd className="mt-0.5 text-sm text-slate-800">{c.valor || "—"}</dd>
+            </div>
+          ))}
+        </dl>
         <button
-          onClick={onToggle}
-          className={`rounded-md px-2 py-1 text-xs font-medium ${
-            ativo
-              ? "text-slate-500 hover:bg-slate-100"
-              : "text-emerald-600 hover:bg-emerald-50"
-          }`}
+          type="button"
+          onClick={onFechar}
+          className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
-          {ativo ? "Desativar" : "Reativar"}
+          Fechar
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CampoModal({
+  rotulo,
+  children,
+}: {
+  rotulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-xs font-medium text-slate-500">{rotulo}</span>
+      {children}
+    </label>
+  );
+}
+
+function ModalEditarEquipe({
+  usuario,
+  emailInicial,
+  propriedades,
+  onFechar,
+  onSalvo,
+}: {
+  usuario: Usuario;
+  emailInicial: string;
+  propriedades: Prop[];
+  onFechar: () => void;
+  onSalvo: (msg: string) => void;
+}) {
+  const { supabase } = useAdmin();
+  const [nome, setNome] = useState(usuario.nome);
+  const [email, setEmail] = useState(emailInicial);
+  const [ativo, setAtivo] = useState(usuario.ativo);
+  const [propId, setPropId] = useState(usuario.propriedade_id ?? "");
+  const [senha, setSenha] = useState("");
+  const [senha2, setSenha2] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const ultima = rotuloUltimaAlteracao(usuario.atualizado_em);
+  const ultimaExibida =
+    ultima === "Ainda não houve alteração" ? ultima : formatarData(usuario.atualizado_em);
+
+  async function salvar() {
+    setErro(null);
+    const falha = validarEdicaoEquipe({
+      nome,
+      email,
+      senha,
+      senha2,
+      ativo,
+      propriedadeId: propId,
+      userId: usuario.id,
+    });
+    if (falha) return setErro(falha);
+    setSalvando(true);
+    const { error } = await supabase.rpc(
+      "admin_atualizar_usuario",
+      payloadAtualizarUsuario({
+        nome,
+        email,
+        senha,
+        senha2,
+        ativo,
+        propriedadeId: propId,
+        userId: usuario.id,
+      }),
+    );
+    setSalvando(false);
+    if (error) return setErro(error.message);
+    onSalvo("Dados do membro atualizados.");
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onFechar}
+    >
+      <div
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-base font-bold text-slate-900">Editar membro</h2>
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <CampoModal rotulo="Nome">
+            <input className={inputCls} value={nome} onChange={(e) => setNome(e.target.value)} />
+          </CampoModal>
+          <CampoModal rotulo="E-mail">
+            <input
+              className={inputCls}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </CampoModal>
+          <CampoModal rotulo="Papel">
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {ROLE_LABEL[usuario.role]}
+            </p>
+          </CampoModal>
+          <CampoModal rotulo="Local">
+            <select
+              className={inputCls}
+              value={propId}
+              onChange={(e) => setPropId(e.target.value)}
+            >
+              <option value="">Todos os locais principais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </CampoModal>
+          <CampoModal rotulo="Situação">
+            <select
+              className={inputCls}
+              value={ativo ? "ativo" : "inativo"}
+              onChange={(e) => setAtivo(e.target.value === "ativo")}
+            >
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+            </select>
+          </CampoModal>
+          <CampoModal rotulo="Cadastrado em">
+            <p className="text-sm text-slate-700">{formatarData(usuario.criado_em)}</p>
+          </CampoModal>
+          <CampoModal rotulo="Última alteração">
+            <p className="text-sm text-slate-700">{ultimaExibida}</p>
+          </CampoModal>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold text-slate-600">Redefinir senha</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              Deixe em branco para manter a senha atual.
+            </p>
+            <div className="mt-2 grid gap-2">
+              <input
+                className={inputCls}
+                type="password"
+                placeholder="Nova senha (mín. 6)"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                autoComplete="new-password"
+              />
+              <input
+                className={inputCls}
+                type="password"
+                placeholder="Confirmar nova senha"
+                value={senha2}
+                onChange={(e) => setSenha2(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+        </div>
+
+        <ErroMsg erro={erro} />
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void salvar()}
+            disabled={salvando}
+            className="flex-1 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          >
+            {salvando ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -509,6 +767,7 @@ function Solicitantes({
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
   const [setorId, setSetorId] = useState("");
+  const [ver, setVer] = useState<Solic | null>(null);
   const nomeProp = (id: string) => propriedades.find((p) => p.id === id)?.nome ?? "?";
   const nomeSetor = (id: string | null) =>
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
@@ -520,16 +779,6 @@ function Solicitantes({
       .insert({ nome: nome.trim(), propriedade_id: propId, setor_id: setorId || null });
     if (error) return setErro(error.message);
     setNome("");
-    refresh();
-  }
-  async function toggle(s: Solic) {
-    await supabase.from("solicitantes").update({ ativo: !s.ativo }).eq("id", s.id);
-    refresh();
-  }
-  async function renomear(s: Solic) {
-    const novo = window.prompt("Novo nome:", s.nome);
-    if (!novo?.trim()) return;
-    await supabase.from("solicitantes").update({ nome: novo.trim() }).eq("id", s.id);
     refresh();
   }
 
@@ -569,11 +818,23 @@ function Solicitantes({
             extra={[nomeProp(s.propriedade_id), nomeSetor(s.setor_id)]
               .filter(Boolean)
               .join(" · ")}
-            onRenomear={() => renomear(s)}
-            onToggle={() => toggle(s)}
+            onEditar={() => setVer(s)}
           />
         ))}
       </div>
+      {ver && (
+        <ModalVer
+          titulo="Solicitante"
+          campos={[
+            { rotulo: "Nome", valor: ver.nome },
+            { rotulo: "Local principal", valor: nomeProp(ver.propriedade_id) },
+            { rotulo: "Setor", valor: nomeSetor(ver.setor_id) || "Sem setor" },
+            { rotulo: "Situação", valor: ver.ativo ? "Ativo" : "Inativo" },
+            { rotulo: "Cadastrado em", valor: formatarData(ver.criado_em) },
+          ]}
+          onFechar={() => setVer(null)}
+        />
+      )}
     </Card>
   );
 }
@@ -899,7 +1160,15 @@ const ROLE_LABEL: Record<Enums<"user_role">, string> = {
   colaborador: "Colaborador",
 };
 
-function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[] }) {
+function Equipe({
+  itens,
+  emails,
+  propriedades,
+}: {
+  itens: Usuario[];
+  emails: Record<string, string>;
+  propriedades: Prop[];
+}) {
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -907,6 +1176,7 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
   const [role, setRole] = useState<Enums<"user_role">>("colaborador");
   const [propId, setPropId] = useState("");
   const [ok, setOk] = useState<string | null>(null);
+  const [ver, setVer] = useState<Usuario | null>(null);
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas";
 
@@ -937,20 +1207,6 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
     setEmail("");
     setSenha("");
     refresh();
-  }
-  async function toggle(u: Usuario) {
-    await supabase.from("usuarios").update({ ativo: !u.ativo }).eq("id", u.id);
-    refresh();
-  }
-  async function trocarSenha(u: Usuario) {
-    const nova = window.prompt(`Nova senha para ${u.nome} (mín. 6 caracteres):`);
-    if (!nova) return;
-    const { error } = await supabase.rpc("admin_redefinir_senha", {
-      p_user_id: u.id,
-      p_senha: nova,
-    });
-    if (error) return setErro(error.message);
-    setOk(`Senha de ${u.nome} redefinida.`);
   }
 
   return (
@@ -996,19 +1252,26 @@ function Equipe({ itens, propriedades }: { itens: Usuario[]; propriedades: Prop[
             key={u.id}
             nome={u.nome}
             ativo={u.ativo}
-            extra={`${ROLE_LABEL[u.role]} · ${nomeProp(u.propriedade_id)}`}
-            onToggle={() => toggle(u)}
-            acoes={
-              <button
-                onClick={() => trocarSenha(u)}
-                className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
-              >
-                Trocar senha
-              </button>
-            }
+            extra={[ROLE_LABEL[u.role], nomeProp(u.propriedade_id), emails[u.id]]
+              .filter(Boolean)
+              .join(" · ")}
+            onEditar={() => setVer(u)}
           />
         ))}
       </div>
+      {ver && (
+        <ModalEditarEquipe
+          usuario={ver}
+          emailInicial={emails[ver.id] || ""}
+          propriedades={propriedades}
+          onFechar={() => setVer(null)}
+          onSalvo={(msg) => {
+            setVer(null);
+            setOk(msg);
+            refresh();
+          }}
+        />
+      )}
     </Card>
   );
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { mapaEmails } from "@/lib/equipe-edicao";
 import { getPerfil } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PainelShell } from "@/components/AdminSidebar";
@@ -21,6 +22,7 @@ export default async function AdminPage() {
     { data: usuarios },
     predefRes,
     pesoRes,
+    emailsRes,
   ] = await Promise.all([
     supabase.from("propriedades").select("*").order("nome"),
     supabase.from("setores").select("*").order("nome"),
@@ -29,7 +31,10 @@ export default async function AdminPage() {
     supabase.from("usuarios").select("*").order("nome"),
     supabase.from("demandas_predefinidas").select("*").order("titulo"),
     supabase.from("peso_config").select("*").eq("id", 1).maybeSingle(),
+    supabase.rpc("admin_emails_equipe"),
   ]);
+
+  const emailsEquipe = mapaEmails(emailsRes.data);
 
   return (
     <PainelShell perfil={perfil}>
@@ -39,6 +44,7 @@ export default async function AdminPage() {
         locais={locais ?? []}
         solicitantes={solicitantes ?? []}
         usuarios={usuarios ?? []}
+        emailsEquipe={emailsEquipe}
         predefinidas={predefRes.data ?? []}
         pesoConfig={pesoRes.data ?? null}
       />
