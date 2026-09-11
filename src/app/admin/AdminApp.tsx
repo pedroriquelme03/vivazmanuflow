@@ -7,7 +7,6 @@ import type { Tables, Enums } from "@/lib/database.types";
 import { formatarData } from "@/lib/demanda-ui";
 import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
 import {
-import {
   payloadAtualizarUsuario,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
