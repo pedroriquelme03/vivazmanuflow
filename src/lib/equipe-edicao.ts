@@ -1,3 +1,5 @@
+/** Helpers de edição da equipe (Cadastros) — validado em 11/09/2026. */
+
 export type DadosEdicaoEquipe = {
   nome: string;
   email: string;
