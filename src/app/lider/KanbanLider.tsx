@@ -17,6 +17,11 @@ import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { AtribuirModal } from "./AtribuirModal";
 import { DetalheDemandaModal } from "./DetalheDemandaModal";
 import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
+import {
+  colaboradoresDoFiltroProjeto,
+  filtrarQuadroProjetos,
+  projetosDoFiltroQuadro,
+} from "@/lib/projeto-regras";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
 type Status = Enums<"demanda_status">;
@@ -38,8 +43,8 @@ function textoDemanda(d: DemandaKanban) {
       d.descricao,
       d.solicitante?.nome,
       d.colaborador?.nome,
-      d.sublocal,
-      d.local?.nome,
+      d.projeto?.nome,
+      d.evento?.nome,
     ]
       .filter(Boolean)
       .join(" "),
@@ -117,12 +122,18 @@ export function KanbanLider({
   slaHoras,
   agoraInicial,
   opcoesNovaDemanda,
+  ehAdmin = false,
+  membrosPorProjeto = {},
+  equipeAtribuir = [],
 }: {
   demandasIniciais: DemandaKanban[];
   colaboradores: Colaborador[];
   slaHoras: Record<string, number>;
   agoraInicial: number;
   opcoesNovaDemanda: OpcoesNovaDemanda;
+  ehAdmin?: boolean;
+  membrosPorProjeto?: Record<string, string[]>;
+  equipeAtribuir?: Colaborador[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [demandas, setDemandas] = useState<DemandaKanban[]>(demandasIniciais);
@@ -135,6 +146,8 @@ export function KanbanLider({
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
   const [prioridadeFiltro, setPrioridadeFiltro] = useState<"" | Prioridade>("");
   const [verArquivado, setVerArquivado] = useState(false);
+  const [visao, setVisao] = useState<"fila" | "projetos">("fila");
+  const [projetoFiltro, setProjetoFiltro] = useState("");
 
   const recarregar = useCallback(async () => {
     const { data } = await supabase
@@ -172,13 +185,58 @@ export function KanbanLider({
   const temFiltro = temBusca || Boolean(colaboradorFiltro) || Boolean(prioridadeFiltro);
 
   const demandasFiltradas = useMemo(() => {
-    return demandas.filter((d) => {
+    const base = demandas.filter((d) => {
       if (colaboradorFiltro && d.colaborador_id !== colaboradorFiltro) return false;
       if (prioridadeFiltro && d.prioridade !== prioridadeFiltro) return false;
       if (temBusca && !textoDemanda(d).includes(buscaNorm)) return false;
       return true;
     });
-  }, [demandas, buscaNorm, temBusca, colaboradorFiltro, prioridadeFiltro]);
+    if (!ehAdmin) return base;
+    return filtrarQuadroProjetos(base, visao, projetoFiltro);
+  }, [
+    demandas,
+    buscaNorm,
+    temBusca,
+    colaboradorFiltro,
+    prioridadeFiltro,
+    ehAdmin,
+    visao,
+    projetoFiltro,
+  ]);
+
+  const projetosNoQuadro = useMemo(
+    () =>
+      projetosDoFiltroQuadro(opcoesNovaDemanda.projetos ?? [], demandas),
+    [demandas, opcoesNovaDemanda.projetos],
+  );
+
+  const colaboradoresFiltro = useMemo(() => {
+    if (!ehAdmin || visao !== "projetos") return colaboradores;
+    const equipe = equipeAtribuir.length ? equipeAtribuir : colaboradores;
+    return colaboradoresDoFiltroProjeto(
+      equipe,
+      membrosPorProjeto,
+      projetoFiltro,
+      projetosNoQuadro.map((p) => p.id),
+    );
+  }, [
+    ehAdmin,
+    visao,
+    colaboradores,
+    equipeAtribuir,
+    membrosPorProjeto,
+    projetoFiltro,
+    projetosNoQuadro,
+  ]);
+
+  useEffect(() => {
+    if (
+      colaboradorFiltro &&
+      !colaboradoresFiltro.some((c) => c.id === colaboradorFiltro)
+    ) {
+      setColaboradorFiltro("");
+    }
+  }, [colaboradorFiltro, colaboradoresFiltro]);
 
   const porStatus = (s: Status) => {
     let itens = demandasFiltradas.filter((d) => d.status === s && !d.arquivado);
@@ -203,6 +261,39 @@ export function KanbanLider({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="text-lg font-bold">Demandas</h1>
+            {ehAdmin && (
+              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisao("fila");
+                    setProjetoFiltro("");
+                    setColaboradorFiltro("");
+                  }}
+                  className={`rounded-md px-2.5 py-1 ${
+                    visao === "fila"
+                      ? "bg-brand-600 text-white"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Fila
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisao("projetos");
+                    setColaboradorFiltro("");
+                  }}
+                  className={`rounded-md px-2.5 py-1 ${
+                    visao === "projetos"
+                      ? "bg-brand-600 text-white"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Projetos
+                </button>
+              </div>
+            )}
             {canceladas > 0 && (
               <span className="text-xs text-slate-400">
                 {canceladas} cancelada(s)
@@ -249,7 +340,7 @@ export function KanbanLider({
               className={`min-w-0 w-full sm:w-auto sm:max-w-[14rem] ${filtroCls}`}
             >
               <option value="">Colaborador</option>
-              {colaboradores.map((c) => (
+              {colaboradoresFiltro.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nome}
                 </option>
@@ -269,6 +360,23 @@ export function KanbanLider({
                 </option>
               ))}
             </select>
+            {ehAdmin && visao === "projetos" && (
+              <select
+                value={projetoFiltro}
+                onChange={(e) => {
+                  setProjetoFiltro(e.target.value);
+                  setColaboradorFiltro("");
+                }}
+                className={`min-w-0 w-full sm:w-auto ${filtroCls}`}
+              >
+                <option value="">Todos os projetos</option>
+                {projetosNoQuadro.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            )}
             {temFiltro && (
               <button
                 type="button"
@@ -378,6 +486,7 @@ export function KanbanLider({
         <DetalheDemandaModal
           demanda={detalhe}
           agora={agora}
+          ehAdmin={ehAdmin}
           onFechar={() => setDetalhe(null)}
           onAtribuir={() => {
             setEditando(detalhe);
@@ -392,7 +501,16 @@ export function KanbanLider({
       {editando && (
         <AtribuirModal
           demanda={editando}
-          colaboradores={colaboradores}
+          colaboradores={
+            editando.projeto_id
+              ? (equipeAtribuir.length ? equipeAtribuir : colaboradores).filter(
+                  (c) =>
+                    (membrosPorProjeto[editando.projeto_id ?? ""] ?? []).includes(
+                      c.id,
+                    ),
+                )
+              : colaboradores
+          }
           slaHoras={slaHoras}
           onFechar={() => setEditando(null)}
           onSalvo={() => {
@@ -490,6 +608,11 @@ function Card({
         </p>
       )}
 
+      {demanda.projeto?.nome && (
+        <p className="mt-1 text-[11px] font-semibold text-sky-800">
+          Projeto: {demanda.projeto.nome}
+        </p>
+      )}
       {demanda.evento?.nome && (
         <p className="mt-1 text-[11px] font-semibold text-violet-700">
           🎉 Evento: {demanda.evento.nome}

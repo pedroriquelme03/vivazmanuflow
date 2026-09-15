@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   garantirSolicitantesGestor,
+  idSolicitantePorNome,
   solicitantesUnicos,
 } from "@/lib/solicitante-gestor";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +17,26 @@ describe("solicitantesUnicos", () => {
     const unicos = solicitantesUnicos(lista);
     expect(unicos).toHaveLength(2);
     expect(unicos.map((s) => s.id)).toEqual(["1", "3"]);
+  });
+});
+
+describe("idSolicitantePorNome", () => {
+  const lista = [
+    { id: "a", nome: "Pedro Riquelme", propriedade_id: "v" },
+    { id: "b", nome: "Ana", propriedade_id: "v" },
+    { id: "c", nome: "Pedro Riquelme", propriedade_id: "x" },
+  ];
+
+  it("acha o usuário logado no local", () => {
+    expect(idSolicitantePorNome(lista, " pedro riquelme ", "v")).toBe("a");
+  });
+
+  it("não mistura local", () => {
+    expect(idSolicitantePorNome(lista, "Pedro Riquelme", "x")).toBe("c");
+  });
+
+  it("vazio se não achar", () => {
+    expect(idSolicitantePorNome(lista, "João", "v")).toBe("");
   });
 });
 

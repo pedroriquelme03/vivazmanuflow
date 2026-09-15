@@ -1,4 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Enums } from "@/lib/database.types";
+
+const STATUS_CONCLUSAO_ADMIN: Enums<"demanda_status">[] = [
+  "aberta",
+  "atribuida",
+  "em_andamento",
+];
+
+export function validarConclusaoAdmin(
+  observacao: string,
+  status: Enums<"demanda_status">,
+  arquivado = false,
+): string | null {
+  if (arquivado) return "Desarquive a demanda antes de concluir.";
+  if (!STATUS_CONCLUSAO_ADMIN.includes(status)) {
+    return "Só é possível concluir demandas abertas, atribuídas ou em andamento.";
+  }
+  if (!observacao.trim()) {
+    return "Informe o motivo da conclusão.";
+  }
+  return null;
+}
 
 function msgSqlFaltando(erro: string, dica: string): string {
   if (
@@ -71,6 +93,33 @@ export async function arquivarDemandaGestor(
     return msgSqlFaltando(
       error.message,
       "Rode o SQL em supabase/migrations/20260813190000_demandas_arquivar_apagar.sql no Supabase.",
+    );
+  }
+  return null;
+}
+
+export async function concluirDemandaAdmin(
+  supabase: SupabaseClient,
+  demandaId: string,
+  observacao: string,
+  statusAnterior: Enums<"demanda_status">,
+  arquivado = false,
+): Promise<string | null> {
+  const erroValidacao = validarConclusaoAdmin(
+    observacao,
+    statusAnterior,
+    arquivado,
+  );
+  if (erroValidacao) return erroValidacao;
+
+  const { error } = await supabase.rpc("admin_concluir_demanda", {
+    p_id: demandaId,
+    p_observacao: observacao.trim(),
+  });
+  if (error) {
+    return msgSqlFaltando(
+      error.message,
+      "Rode o SQL em supabase/migrations/20260914160000_admin_concluir_demanda.sql no Supabase.",
     );
   }
   return null;

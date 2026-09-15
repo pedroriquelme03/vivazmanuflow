@@ -20,6 +20,9 @@ export default async function LiderHome() {
     { data: propriedades },
     { data: solicitantes },
     eventosRes,
+    projetosRes,
+    membrosRes,
+    equipeRes,
   ] = await Promise.all([
     supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
       ascending: false,
@@ -45,10 +48,26 @@ export default async function LiderHome() {
       .select("id, nome, propriedade_id, data_inicio, data_fim")
       .eq("ativo", true)
       .order("data_inicio", { ascending: false, nullsFirst: false }),
+    supabase.rpc("listar_projetos_ativos"),
+    supabase.from("projeto_membros").select("projeto_id, usuario_id"),
+    supabase
+      .from("usuarios")
+      .select("id, nome, propriedade_id")
+      .eq("ativo", true)
+      .in("role", ["colaborador", "lider", "admin"])
+      .order("nome"),
   ]);
 
   const slaHoras: Record<string, number> = {};
   for (const s of sla ?? []) slaHoras[s.prioridade] = s.horas_padrao;
+
+  const membrosPorProjeto: Record<string, string[]> = {};
+  for (const m of membrosRes.data ?? []) {
+    membrosPorProjeto[m.projeto_id] = [
+      ...(membrosPorProjeto[m.projeto_id] ?? []),
+      m.usuario_id,
+    ];
+  }
 
   return (
     <PainelShell perfil={perfil}>
@@ -57,10 +76,16 @@ export default async function LiderHome() {
         colaboradores={colaboradores ?? []}
         slaHoras={slaHoras}
         agoraInicial={Date.now()}
+        ehAdmin={perfil.role === "admin"}
+        membrosPorProjeto={membrosPorProjeto}
+        equipeAtribuir={equipeRes.data ?? []}
         opcoesNovaDemanda={{
           propriedades: propriedades ?? [],
           solicitantes: solicitantes ?? [],
           eventos: eventosRes.data ?? [],
+          projetos: projetosRes.data ?? [],
+          nomeSolicitantePadrao: perfil.nome,
+          propriedadePadrao: perfil.propriedade_id,
         }}
       />
     </PainelShell>

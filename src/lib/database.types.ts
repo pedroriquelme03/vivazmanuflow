@@ -114,6 +114,7 @@ export type Database = {
           peso: number
           afeta_experiencia: boolean
           evento_id: string | null
+          projeto_id: string | null
           arquivado: boolean
           sublocal: string | null
           mensagem_devolucao: string | null
@@ -139,6 +140,7 @@ export type Database = {
           peso?: number
           afeta_experiencia?: boolean
           evento_id?: string | null
+          projeto_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -164,6 +166,7 @@ export type Database = {
           peso?: number
           afeta_experiencia?: boolean
           evento_id?: string | null
+          projeto_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -181,6 +184,13 @@ export type Database = {
             columns: ["evento_id"]
             isOneToOne: false
             referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
             referencedColumns: ["id"]
           },
           {
@@ -333,6 +343,71 @@ export type Database = {
             columns: ["propriedade_id"]
             isOneToOne: false
             referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projetos: {
+        Row: {
+          id: string
+          nome: string
+          descricao: string | null
+          propriedade_id: string | null
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          descricao?: string | null
+          propriedade_id?: string | null
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          descricao?: string | null
+          propriedade_id?: string | null
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projetos_propriedade_id_fkey"
+            columns: ["propriedade_id"]
+            isOneToOne: false
+            referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_membros: {
+        Row: {
+          projeto_id: string
+          usuario_id: string
+        }
+        Insert: {
+          projeto_id: string
+          usuario_id: string
+        }
+        Update: {
+          projeto_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_membros_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projetos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_membros_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -696,6 +771,31 @@ export type Database = {
         Args: { p_token: string; p_evento_id: string }
         Returns: undefined
       }
+      vincular_projeto_demanda: {
+        Args: { p_token: string; p_projeto_id: string }
+        Returns: undefined
+      }
+      listar_projetos_ativos: {
+        Args: Record<string, never>
+        Returns: { id: string; nome: string; propriedade_id: string | null }[]
+      }
+      admin_criar_projeto: {
+        Args: {
+          p_nome: string
+          p_descricao?: string | null
+          p_propriedade_id?: string | null
+          p_membros: string[]
+        }
+        Returns: string
+      }
+      admin_definir_membros_projeto: {
+        Args: { p_projeto_id: string; p_membros: string[] }
+        Returns: undefined
+      }
+      eh_membro_projeto: {
+        Args: { p_projeto_id: string; p_uid: string }
+        Returns: boolean
+      }
       consultar_equipamento: {
         Args: { p_codigo: string }
         Returns: Json
@@ -733,6 +833,10 @@ export type Database = {
       admin_emails_equipe: {
         Args: Record<string, never>
         Returns: { id: string; email: string }[]
+      }
+      admin_concluir_demanda: {
+        Args: { p_id: string; p_observacao: string }
+        Returns: undefined
       }
       admin_atualizar_usuario: {
         Args: {

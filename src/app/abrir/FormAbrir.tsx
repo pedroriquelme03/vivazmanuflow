@@ -7,7 +7,7 @@ import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
 import { uploadAnexo } from "@/lib/upload-anexo";
 import { EscolherMidia } from "@/components/EscolherMidia";
-import { solicitantesUnicos } from "@/lib/solicitante-gestor";
+import { idSolicitantePorNome, solicitantesUnicos } from "@/lib/solicitante-gestor";
 import type { Enums } from "@/lib/database.types";
 
 type Opcao = { id: string; nome: string };
@@ -19,16 +19,36 @@ type EventoOpcao = {
   data_inicio: string | null;
   data_fim: string | null;
 };
+type ProjetoOpcao = {
+  id: string;
+  nome: string;
+  propriedade_id: string | null;
+};
 type Prioridade = Enums<"demanda_prioridade">;
 
 function semAquamania(lista: Opcao[]) {
   return lista.filter((p) => !p.nome.toLowerCase().includes("aquamania"));
 }
 
+function idLocalPadrao(lista: Opcao[], preferido?: string | null) {
+  const visiveis = semAquamania(lista);
+  const vivaz = visiveis.find((p) => {
+    const n = p.nome.toLowerCase();
+    return n.includes("vivaz") && n.includes("cataratas");
+  });
+  if (vivaz) return vivaz.id;
+  if (preferido && visiveis.some((p) => p.id === preferido)) return preferido;
+  return visiveis[0]?.id ?? "";
+}
+
 export type FormAbrirProps = {
   propriedades: Opcao[];
   solicitantes: OpcaoProp[];
   eventos: EventoOpcao[];
+  projetos?: ProjetoOpcao[];
+  /** Nome do usuário logado (Nova demanda no quadro). */
+  nomeSolicitantePadrao?: string | null;
+  propriedadePadrao?: string | null;
   /**
    * Se informado, é chamado após criar a demanda (com o token) em vez de
    * redirecionar para o acompanhamento. Usado no modal "Nova demanda" do quadro.
@@ -40,6 +60,9 @@ export function FormAbrir({
   propriedades,
   solicitantes,
   eventos,
+  projetos = [],
+  nomeSolicitantePadrao,
+  propriedadePadrao,
   onSucesso,
 }: FormAbrirProps) {
   const router = useRouter();
@@ -50,12 +73,19 @@ export function FormAbrir({
     [propriedades],
   );
 
-  const [propriedadeId, setPropriedadeId] = useState(
-    () => semAquamania(propriedades)[0]?.id ?? "",
+  const [propriedadeId, setPropriedadeId] = useState(() =>
+    idLocalPadrao(propriedades, propriedadePadrao),
   );
-  const [solicitanteId, setSolicitanteId] = useState("");
+  const [solicitanteId, setSolicitanteId] = useState(() =>
+    idSolicitantePorNome(
+      solicitantes,
+      nomeSolicitantePadrao,
+      idLocalPadrao(propriedades, propriedadePadrao),
+    ),
+  );
   const [sublocal, setSublocal] = useState("");
   const [eventoId, setEventoId] = useState("");
+  const [projetoId, setProjetoId] = useState("");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [afetaExperiencia, setAfetaExperiencia] = useState(false);
@@ -70,6 +100,7 @@ export function FormAbrir({
       ),
     [solicitantes, propriedadeId],
   );
+  const projetosFiltrados = projetos;
   const eventosFiltrados = useMemo(
     () =>
       eventos.filter(
@@ -79,12 +110,21 @@ export function FormAbrir({
   );
 
   const mostrarLocalPrincipal = propriedadesVisiveis.length > 1;
+  const solicitanteTravado = Boolean(nomeSolicitantePadrao?.trim());
+  const solicitanteIdLogado = idSolicitantePorNome(
+    solicitantes,
+    nomeSolicitantePadrao,
+    propriedadeId,
+  );
 
   function trocarPropriedade(id: string) {
     setPropriedadeId(id);
-    setSolicitanteId("");
+    setSolicitanteId(
+      idSolicitantePorNome(solicitantes, nomeSolicitantePadrao, id),
+    );
     setSublocal("");
     setEventoId("");
+    setProjetoId("");
   }
 
   function adicionarArquivos(lista: File[]) {
@@ -111,7 +151,16 @@ export function FormAbrir({
     setErro(null);
 
     if (!sublocal.trim()) return setErro("Informe o local.");
-    if (!solicitanteId) return setErro("Selecione quem está solicitando.");
+    const quemSolicita = solicitanteTravado
+      ? solicitanteIdLogado
+      : solicitanteId;
+    if (!quemSolicita) {
+      return setErro(
+        solicitanteTravado
+          ? "Seu usuário ainda não está na lista de solicitantes deste local."
+          : "Selecione quem está solicitando.",
+      );
+    }
     if (!titulo.trim()) return setErro("Descreva o que precisa ser feito.");
 
     setEnviando(true);
@@ -139,7 +188,7 @@ export function FormAbrir({
       }
 
       const { data, error } = await supabase.rpc("abrir_demanda", {
-        p_solicitante_id: solicitanteId,
+        p_solicitante_id: quemSolicita,
         p_titulo: titulo.trim(),
         p_descricao: descricao || undefined,
         p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
@@ -179,6 +228,18 @@ export function FormAbrir({
         });
         if (evErro) {
           console.warn("Falha ao vincular evento:", evErro.message);
+        }
+      }
+
+      if (projetoId) {
+        const { error: prErro } = await supabase.rpc("vincular_projeto_demanda", {
+          p_token: token,
+          p_projeto_id: projetoId,
+        });
+        if (prErro) {
+          throw new Error(
+            `Demanda criada, mas o projeto não gravou: ${prErro.message}`,
+          );
         }
       }
 
@@ -269,19 +330,64 @@ export function FormAbrir({
       </Campo>
 
       <Campo label="Quem está solicitando?">
+        {solicitanteTravado ? (
+          <>
+            <p className={`${inputCls} bg-slate-50 text-slate-800`}>
+              {nomeSolicitantePadrao}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Logado: a demanda fica no seu nome e não pode ser trocada.
+            </p>
+            {!solicitanteIdLogado && (
+              <p className="mt-1 text-xs text-red-600">
+                Seu usuário ainda não está na lista de solicitantes deste local.
+              </p>
+            )}
+          </>
+        ) : (
+          <select
+            value={solicitanteId}
+            onChange={(e) => setSolicitanteId(e.target.value)}
+            className={inputCls}
+            required
+          >
+            <option value="">Selecione seu nome…</option>
+            {solicitantesFiltrados.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
+        )}
+      </Campo>
+
+      <Campo label="Projeto" opcional>
         <select
-          value={solicitanteId}
-          onChange={(e) => setSolicitanteId(e.target.value)}
+          value={projetoId}
+          onChange={(e) => setProjetoId(e.target.value)}
           className={inputCls}
-          required
         >
-          <option value="">Selecione seu nome…</option>
-          {solicitantesFiltrados.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nome}
+          <option value="">Nenhum — fila normal</option>
+          {projetosFiltrados.map((pr) => (
+            <option key={pr.id} value={pr.id}>
+              {pr.nome}
             </option>
           ))}
         </select>
+        {projetosFiltrados.length === 0 && (
+          <p className="mt-1 text-xs text-slate-400">
+            Nenhum projeto ativo. Cadastre em Projetos no menu do admin.
+          </p>
+        )}
+        {projetoId ? (
+          <p className="mt-1 text-xs text-brand-700">
+            Só quem está neste projeto (e o administrador) vai ver esta demanda.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-slate-400">
+            Sem projeto, entra na fila de todo mundo.
+          </p>
+        )}
       </Campo>
 
       <Campo label="É demanda de evento?" opcional>

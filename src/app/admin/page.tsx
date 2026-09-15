@@ -22,7 +22,6 @@ export default async function AdminPage() {
     { data: usuarios },
     predefRes,
     pesoRes,
-    emailsRes,
   ] = await Promise.all([
     supabase.from("propriedades").select("*").order("nome"),
     supabase.from("setores").select("*").order("nome"),
@@ -31,10 +30,13 @@ export default async function AdminPage() {
     supabase.from("usuarios").select("*").order("nome"),
     supabase.from("demandas_predefinidas").select("*").order("titulo"),
     supabase.from("peso_config").select("*").eq("id", 1).maybeSingle(),
-    supabase.rpc("admin_emails_equipe"),
   ]);
 
-  const emailsEquipe = mapaEmails(emailsRes.data);
+  const emailsEquipe = mapaEmails(
+    (usuarios ?? []).flatMap((u) =>
+      u.email ? [{ id: u.id, email: u.email }] : [],
+    ),
+  );
 
   return (
     <PainelShell perfil={perfil}>

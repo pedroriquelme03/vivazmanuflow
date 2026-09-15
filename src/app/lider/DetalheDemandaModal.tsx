@@ -16,6 +16,7 @@ import {
 import {
   aprovarConclusaoGestor,
   devolverDemandaGestor,
+  concluirDemandaAdmin,
   arquivarDemandaGestor,
   apagarDemandaGestor,
 } from "@/lib/demanda-gestor";
@@ -42,12 +43,14 @@ type AnexoItem = {
 export function DetalheDemandaModal({
   demanda,
   agora,
+  ehAdmin = false,
   onFechar,
   onAtribuir,
   onAtualizou,
 }: {
   demanda: DemandaKanban;
   agora: number;
+  ehAdmin?: boolean;
   onFechar: () => void;
   onAtribuir: () => void;
   onAtualizou: () => void;
@@ -62,6 +65,8 @@ export function DetalheDemandaModal({
   const [textoApagar, setTextoApagar] = useState("");
   const [msgDevolucao, setMsgDevolucao] = useState("");
   const [confirmandoDevolver, setConfirmandoDevolver] = useState(false);
+  const [msgConclusao, setMsgConclusao] = useState("");
+  const [confirmandoConcluir, setConfirmandoConcluir] = useState(false);
 
   const arquivado = Boolean(demanda.arquivado);
   const podeAtribuir =
@@ -69,6 +74,7 @@ export function DetalheDemandaModal({
     (demanda.status === "aberta" ||
       demanda.status === "atribuida" ||
       demanda.status === "em_andamento");
+  const podeConcluirAdmin = ehAdmin && podeAtribuir;
 
   const urgencia =
     demanda.status === "concluida" ||
@@ -123,6 +129,25 @@ export function DetalheDemandaModal({
     setOcupado(false);
     if (erroAprovar) {
       setErro(erroAprovar);
+      return;
+    }
+    onAtualizou();
+    onFechar();
+  }
+
+  async function concluirComoAdmin() {
+    setErro(null);
+    setOcupado(true);
+    const erroConc = await concluirDemandaAdmin(
+      supabase,
+      demanda.id,
+      msgConclusao,
+      demanda.status,
+      arquivado,
+    );
+    setOcupado(false);
+    if (erroConc) {
+      setErro(erroConc);
       return;
     }
     onAtualizou();
@@ -216,6 +241,12 @@ export function DetalheDemandaModal({
           {demanda.afeta_experiencia && (
             <p className="mt-2 text-xs font-semibold text-red-600">
               Afeta a experiência do hóspede
+            </p>
+          )}
+
+          {demanda.projeto?.nome && (
+            <p className="mt-2 text-xs font-semibold text-sky-800">
+              Projeto: {demanda.projeto.nome}
             </p>
           )}
 
@@ -448,6 +479,47 @@ export function DetalheDemandaModal({
                 ? "Atribuir e definir prazo"
                 : "Reatribuir / editar prazo"}
             </button>
+          )}
+
+          {podeConcluirAdmin && (
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmandoConcluir((v) => !v);
+                  setErro(null);
+                }}
+                disabled={ocupado}
+                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {confirmandoConcluir
+                  ? "Cancelar conclusão"
+                  : "Marcar como concluída"}
+              </button>
+              {confirmandoConcluir && (
+                <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <label className="text-xs font-medium text-emerald-900">
+                    Por que está concluindo agora?{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={msgConclusao}
+                    onChange={(e) => setMsgConclusao(e.target.value)}
+                    rows={3}
+                    placeholder="Explique o motivo de fechar a demanda neste estágio…"
+                    className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={concluirComoAdmin}
+                    disabled={ocupado}
+                    className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60"
+                  >
+                    {ocupado ? "Concluindo…" : "Confirmar conclusão"}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-2">

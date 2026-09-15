@@ -4,13 +4,14 @@ import type { Enums } from "@/lib/database.types";
 export const DEMANDA_SELECT = `
   id, titulo, descricao, prioridade, status, criado_em, atribuido_em,
   iniciado_em, concluido_em, prazo_confirmado, colaborador_id,
-  propriedade_id, motivo_nao_conclusao, peso, afeta_experiencia, evento_id,
-  arquivado, token_acompanhamento, sublocal,
+  propriedade_id, motivo_nao_conclusao, peso, afeta_experiencia,
+  evento_id, projeto_id, arquivado, token_acompanhamento, sublocal,
   solicitante:solicitantes(nome),
   local:locais(nome),
   propriedade:propriedades(nome),
   colaborador:usuarios(nome),
   evento:eventos(nome),
+  projeto:projetos(nome),
   anexos:demanda_anexos(url, tipo, enviado_por, criado_em)
 `;
 
@@ -33,6 +34,7 @@ export type DemandaKanban = {
   peso: number;
   afeta_experiencia: boolean;
   evento_id: string | null;
+  projeto_id: string | null;
   arquivado: boolean;
   token_acompanhamento: string;
   sublocal: string | null;
@@ -41,6 +43,7 @@ export type DemandaKanban = {
   propriedade: Rel;
   colaborador: Rel;
   evento: Rel;
+  projeto: Rel;
   anexos: AnexoDemanda[];
 };
 
@@ -48,10 +51,11 @@ export type DemandaKanban = {
 export const COLAB_SELECT = `
   id, titulo, descricao, prioridade, status, prazo_confirmado,
   atribuido_em, iniciado_em, criado_em, peso, afeta_experiencia, evento_id,
-  sublocal,
+  projeto_id, sublocal,
   local:locais(nome),
   solicitante:solicitantes(nome),
   evento:eventos(nome),
+  projeto:projetos(nome),
   anexos:demanda_anexos(url, tipo, enviado_por),
   historico:demanda_historico(observacao, status_anterior, status_novo, criado_em)
 `;
@@ -76,10 +80,12 @@ export type DemandaColab = {
   peso: number;
   afeta_experiencia: boolean;
   evento_id: string | null;
+  projeto_id: string | null;
   sublocal: string | null;
   local: Rel;
   solicitante: Rel;
   evento: Rel;
+  projeto: Rel;
   anexos: AnexoDemanda[];
   historico?: {
     observacao: string | null;
@@ -93,10 +99,11 @@ export type DemandaColab = {
 export const GERAIS_SELECT = `
   id, titulo, descricao, prioridade, status, prazo_confirmado,
   atribuido_em, iniciado_em, criado_em, peso, afeta_experiencia, evento_id,
-  sublocal,
+  projeto_id, sublocal,
   local:locais(nome),
   solicitante:solicitantes(nome),
   evento:eventos(nome),
+  projeto:projetos(nome),
   anexos:demanda_anexos(url, tipo, enviado_por)
 `;
 

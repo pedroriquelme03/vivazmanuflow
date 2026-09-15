@@ -11,6 +11,7 @@ export default async function AbrirPage() {
     { data: propriedades },
     { data: solicitantes },
     eventosRes,
+    projetosRes,
   ] = await Promise.all([
     supabase.from("propriedades").select("id, nome").eq("ativo", true).order("nome"),
     supabase
@@ -23,6 +24,7 @@ export default async function AbrirPage() {
       .select("id, nome, propriedade_id, data_inicio, data_fim")
       .eq("ativo", true)
       .order("data_inicio", { ascending: false, nullsFirst: false }),
+    supabase.rpc("listar_projetos_ativos"),
   ]);
 
   return (
@@ -41,6 +43,7 @@ export default async function AbrirPage() {
             propriedades={propriedades ?? []}
             solicitantes={solicitantes ?? []}
             eventos={eventosRes.data ?? []}
+            projetos={projetosRes.data ?? []}
           />
         </div>
       </div>

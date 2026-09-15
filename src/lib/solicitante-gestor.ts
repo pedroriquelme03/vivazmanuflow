@@ -20,6 +20,20 @@ export function solicitantesUnicos<T extends { nome: string; propriedade_id: str
   });
 }
 
+export function idSolicitantePorNome<
+  T extends { id: string; nome: string; propriedade_id: string },
+>(lista: T[], nome: string | null | undefined, propriedadeId: string): string {
+  const n = nome?.trim().toLowerCase();
+  if (!n || !propriedadeId) return "";
+  return (
+    lista.find(
+      (s) =>
+        s.propriedade_id === propriedadeId &&
+        s.nome.trim().toLowerCase() === n,
+    )?.id ?? ""
+  );
+}
+
 /** Só cria se aquele nome ainda não existe naquele local. */
 export async function garantirSolicitantesGestor(
   supabase: SupabaseClient<Database>,

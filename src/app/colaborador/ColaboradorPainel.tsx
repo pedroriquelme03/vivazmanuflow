@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
@@ -29,12 +29,19 @@ import {
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
+import {
+  aplicarPegarNoPainel,
+  aplicarReloadMinhas,
+  demandaNoHistoricoColab,
+  filasDoPainelColaborador,
+} from "@/lib/colaborador-fila";
 
-type Aba = "demandas" | "gerais" | "historico" | "perfil";
+type Aba = "demandas" | "gerais" | "projetos" | "historico" | "perfil";
 
 const ABAS: { id: Aba; rotulo: string; icone: string }[] = [
   { id: "demandas", rotulo: "Minhas", icone: "🛠️" },
   { id: "gerais", rotulo: "Gerais", icone: "📥" },
+  { id: "projetos", rotulo: "Projetos", icone: "📁" },
   { id: "historico", rotulo: "Histórico", icone: "📋" },
   { id: "perfil", rotulo: "Perfil", icone: "👤" },
 ];
@@ -59,9 +66,10 @@ export function ColaboradorPainel({
   );
   const [agora, setAgora] = useState(() => Date.now());
   const [aba, setAba] = useState<Aba>("demandas");
+  const recemPegaId = useRef<string | null>(null);
 
   const recarregar = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("demandas")
       .select(COLAB_SELECT)
       .eq("colaborador_id", colaboradorId)
@@ -69,8 +77,15 @@ export function ColaboradorPainel({
       .eq("arquivado", false)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });
-    if (data) {
-      setDemandas(ordenarFilaPorPeso(data as unknown as DemandaColab[]));
+    if (error || !data) return;
+    const lista = data as unknown as DemandaColab[];
+    setDemandas((atuais) =>
+      ordenarFilaPorPeso(
+        aplicarReloadMinhas(atuais, lista, recemPegaId.current, false),
+      ),
+    );
+    if (lista.some((d) => d.id === recemPegaId.current)) {
+      recemPegaId.current = null;
     }
   }, [supabase, colaboradorId]);
 
@@ -115,6 +130,27 @@ export function ColaboradorPainel({
     return () => clearInterval(t);
   }, []);
 
+  const { gerais: geraisFila, projetosAbertas } = useMemo(
+    () => filasDoPainelColaborador(demandas, gerais),
+    [demandas, gerais],
+  );
+
+  function aoPegar(item: DemandaGeral) {
+    recemPegaId.current = item.id;
+    const pega = {
+      ...item,
+      status: "atribuida" as const,
+      historico: item.historico ?? [],
+    };
+    setGerais((atual) => aplicarPegarNoPainel(demandas, atual, pega).abertas);
+    setDemandas((atual) =>
+      ordenarFilaPorPeso(aplicarPegarNoPainel(atual, gerais, pega).minhas),
+    );
+    setAba("demandas");
+    void recarregarGerais();
+    void recarregar();
+  }
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-6">
@@ -129,12 +165,15 @@ export function ColaboradorPainel({
         )}
         {aba === "gerais" && (
           <DemandasGerais
-            itens={gerais}
-            onPegou={() => {
-              recarregarGerais();
-              recarregar();
-              setAba("demandas");
-            }}
+            itens={geraisFila}
+            onPegou={aoPegar}
+            onAtualizar={recarregarGerais}
+          />
+        )}
+        {aba === "projetos" && (
+          <AbaProjetos
+            abertas={projetosAbertas}
+            onPegou={aoPegar}
             onAtualizar={recarregarGerais}
           />
         )}
@@ -151,9 +190,11 @@ export function ColaboradorPainel({
             const badge =
               a.id === "demandas" && demandas.length > 0
                 ? demandas.length
-                : a.id === "gerais" && gerais.length > 0
-                  ? gerais.length
-                  : null;
+                : a.id === "gerais" && geraisFila.length > 0
+                  ? geraisFila.length
+                  : a.id === "projetos" && projetosAbertas.length > 0
+                    ? projetosAbertas.length
+                    : null;
             return (
               <button
                 key={a.id}
@@ -226,24 +267,60 @@ function ListaDemandas({
   );
 }
 
+function AbaProjetos({
+  abertas,
+  onPegou,
+  onAtualizar,
+}: {
+  abertas: DemandaGeral[];
+  onPegou: (item: DemandaGeral) => void;
+  onAtualizar: () => void;
+}) {
+  return (
+    <>
+      <h1 className="text-xl font-bold">Projetos</h1>
+      <p className="mt-0.5 text-sm text-slate-500">
+        Demandas dos seus projetos, ainda sem responsável. Depois de pegar,
+        elas vão para Minhas.
+      </p>
+      {abertas.length === 0 ? (
+        <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
+          Nenhuma demanda de projeto no momento.
+        </div>
+      ) : (
+        <div className="mt-5">
+          <DemandasGerais
+            itens={abertas}
+            onPegou={onPegou}
+            onAtualizar={onAtualizar}
+            compacto
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 function DemandasGerais({
   itens,
   onPegou,
   onAtualizar,
+  compacto = false,
 }: {
   itens: DemandaGeral[];
-  onPegou: () => void;
+  onPegou: (item: DemandaGeral) => void;
   onAtualizar: () => void;
+  compacto?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [pegandoId, setPegandoId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function pegar(id: string) {
+  async function pegar(d: DemandaGeral) {
     setErro(null);
-    setPegandoId(id);
+    setPegandoId(d.id);
     const { error } = await supabase.rpc("pegar_demanda", {
-      p_demanda_id: id,
+      p_demanda_id: d.id,
     });
     setPegandoId(null);
     if (error) {
@@ -255,15 +332,19 @@ function DemandasGerais({
       onAtualizar();
       return;
     }
-    onPegou();
+    onPegou(d);
   }
 
   return (
     <>
-      <h1 className="text-xl font-bold">Demandas Gerais</h1>
-      <p className="mt-0.5 text-sm text-slate-500">
-        Demandas ainda sem responsável. Qualquer colaborador pode pegar.
-      </p>
+      {!compacto && (
+        <>
+          <h1 className="text-xl font-bold">Demandas Gerais</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Demandas ainda sem responsável. Qualquer colaborador pode pegar.
+          </p>
+        </>
+      )}
 
       {erro && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -308,6 +389,11 @@ function DemandasGerais({
                       : ""}
                     {d.solicitante?.nome}
                   </p>
+                  {d.projeto?.nome && (
+                    <p className="mt-1 text-[11px] font-semibold text-sky-800">
+                      Projeto: {d.projeto.nome}
+                    </p>
+                  )}
                   {d.evento?.nome && (
                     <p className="mt-1 text-xs font-semibold text-violet-700">
                       🎉 Evento: {d.evento.nome}
@@ -319,7 +405,7 @@ function DemandasGerais({
                   <AnexosDoSolicitante anexos={d.anexos} />
                   <button
                     type="button"
-                    onClick={() => pegar(d.id)}
+                    onClick={() => pegar(d)}
                     disabled={pegandoId === d.id}
                     className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
                   >
@@ -384,13 +470,7 @@ function HistoricoColab({ colaboradorId }: { colaboradorId: string }) {
       const todos = (data as unknown as ItemHistorico[]) ?? [];
       const inicio = inicioPeriodo(nDias).getTime();
       setItens(
-        todos.filter((i) => {
-          if (i.status === "aguardando_validacao") return true;
-          const quando = i.concluido_em
-            ? new Date(i.concluido_em).getTime()
-            : 0;
-          return quando >= inicio;
-        }),
+        todos.filter((i) => demandaNoHistoricoColab(i, inicio)),
       );
       setCarregando(false);
     },
@@ -814,6 +894,11 @@ function CardColab({
             : ""}
           {demanda.solicitante?.nome}
         </p>
+        {demanda.projeto?.nome && (
+          <p className="mt-1 text-xs font-semibold text-sky-800">
+            Projeto: {demanda.projeto.nome}
+          </p>
+        )}
         {demanda.evento?.nome && (
           <p className="mt-1 text-xs font-semibold text-violet-700">
             🎉 Evento: {demanda.evento.nome}
