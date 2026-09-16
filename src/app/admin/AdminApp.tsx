@@ -12,6 +12,10 @@ import {
   validarEdicaoEquipe,
 } from "@/lib/equipe-edicao";
 import {
+  idPrimeiraPropriedadeAtiva,
+  propriedadesAtivas,
+} from "@/lib/propriedade-opcoes";
+import {
   ListaCadastroControles,
   useListaCadastro,
 } from "@/components/ListaCadastroControles";
@@ -383,11 +387,13 @@ function ModalEditarEquipe({
               onChange={(e) => setPropId(e.target.value)}
             >
               <option value="">Todos os locais principais</option>
-              {propriedades.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome}
-                </option>
-              ))}
+              {propriedadesAtivas(propriedades, usuario.propriedade_id).map(
+                (p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ),
+              )}
             </select>
           </CampoModal>
           <CampoModal rotulo="Situação">
@@ -529,6 +535,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
   const [nome, setNome] = useState("");
   const [propId, setPropId] = useState("");
   const [filtroProp, setFiltroProp] = useState("");
+  const locaisEscolha = propriedadesAtivas(propriedades);
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
 
@@ -575,7 +582,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
         />
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
           <option value="">Todos os locais principais</option>
-          {propriedades.map((p) => (
+          {locaisEscolha.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -594,7 +601,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
             onChange={(e) => setFiltroProp(e.target.value)}
           >
             <option value="">Todos os locais</option>
-            {propriedades.map((p) => (
+            {locaisEscolha.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
               </option>
@@ -630,12 +637,13 @@ function Locais({
 }) {
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
-  const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
+  const [propId, setPropId] = useState(idPrimeiraPropriedadeAtiva(propriedades));
   const [setorId, setSetorId] = useState("");
   const [filtroProp, setFiltroProp] = useState<string>("");
   const [filtroSetor, setFiltroSetor] = useState("");
   const [populando, setPopulando] = useState(false);
   const [msgOk, setMsgOk] = useState<string | null>(null);
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   const nomeProp = (id: string) => propriedades.find((p) => p.id === id)?.nome ?? "?";
   const nomeSetor = (id: string | null) =>
@@ -683,7 +691,7 @@ function Locais({
     setPopulando(true);
     try {
       const novos: { nome: string; propriedade_id: string }[] = [];
-      for (const prop of propriedades) {
+      for (const prop of locaisEscolha) {
         const chave = normalizarNome(prop.nome);
         const padrao =
           SUBLOCAIS_PADRAO[chave] ??
@@ -726,7 +734,7 @@ function Locais({
         <button
           type="button"
           onClick={popularPadrao}
-          disabled={populando || propriedades.length === 0}
+          disabled={populando || locaisEscolha.length === 0}
           className="rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
         >
           {populando ? "Populando…" : "Popular sublocais padrão"}
@@ -744,7 +752,7 @@ function Locais({
           onChange={(e) => setNome(e.target.value)}
         />
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
-          {propriedades.map((p) => (
+          {locaisEscolha.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -778,7 +786,7 @@ function Locais({
               onChange={(e) => setFiltroProp(e.target.value)}
             >
               <option value="">Todos os locais</option>
-              {propriedades.map((p) => (
+              {locaisEscolha.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nome}
                 </option>
@@ -835,11 +843,12 @@ function Solicitantes({
 }) {
   const { supabase, refresh, erro, setErro } = useAdmin();
   const [nome, setNome] = useState("");
-  const [propId, setPropId] = useState(propriedades[0]?.id ?? "");
+  const [propId, setPropId] = useState(idPrimeiraPropriedadeAtiva(propriedades));
   const [setorId, setSetorId] = useState("");
   const [ver, setVer] = useState<Solic | null>(null);
   const [filtroProp, setFiltroProp] = useState("");
   const [filtroSetor, setFiltroSetor] = useState("");
+  const locaisEscolha = propriedadesAtivas(propriedades);
   const nomeProp = (id: string) => propriedades.find((p) => p.id === id)?.nome ?? "?";
   const nomeSetor = (id: string | null) =>
     id ? setores.find((s) => s.id === id)?.nome ?? "" : "";
@@ -879,7 +888,7 @@ function Solicitantes({
           onChange={(e) => setNome(e.target.value)}
         />
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
-          {propriedades.map((p) => (
+          {locaisEscolha.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -907,7 +916,7 @@ function Solicitantes({
               onChange={(e) => setFiltroProp(e.target.value)}
             >
               <option value="">Todos os locais</option>
-              {propriedades.map((p) => (
+              {locaisEscolha.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nome}
                 </option>
@@ -987,6 +996,7 @@ function Predefinidas({
     usuarios.find((u) => u.id === id)?.nome ?? "?";
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   const getTexto = useCallback(
     (p: Pred) =>
@@ -1093,7 +1103,7 @@ function Predefinidas({
           onChange={(e) => setPropId(e.target.value)}
         >
           <option value="">Todos os locais principais</option>
-          {propriedades.map((p) => (
+          {locaisEscolha.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -1127,7 +1137,7 @@ function Predefinidas({
               onChange={(e) => setFiltroProp(e.target.value)}
             >
               <option value="">Todos os locais</option>
-              {propriedades.map((p) => (
+              {locaisEscolha.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nome}
                 </option>
@@ -1363,6 +1373,7 @@ function Equipe({
   const [ver, setVer] = useState<Usuario | null>(null);
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas";
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   const getTexto = useCallback(
     (u: Usuario) =>
@@ -1432,7 +1443,7 @@ function Equipe({
         </select>
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
           <option value="">Todos os locais principais</option>
-          {propriedades.map((p) => (
+          {locaisEscolha.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nome}
             </option>
@@ -1466,7 +1477,7 @@ function Equipe({
               onChange={(e) => setFiltroProp(e.target.value)}
             >
               <option value="">Todos os locais</option>
-              {propriedades.map((p) => (
+              {locaisEscolha.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nome}
                 </option>

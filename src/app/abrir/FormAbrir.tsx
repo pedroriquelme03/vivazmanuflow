@@ -9,6 +9,11 @@ import { uploadAnexo } from "@/lib/upload-anexo";
 import { EscolherMidia } from "@/components/EscolherMidia";
 import { idSolicitantePorNome, solicitantesUnicos } from "@/lib/solicitante-gestor";
 import type { Enums } from "@/lib/database.types";
+import type { ModoCampoProjeto } from "@/lib/projeto-regras";
+import {
+  idProjetoParaVincular,
+  validarCampoProjeto,
+} from "@/lib/projeto-regras";
 
 type Opcao = { id: string; nome: string };
 type OpcaoProp = { id: string; nome: string; propriedade_id: string };
@@ -46,6 +51,9 @@ export type FormAbrirProps = {
   solicitantes: OpcaoProp[];
   eventos: EventoOpcao[];
   projetos?: ProjetoOpcao[];
+  /** Público: opcional. Kanban Chamados: oculto. Kanban Projetos: obrigatorio. */
+  modoProjeto?: ModoCampoProjeto;
+  projetoIdPadrao?: string | null;
   /** Nome do usuário logado (Nova demanda no quadro). */
   nomeSolicitantePadrao?: string | null;
   propriedadePadrao?: string | null;
@@ -61,6 +69,8 @@ export function FormAbrir({
   solicitantes,
   eventos,
   projetos = [],
+  modoProjeto = "opcional",
+  projetoIdPadrao = "",
   nomeSolicitantePadrao,
   propriedadePadrao,
   onSucesso,
@@ -85,7 +95,9 @@ export function FormAbrir({
   );
   const [sublocal, setSublocal] = useState("");
   const [eventoId, setEventoId] = useState("");
-  const [projetoId, setProjetoId] = useState("");
+  const [projetoId, setProjetoId] = useState(
+    () => (modoProjeto === "oculto" ? "" : projetoIdPadrao ?? ""),
+  );
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [afetaExperiencia, setAfetaExperiencia] = useState(false);
@@ -124,7 +136,7 @@ export function FormAbrir({
     );
     setSublocal("");
     setEventoId("");
-    setProjetoId("");
+    if (modoProjeto === "opcional") setProjetoId("");
   }
 
   function adicionarArquivos(lista: File[]) {
@@ -161,6 +173,8 @@ export function FormAbrir({
           : "Selecione quem está solicitando.",
       );
     }
+    const erroProjeto = validarCampoProjeto(modoProjeto, projetoId);
+    if (erroProjeto) return setErro(erroProjeto);
     if (!titulo.trim()) return setErro("Descreva o que precisa ser feito.");
 
     setEnviando(true);
@@ -231,10 +245,11 @@ export function FormAbrir({
         }
       }
 
-      if (projetoId) {
+      const projetoVincular = idProjetoParaVincular(modoProjeto, projetoId);
+      if (projetoVincular) {
         const { error: prErro } = await supabase.rpc("vincular_projeto_demanda", {
           p_token: token,
-          p_projeto_id: projetoId,
+          p_projeto_id: projetoVincular,
         });
         if (prErro) {
           throw new Error(
@@ -361,34 +376,42 @@ export function FormAbrir({
         )}
       </Campo>
 
-      <Campo label="Projeto" opcional>
-        <select
-          value={projetoId}
-          onChange={(e) => setProjetoId(e.target.value)}
-          className={inputCls}
-        >
-          <option value="">Nenhum — fila normal</option>
-          {projetosFiltrados.map((pr) => (
-            <option key={pr.id} value={pr.id}>
-              {pr.nome}
-            </option>
-          ))}
-        </select>
-        {projetosFiltrados.length === 0 && (
-          <p className="mt-1 text-xs text-slate-400">
-            Nenhum projeto ativo. Cadastre em Projetos no menu do admin.
-          </p>
-        )}
-        {projetoId ? (
-          <p className="mt-1 text-xs text-brand-700">
-            Só quem está neste projeto (e o administrador) vai ver esta demanda.
-          </p>
-        ) : (
-          <p className="mt-1 text-xs text-slate-400">
-            Sem projeto, entra na fila de todo mundo.
-          </p>
-        )}
-      </Campo>
+      {modoProjeto !== "oculto" && (
+        <Campo label="Projeto" opcional={modoProjeto !== "obrigatorio"}>
+          <select
+            value={projetoId}
+            onChange={(e) => setProjetoId(e.target.value)}
+            className={inputCls}
+            required={modoProjeto === "obrigatorio"}
+          >
+            {modoProjeto === "opcional" ? (
+              <option value="">Nenhum — fila normal</option>
+            ) : (
+              <option value="">Selecione o projeto…</option>
+            )}
+            {projetosFiltrados.map((pr) => (
+              <option key={pr.id} value={pr.id}>
+                {pr.nome}
+              </option>
+            ))}
+          </select>
+          {projetosFiltrados.length === 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Nenhum projeto ativo. Cadastre em Projetos no menu do admin.
+            </p>
+          )}
+          {projetoId ? (
+            <p className="mt-1 text-xs text-brand-700">
+              Só quem está neste projeto (e o administrador) vai ver esta
+              demanda.
+            </p>
+          ) : modoProjeto === "opcional" ? (
+            <p className="mt-1 text-xs text-slate-400">
+              Sem projeto, entra na fila de todo mundo.
+            </p>
+          ) : null}
+        </Campo>
+      )}
 
       <Campo label="É demanda de evento?" opcional>
         <select

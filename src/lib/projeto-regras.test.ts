@@ -3,8 +3,13 @@ import {
   colaboradoresDoFiltroProjeto,
   ehFilaNormal,
   filtrarQuadroProjetos,
+  idProjetoParaVincular,
+  modoCampoProjetoKanban,
+  projetoIdInicialKanban,
   projetosDoFiltroQuadro,
+  validarCampoProjeto,
   validarCriacaoProjeto,
+  pessoasElegiveisMembro,
 } from "@/lib/projeto-regras";
 
 describe("validarCriacaoProjeto", () => {
@@ -26,6 +31,17 @@ describe("validarCriacaoProjeto", () => {
 
   it("aceita duas ou mais pessoas", () => {
     expect(validarCriacaoProjeto("TESTE 2", ["u1", "u2", "u3"])).toBeNull();
+  });
+});
+
+describe("pessoasElegiveisMembro", () => {
+  it("só colaborador entra na lista do projeto", () => {
+    const ids = pessoasElegiveisMembro([
+      { id: "1", role: "admin" },
+      { id: "2", role: "lider" },
+      { id: "3", role: "colaborador" },
+    ]).map((p) => p.id);
+    expect(ids).toEqual(["3"]);
   });
 });
 
@@ -101,5 +117,30 @@ describe("ehFilaNormal", () => {
     expect(ehFilaNormal(null)).toBe(true);
     expect(ehFilaNormal("")).toBe(true);
     expect(ehFilaNormal("p1")).toBe(false);
+  });
+});
+
+describe("campo projeto no formulário", () => {
+  it("Kanban Chamados esconde o campo", () => {
+    expect(modoCampoProjetoKanban("fila")).toBe("oculto");
+    expect(projetoIdInicialKanban("fila", "p1")).toBe("");
+    expect(idProjetoParaVincular("oculto", "p1")).toBeNull();
+  });
+
+  it("Kanban Projetos + todos: obriga escolher, sem id inicial", () => {
+    expect(modoCampoProjetoKanban("projetos")).toBe("obrigatorio");
+    expect(projetoIdInicialKanban("projetos", "")).toBe("");
+    expect(validarCampoProjeto("obrigatorio", "")).toBe("Selecione o projeto.");
+  });
+
+  it("Kanban Projetos + filtro: já vem o projeto do quadro", () => {
+    expect(projetoIdInicialKanban("projetos", "p-teste")).toBe("p-teste");
+    expect(validarCampoProjeto("obrigatorio", "p-teste")).toBeNull();
+    expect(idProjetoParaVincular("obrigatorio", "p-teste")).toBe("p-teste");
+  });
+
+  it("público /abrir: opcional, vazio vai para a fila", () => {
+    expect(validarCampoProjeto("opcional", "")).toBeNull();
+    expect(idProjetoParaVincular("opcional", "")).toBeNull();
   });
 });

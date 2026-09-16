@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/database.types";
+import { propriedadesAtivas } from "@/lib/propriedade-opcoes";
 import {
   gerarCodigoEquipamento,
   normalizarCodigo,
@@ -92,6 +93,7 @@ function ListaAreas({
 
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos";
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   async function adicionar() {
     setErro(null);
@@ -147,7 +149,7 @@ function ListaAreas({
             onChange={(e) => setPropId(e.target.value)}
           >
             <option value="">Todos os locais principais</option>
-            {propriedades.map((p) => (
+            {locaisEscolha.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
               </option>

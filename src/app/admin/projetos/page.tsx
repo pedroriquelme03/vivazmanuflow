@@ -22,7 +22,7 @@ export default async function ProjetosPage() {
         .from("usuarios")
         .select("id, nome, role")
         .eq("ativo", true)
-        .in("role", ["colaborador", "lider", "admin"])
+        .eq("role", "colaborador")
         .order("nome"),
     ]);
 

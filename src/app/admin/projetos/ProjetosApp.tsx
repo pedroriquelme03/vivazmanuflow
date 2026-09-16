@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { validarCriacaoProjeto } from "@/lib/projeto-regras";
+import { pessoasElegiveisMembro, validarCriacaoProjeto } from "@/lib/projeto-regras";
+import { propriedadesAtivas } from "@/lib/propriedade-opcoes";
 import type { Tables } from "@/lib/database.types";
 
 type Projeto = Tables<"projetos">;
@@ -25,6 +26,10 @@ export function ProjetosApp({
   membros: Membro[];
   equipe: Pessoa[];
 }) {
+  const colaboradores = useMemo(
+    () => pessoasElegiveisMembro(equipe),
+    [equipe],
+  );
   const supabase = createClient();
   const router = useRouter();
   const [nome, setNome] = useState("");
@@ -45,6 +50,7 @@ export function ProjetosApp({
 
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   const membrosPorProjeto = useMemo(() => {
     const mapa: Record<string, string[]> = {};
@@ -56,12 +62,12 @@ export function ProjetosApp({
 
   const nomesEquipe = useMemo(() => {
     const mapa: Record<string, string> = {};
-    for (const p of equipe) mapa[p.id] = p.nome;
+    for (const p of colaboradores) mapa[p.id] = p.nome;
     return mapa;
-  }, [equipe]);
+  }, [colaboradores]);
 
   function idsAtivos(ids: string[]) {
-    const permitidos = new Set(equipe.map((p) => p.id));
+    const permitidos = new Set(colaboradores.map((p) => p.id));
     return [...new Set(ids.filter((id) => permitidos.has(id)))];
   }
 
@@ -227,7 +233,7 @@ export function ProjetosApp({
             onChange={(e) => setPropId(e.target.value)}
           >
             <option value="">Todos os locais principais</option>
-            {propriedades.map((p) => (
+            {locaisEscolha.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
               </option>
@@ -236,13 +242,16 @@ export function ProjetosApp({
           <p className="text-xs font-medium text-slate-600">
             Quem faz parte <span className="text-red-500">*</span>
           </p>
+          <p className="text-xs text-slate-500">
+            Só colaboradores. Líder e administrador já veem todos os projetos.
+          </p>
           <ul className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-2">
-            {equipe.length === 0 ? (
+            {colaboradores.length === 0 ? (
               <li className="px-1 py-2 text-xs text-slate-400">
-                Nenhum colaborador ou líder ativo.
+                Nenhum colaborador ativo.
               </li>
             ) : (
-              equipe.map((p) => (
+              colaboradores.map((p) => (
                 <li key={p.id}>
                   <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50">
                     <input
@@ -355,8 +364,12 @@ export function ProjetosApp({
                   </div>
                   {editandoId === p.id && (
                     <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <p className="mb-1 px-2 text-xs text-slate-500">
+                        Só colaboradores. Líder e administrador já veem todos os
+                        projetos.
+                      </p>
                       <ul className="max-h-40 overflow-y-auto">
-                        {equipe.map((pessoa) => (
+                        {colaboradores.map((pessoa) => (
                           <li key={pessoa.id}>
                             <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm">
                               <input

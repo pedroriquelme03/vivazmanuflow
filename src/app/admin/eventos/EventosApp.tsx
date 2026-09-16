@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/database.types";
+import { propriedadesAtivas } from "@/lib/propriedade-opcoes";
 
 type Evento = Tables<"eventos">;
 type Prop = Tables<"propriedades">;
@@ -37,6 +38,7 @@ export function EventosApp({
 
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todos os locais";
+  const locaisEscolha = propriedadesAtivas(propriedades);
 
   async function adicionar() {
     setErro(null);
@@ -125,7 +127,7 @@ export function EventosApp({
             onChange={(e) => setPropId(e.target.value)}
           >
             <option value="">Todos os locais principais</option>
-            {propriedades.map((p) => (
+            {locaisEscolha.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
               </option>

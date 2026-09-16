@@ -22,7 +22,6 @@ export default async function LiderHome() {
     eventosRes,
     projetosRes,
     membrosRes,
-    equipeRes,
   ] = await Promise.all([
     supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
       ascending: false,
@@ -50,12 +49,6 @@ export default async function LiderHome() {
       .order("data_inicio", { ascending: false, nullsFirst: false }),
     supabase.rpc("listar_projetos_ativos"),
     supabase.from("projeto_membros").select("projeto_id, usuario_id"),
-    supabase
-      .from("usuarios")
-      .select("id, nome, propriedade_id")
-      .eq("ativo", true)
-      .in("role", ["colaborador", "lider", "admin"])
-      .order("nome"),
   ]);
 
   const slaHoras: Record<string, number> = {};
@@ -77,8 +70,9 @@ export default async function LiderHome() {
         slaHoras={slaHoras}
         agoraInicial={Date.now()}
         ehAdmin={perfil.role === "admin"}
+        ehGestor
         membrosPorProjeto={membrosPorProjeto}
-        equipeAtribuir={equipeRes.data ?? []}
+        equipeAtribuir={colaboradores ?? []}
         opcoesNovaDemanda={{
           propriedades: propriedades ?? [],
           solicitantes: solicitantes ?? [],

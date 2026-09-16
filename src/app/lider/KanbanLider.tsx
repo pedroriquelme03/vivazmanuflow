@@ -20,7 +20,10 @@ import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
 import {
   colaboradoresDoFiltroProjeto,
   filtrarQuadroProjetos,
+  modoCampoProjetoKanban,
+  projetoIdInicialKanban,
   projetosDoFiltroQuadro,
+  type ModoCampoProjeto,
 } from "@/lib/projeto-regras";
 
 type Colaborador = { id: string; nome: string; propriedade_id: string | null };
@@ -123,6 +126,7 @@ export function KanbanLider({
   agoraInicial,
   opcoesNovaDemanda,
   ehAdmin = false,
+  ehGestor = false,
   membrosPorProjeto = {},
   equipeAtribuir = [],
 }: {
@@ -132,6 +136,7 @@ export function KanbanLider({
   agoraInicial: number;
   opcoesNovaDemanda: OpcoesNovaDemanda;
   ehAdmin?: boolean;
+  ehGestor?: boolean;
   membrosPorProjeto?: Record<string, string[]>;
   equipeAtribuir?: Colaborador[];
 }) {
@@ -141,6 +146,9 @@ export function KanbanLider({
   const [editando, setEditando] = useState<DemandaKanban | null>(null);
   const [detalhe, setDetalhe] = useState<DemandaKanban | null>(null);
   const [criando, setCriando] = useState(false);
+  const [novaModoProjeto, setNovaModoProjeto] =
+    useState<ModoCampoProjeto>("oculto");
+  const [novaProjetoPadrao, setNovaProjetoPadrao] = useState("");
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
@@ -191,7 +199,7 @@ export function KanbanLider({
       if (temBusca && !textoDemanda(d).includes(buscaNorm)) return false;
       return true;
     });
-    if (!ehAdmin) return base;
+    if (!ehGestor) return base;
     return filtrarQuadroProjetos(base, visao, projetoFiltro);
   }, [
     demandas,
@@ -199,7 +207,7 @@ export function KanbanLider({
     temBusca,
     colaboradorFiltro,
     prioridadeFiltro,
-    ehAdmin,
+    ehGestor,
     visao,
     projetoFiltro,
   ]);
@@ -211,7 +219,7 @@ export function KanbanLider({
   );
 
   const colaboradoresFiltro = useMemo(() => {
-    if (!ehAdmin || visao !== "projetos") return colaboradores;
+    if (!ehGestor || visao !== "projetos") return colaboradores;
     const equipe = equipeAtribuir.length ? equipeAtribuir : colaboradores;
     return colaboradoresDoFiltroProjeto(
       equipe,
@@ -220,7 +228,7 @@ export function KanbanLider({
       projetosNoQuadro.map((p) => p.id),
     );
   }, [
-    ehAdmin,
+    ehGestor,
     visao,
     colaboradores,
     equipeAtribuir,
@@ -261,7 +269,7 @@ export function KanbanLider({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="text-lg font-bold">Demandas</h1>
-            {ehAdmin && (
+            {ehGestor && (
               <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-xs font-semibold">
                 <button
                   type="button"
@@ -276,7 +284,7 @@ export function KanbanLider({
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  Fila
+                  Chamados
                 </button>
                 <button
                   type="button"
@@ -315,7 +323,13 @@ export function KanbanLider({
             </button>
             <button
               type="button"
-              onClick={() => setCriando(true)}
+              onClick={() => {
+                setNovaModoProjeto(modoCampoProjetoKanban(visao));
+                setNovaProjetoPadrao(
+                  projetoIdInicialKanban(visao, projetoFiltro),
+                );
+                setCriando(true);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:px-3.5"
             >
               <span className="text-base leading-none">＋</span>
@@ -360,7 +374,7 @@ export function KanbanLider({
                 </option>
               ))}
             </select>
-            {ehAdmin && visao === "projetos" && (
+            {ehGestor && visao === "projetos" && (
               <select
                 value={projetoFiltro}
                 onChange={(e) => {
@@ -523,7 +537,11 @@ export function KanbanLider({
 
       {criando && (
         <NovaDemandaModal
-          opcoes={opcoesNovaDemanda}
+          opcoes={{
+            ...opcoesNovaDemanda,
+            modoProjeto: novaModoProjeto,
+            projetoIdPadrao: novaProjetoPadrao,
+          }}
           onFechar={() => setCriando(false)}
           onSucesso={() => {
             setCriando(false);

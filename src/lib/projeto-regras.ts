@@ -9,6 +9,12 @@ export function validarCriacaoProjeto(
   return null;
 }
 
+export function pessoasElegiveisMembro<T extends { role: string }>(
+  pessoas: T[],
+): T[] {
+  return pessoas.filter((p) => p.role === "colaborador");
+}
+
 export function ehFilaNormal(projetoId: string | null | undefined) {
   return !projetoId;
 }
@@ -63,4 +69,40 @@ export function projetosDoFiltroQuadro(
   return [...vistos.entries()]
     .map(([id, nome]) => ({ id, nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
+}
+
+export type ModoCampoProjeto = "opcional" | "oculto" | "obrigatorio";
+
+/** Kanban: Chamados esconde; Projetos obriga escolher. Público fica opcional. */
+export function modoCampoProjetoKanban(
+  visao: "fila" | "projetos",
+): ModoCampoProjeto {
+  return visao === "projetos" ? "obrigatorio" : "oculto";
+}
+
+export function projetoIdInicialKanban(
+  visao: "fila" | "projetos",
+  projetoFiltro: string,
+): string {
+  if (visao !== "projetos") return "";
+  return projetoFiltro;
+}
+
+export function validarCampoProjeto(
+  modo: ModoCampoProjeto,
+  projetoId: string,
+): string | null {
+  if (modo === "obrigatorio" && !projetoId.trim()) {
+    return "Selecione o projeto.";
+  }
+  return null;
+}
+
+export function idProjetoParaVincular(
+  modo: ModoCampoProjeto,
+  projetoId: string,
+): string | null {
+  if (modo === "oculto") return null;
+  const id = projetoId.trim();
+  return id || null;
 }
