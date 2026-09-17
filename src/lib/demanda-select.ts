@@ -109,6 +109,8 @@ export const GERAIS_SELECT = `
 
 export type DemandaGeral = DemandaColab;
 
+export const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** Ordena a fila: maior peso primeiro; empate → mais antiga primeiro. */
 export function ordenarFilaPorPeso<
   T extends { peso?: number | null; criado_em?: string | null },
@@ -121,4 +123,28 @@ export function ordenarFilaPorPeso<
     const cb = b.criado_em ? new Date(b.criado_em).getTime() : 0;
     return ca - cb;
   });
+}
+
+function instanteConclusao(iso: string | null | undefined) {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Concluídas: mais recente em cima, pelo instante de conclusão (não abertura). */
+export function ordenarPorConclusao<
+  T extends { concluido_em?: string | null },
+>(itens: T[]): T[] {
+  return [...itens].sort(
+    (a, b) => instanteConclusao(b.concluido_em) - instanteConclusao(a.concluido_em),
+  );
+}
+
+export function concluidaNosUltimos7Dias(
+  concluidoEm: string | null | undefined,
+  agora: number,
+) {
+  const t = instanteConclusao(concluidoEm);
+  if (!t) return false;
+  return agora - t <= SETE_DIAS_MS;
 }

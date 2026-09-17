@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { DEMANDA_SELECT, type DemandaKanban, ordenarFilaPorPeso } from "@/lib/demanda-select";
+import {
+  DEMANDA_SELECT,
+  type DemandaKanban,
+  concluidaNosUltimos7Dias,
+  ordenarFilaPorPeso,
+  ordenarPorConclusao,
+} from "@/lib/demanda-select";
 import {
   PRAZO_COR,
   PRIORIDADE_LABEL,
@@ -30,8 +36,6 @@ type Colaborador = { id: string; nome: string; propriedade_id: string | null };
 type Status = Enums<"demanda_status">;
 type Prioridade = Enums<"demanda_prioridade">;
 
-const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
-
 function normalizar(texto: string) {
   return texto
     .toLowerCase()
@@ -52,11 +56,6 @@ function textoDemanda(d: DemandaKanban) {
       .filter(Boolean)
       .join(" "),
   );
-}
-
-function concluidaNosUltimos7Dias(d: DemandaKanban, agora: number) {
-  if (!d.concluido_em) return false;
-  return agora - new Date(d.concluido_em).getTime() <= SETE_DIAS_MS;
 }
 
 const COLUNAS: { status: Status; titulo: string }[] = [
@@ -248,8 +247,13 @@ export function KanbanLider({
 
   const porStatus = (s: Status) => {
     let itens = demandasFiltradas.filter((d) => d.status === s && !d.arquivado);
-    if (s === "concluida" && !temBusca) {
-      itens = itens.filter((d) => concluidaNosUltimos7Dias(d, agora));
+    if (s === "concluida") {
+      if (!temBusca) {
+        itens = itens.filter((d) =>
+          concluidaNosUltimos7Dias(d.concluido_em, agora),
+        );
+      }
+      return ordenarPorConclusao(itens);
     }
     return ordenarFilaPorPeso(itens);
   };

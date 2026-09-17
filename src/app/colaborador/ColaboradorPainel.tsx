@@ -14,6 +14,7 @@ import {
   type DemandaColab,
   type DemandaGeral,
   ordenarFilaPorPeso,
+  ordenarPorConclusao,
 } from "@/lib/demanda-select";
 import type { TablesUpdate, Enums } from "@/lib/database.types";
 import {
@@ -486,7 +487,8 @@ function HistoricoColab({ colaboradorId }: { colaboradorId: string }) {
     [itens],
   );
   const concluidas = useMemo(
-    () => itens.filter((i) => i.status === "concluida"),
+    () =>
+      ordenarPorConclusao(itens.filter((i) => i.status === "concluida")),
     [itens],
   );
 

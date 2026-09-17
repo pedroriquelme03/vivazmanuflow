@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { createClient } from "@/lib/supabase/client";
 import {
   type DemandaKanban,
+  concluidaNosUltimos7Dias,
   ordenarFilaPorPeso,
+  ordenarPorConclusao,
 } from "@/lib/demanda-select";
 import {
   PRAZO_COR,
@@ -25,15 +27,8 @@ const COLUNAS: { status: Status; titulo: string; selo?: string }[] = [
   { status: "atribuida", titulo: "Atribuídas" },
   { status: "em_andamento", titulo: "Em andamento" },
   { status: "aguardando_validacao", titulo: "Validação" },
-  { status: "concluida", titulo: "Concluídas", selo: "hoje" },
+  { status: "concluida", titulo: "Concluídas", selo: "7 dias" },
 ];
-
-const TZ_DIA = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Sao_Paulo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 
 const TZ_DATA = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
@@ -58,11 +53,6 @@ function climaDeCodigo(code: number): { texto: string; emoji: string } {
   if (code <= 77) return { texto: "Garoa fria", emoji: "🌨️" };
   if (code <= 82) return { texto: "Pancadas de chuva", emoji: "🌦️" };
   return { texto: "Trovoada", emoji: "⛈️" };
-}
-
-function ehHoje(iso: string | null) {
-  if (!iso) return false;
-  return TZ_DIA.format(new Date(iso)) === TZ_DIA.format(new Date());
 }
 
 function comoDemandas(data: unknown): DemandaKanban[] {
@@ -211,7 +201,10 @@ export function QuadroTv() {
   const porStatus = (s: Status) => {
     let itens = demandas.filter((d) => d.status === s && !d.arquivado);
     if (s === "concluida") {
-      itens = itens.filter((d) => ehHoje(d.concluido_em));
+      itens = itens.filter((d) =>
+        concluidaNosUltimos7Dias(d.concluido_em, agora),
+      );
+      return ordenarPorConclusao(itens);
     }
     return ordenarFilaPorPeso(itens);
   };
