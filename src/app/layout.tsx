@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NavigationLoader } from "@/components/NavigationLoader";
@@ -16,7 +16,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Manutenção Vivaz — Vivaz Cataratas",
-  description: "Sistema de gestão de demandas de manutenção do resort Vivaz Cataratas.",
+  description:
+    "Sistema de gestão de demandas de manutenção do resort Vivaz Cataratas.",
+  applicationName: "Manutenção Vivaz",
+  appleWebApp: {
+    capable: true,
+    title: "Manutenção Vivaz",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0891b2",
 };
 
 export default function RootLayout({
