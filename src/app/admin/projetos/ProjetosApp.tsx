@@ -13,7 +13,7 @@ type Membro = { projeto_id: string; usuario_id: string };
 type Pessoa = { id: string; nome: string; role: string };
 
 const inputCls =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 export function ProjetosApp({
   projetos,
@@ -205,7 +205,7 @@ export function ProjetosApp({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <h1 className="text-xl font-bold">Projetos</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         Demandas de um projeto só aparecem para as pessoas marcadas aqui e para
@@ -303,27 +303,27 @@ export function ProjetosApp({
                   key={p.id}
                   className="border-t border-slate-100 py-2.5 first:border-t-0"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className={p.ativo ? "" : "opacity-50"}>
-                      <p className="text-sm font-medium text-slate-800">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className={`min-w-0 ${p.ativo ? "" : "opacity-50"}`}>
+                      <p className="break-words text-sm font-medium text-slate-800">
                         {p.nome}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="break-words text-xs text-slate-400">
                         {nomeProp(p.propriedade_id)}
                         {" · "}
                         {ids.length} pessoa(s)
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 break-words text-xs text-slate-500">
                         {ids.map((id) => nomesEquipe[id] ?? "?").join(", ") ||
                           "Sem membros"}
                       </p>
                       {p.descricao && (
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 break-words text-xs text-slate-500">
                           {p.descricao}
                         </p>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <div className="flex shrink-0 flex-wrap gap-1">
                       <button
                         type="button"
                         onClick={() => {

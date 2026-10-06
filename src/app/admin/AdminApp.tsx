@@ -46,8 +46,19 @@ const ABAS = [
 ] as const;
 type Aba = (typeof ABAS)[number];
 
+const ABA_CURTA: Record<Aba, string> = {
+  "Locais principais": "Locais",
+  Setores: "Setores",
+  Sublocais: "Sublocais",
+  Solicitantes: "Solicitantes",
+  "Demandas pré-definidas": "Demandas",
+  Peso: "Peso",
+  Solicitações: "Solicitações",
+  Equipe: "Equipe",
+};
+
 const inputCls =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 type Pred = Tables<"demandas_predefinidas">;
 type PesoCfg = Tables<"peso_config">;
@@ -101,18 +112,36 @@ export function AdminApp(props: {
   } | null>(null);
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <h1 className="text-xl font-bold">Cadastros</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         Cadastre locais, solicitantes, demandas pré-definidas, pesos e a equipe.
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-1 border-b border-slate-200">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:hidden">
         {ABAS.map((a) => (
           <button
             key={a}
+            type="button"
             onClick={() => setAba(a)}
-            className={`px-3 py-2 text-sm font-medium ${
+            className={`rounded-xl px-3 py-2.5 text-center text-sm font-semibold leading-tight ${
+              aba === a
+                ? "bg-brand-600 text-white"
+                : "bg-white text-slate-600 ring-1 ring-slate-200"
+            }`}
+          >
+            {ABA_CURTA[a]}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 hidden gap-1 overflow-x-auto border-b border-slate-200 sm:flex">
+        {ABAS.map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => setAba(a)}
+            className={`shrink-0 px-3 py-2 text-sm font-medium ${
               aba === a
                 ? "border-b-2 border-brand-600 text-brand-700"
                 : "text-slate-500 hover:text-brand-700"
@@ -188,7 +217,7 @@ function useAdmin() {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">{children}</div>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">{children}</div>
   );
 }
 
@@ -210,12 +239,14 @@ function Linha({
   acoes?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-t border-slate-100 py-2.5 first:border-t-0">
-      <div className={ativo ? "" : "opacity-50"}>
-        <p className="text-sm font-medium text-slate-800">{nome}</p>
-        {extra && <p className="text-xs text-slate-400">{extra}</p>}
+    <div className="flex flex-col gap-2 border-t border-slate-100 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className={`min-w-0 ${ativo ? "" : "opacity-50"}`}>
+        <p className="break-words text-sm font-medium text-slate-800">{nome}</p>
+        {extra && (
+          <p className="break-words text-xs text-slate-400">{extra}</p>
+        )}
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         {onEditar && (
           <button
             type="button"
@@ -262,11 +293,11 @@ function ModalVer({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4"
       onClick={onFechar}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
+        className="max-h-[min(88dvh,calc(100dvh-1.5rem))] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -423,11 +454,11 @@ function ModalEditarEquipe({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4"
       onClick={onFechar}
     >
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl"
+        className="max-h-[min(88dvh,calc(100dvh-1.5rem))] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -617,9 +648,9 @@ function Propriedades({ itens }: { itens: Prop[] }) {
         Locais principais abrem a lista de sublocais na abertura de demanda
         (ex.: Aquamania, Vivaz Cataratas).
       </p>
-      <div className="flex gap-2">
+      <div className="grid gap-2">
         <input
-          className={`${inputCls} flex-1`}
+          className={inputCls}
           placeholder="Novo local principal"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
@@ -690,9 +721,9 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
 
   return (
     <Card>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid gap-2">
         <input
-          className={`${inputCls} flex-1`}
+          className={inputCls}
           placeholder="Novo setor"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
@@ -847,21 +878,21 @@ function Locais({
         Sublocais aparecem depois que o solicitante escolhe o local principal.
       </p>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 grid gap-1">
         <button
           type="button"
           onClick={popularPadrao}
           disabled={populando || locaisEscolha.length === 0}
-          className="rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+          className="w-full rounded-lg border border-brand-300 bg-brand-50 px-3 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
         >
           {populando ? "Populando…" : "Popular sublocais padrão"}
         </button>
-        <span className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400">
           Aquamania e Vivaz Cataratas
-        </span>
+        </p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2">
         <input
           className={inputCls}
           placeholder="Novo sublocal"
@@ -997,7 +1028,7 @@ function Solicitantes({
 
   return (
     <Card>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2">
         <input
           className={inputCls}
           placeholder="Nome do solicitante"
@@ -1430,7 +1461,7 @@ function PesoConfiguracao({ inicial }: { inicial: PesoCfg | null }) {
         type="button"
         onClick={salvar}
         disabled={salvando}
-        className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
       >
         {salvando ? "Salvando…" : "Salvar pesos"}
       </button>
@@ -1520,12 +1551,14 @@ function ListaSolicitacoes({
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-800">
                     {pedido.nome}
                   </p>
-                  <p className="text-xs text-slate-500">{pedido.email}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {pedido.email}
+                  </p>
                   <p className="mt-1 text-xs text-slate-500">
                     Setor: {pedido.setor}
                   </p>
@@ -1537,14 +1570,14 @@ function ListaSolicitacoes({
                   </p>
                 </div>
                 {cadastrado ? (
-                  <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
+                  <span className="shrink-0 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
                     Já cadastrado
                   </span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => onCadastrar(pedido.nome, pedido.email)}
-                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+                    className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
                   >
                     Cadastrar
                   </button>
@@ -1880,8 +1913,9 @@ function EscolhaAmbientes({
 function BtnAdd({ onClick, rotulo = "Adicionar" }: { onClick: () => void; rotulo?: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+      className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
     >
       {rotulo}
     </button>

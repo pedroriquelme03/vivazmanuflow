@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   type DemandaKanban,
@@ -59,12 +59,12 @@ function textoDemanda(d: DemandaKanban) {
   );
 }
 
-const COLUNAS: { status: Status; titulo: string }[] = [
-  { status: "aberta", titulo: "Abertas" },
-  { status: "atribuida", titulo: "Atribuídas" },
-  { status: "em_andamento", titulo: "Em andamento" },
-  { status: "aguardando_validacao", titulo: "Validação" },
-  { status: "concluida", titulo: "Concluídas" },
+const COLUNAS: { status: Status; titulo: string; curto: string }[] = [
+  { status: "aberta", titulo: "Abertas", curto: "Abertas" },
+  { status: "atribuida", titulo: "Atribuídas", curto: "Atribuídas" },
+  { status: "em_andamento", titulo: "Em andamento", curto: "Andamento" },
+  { status: "aguardando_validacao", titulo: "Validação", curto: "Validação" },
+  { status: "concluida", titulo: "Concluídas", curto: "Concluídas" },
 ];
 
 function ColunaQuadro({
@@ -75,6 +75,7 @@ function ColunaQuadro({
   className = "bg-slate-100/70",
   onAbrir,
   onEditar,
+  cheia = false,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -83,10 +84,13 @@ function ColunaQuadro({
   className?: string;
   onAbrir: (d: DemandaKanban) => void;
   onEditar: (d: DemandaKanban) => void;
+  cheia?: boolean;
 }) {
   return (
     <section
-      className={`flex h-full min-w-[17.5rem] flex-1 flex-col overflow-hidden rounded-xl p-2 ${className}`}
+      className={`flex h-full flex-col overflow-hidden rounded-xl p-2 ${
+        cheia ? "w-full min-w-0" : "min-w-[17.5rem] flex-1 shrink-0"
+      } ${className}`}
     >
       <header className="shrink-0 px-2 py-1.5">
         <div className="flex items-center justify-between gap-2">
@@ -164,6 +168,8 @@ export function KanbanLider({
   const [verArquivado, setVerArquivado] = useState(false);
   const [visao, setVisao] = useState<"fila" | "projetos">("fila");
   const [projetoFiltro, setProjetoFiltro] = useState("");
+  const [colunaCel, setColunaCel] = useState<Status>("aberta");
+  const toqueIni = useRef<{ x: number; y: number } | null>(null);
 
   const recarregar = useCallback(async () => {
     const data = await listarQuadro(supabase, ambiente);
@@ -287,11 +293,20 @@ export function KanbanLider({
   const filtroCls =
     "rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
+  const colunaCelAtual =
+    COLUNAS.find((c) => c.status === colunaCel) ?? COLUNAS[0];
+
+  function irColuna(dir: -1 | 1) {
+    const i = COLUNAS.findIndex((c) => c.status === colunaCel);
+    const proxima = COLUNAS[i + dir];
+    if (proxima) setColunaCel(proxima.status);
+  }
+
   return (
-    <main className="flex h-[calc(100dvh-8.75rem)] flex-col overflow-hidden p-3 md:h-[calc(100dvh-1rem)] md:p-4">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 md:p-4">
       <div className="mb-3 flex shrink-0 flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-lg font-bold">
               {ambiente === "ti" ? "Chamados" : "Demandas"}
             </h1>
@@ -334,11 +349,11 @@ export function KanbanLider({
               </span>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 sm:items-center">
             <button
               type="button"
               onClick={() => setVerArquivado(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 sm:px-3"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto sm:px-3 sm:text-sm"
             >
               Arquivado
               {arquivadas.length > 0 && (
@@ -354,7 +369,7 @@ export function KanbanLider({
                 setNovaProjetoPadrao("");
                 setCriando("concluido");
               }}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 sm:px-3"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto sm:px-3 sm:text-sm"
             >
               <span className="sm:hidden">Concluído</span>
               <span className="hidden sm:inline">Registrar concluído</span>
@@ -368,7 +383,7 @@ export function KanbanLider({
                 );
                 setCriando("fila");
               }}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:px-3.5"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-2 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 sm:w-auto sm:px-3.5 sm:text-sm"
             >
               <span className="text-base leading-none">＋</span>
               <span className="sm:hidden">Nova</span>
@@ -462,27 +477,88 @@ export function KanbanLider({
         </div>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-nowrap gap-3 overflow-x-auto overflow-y-hidden">
-        {COLUNAS.map((col) => {
-          const itens = porStatus(col.status);
-          return (
-            <ColunaQuadro
-              key={col.status}
-              titulo={col.titulo}
-              subtitulo={
-                col.status === "concluida"
-                  ? temBusca
-                    ? "incluindo antigas na busca"
-                    : "últimos 7 dias"
-                  : undefined
-              }
-              itens={itens}
-              agora={agora}
-              onAbrir={setDetalhe}
-              onEditar={setEditando}
-            />
-          );
-        })}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+        <div className="flex shrink-0 gap-1 overflow-x-auto pb-0.5 md:hidden">
+          {COLUNAS.map((col) => {
+            const qtd = porStatus(col.status).length;
+            const ativo = colunaCel === col.status;
+            return (
+              <button
+                key={col.status}
+                type="button"
+                onClick={() => setColunaCel(col.status)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  ativo
+                    ? "bg-brand-600 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {col.curto}
+                <span className={`ml-1 ${ativo ? "text-white/80" : "text-slate-400"}`}>
+                  {qtd}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          className="min-h-0 flex-1 md:hidden"
+          onTouchStart={(e) => {
+            toqueIni.current = {
+              x: e.touches[0].clientX,
+              y: e.touches[0].clientY,
+            };
+          }}
+          onTouchEnd={(e) => {
+            const ini = toqueIni.current;
+            toqueIni.current = null;
+            if (!ini) return;
+            const dx = e.changedTouches[0].clientX - ini.x;
+            const dy = e.changedTouches[0].clientY - ini.y;
+            if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy)) return;
+            irColuna(dx < 0 ? 1 : -1);
+          }}
+        >
+          <ColunaQuadro
+            cheia
+            titulo={colunaCelAtual.titulo}
+            subtitulo={
+              colunaCelAtual.status === "concluida"
+                ? temBusca
+                  ? "incluindo antigas na busca"
+                  : "últimos 7 dias"
+                : undefined
+            }
+            itens={porStatus(colunaCelAtual.status)}
+            agora={agora}
+            onAbrir={setDetalhe}
+            onEditar={setEditando}
+          />
+        </div>
+
+        <div className="hidden min-h-0 min-w-0 flex-1 flex-nowrap gap-3 overflow-x-auto overflow-y-hidden md:flex">
+          {COLUNAS.map((col) => {
+            const itens = porStatus(col.status);
+            return (
+              <ColunaQuadro
+                key={col.status}
+                titulo={col.titulo}
+                subtitulo={
+                  col.status === "concluida"
+                    ? temBusca
+                      ? "incluindo antigas na busca"
+                      : "últimos 7 dias"
+                    : undefined
+                }
+                itens={itens}
+                agora={agora}
+                onAbrir={setDetalhe}
+                onEditar={setEditando}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {verArquivado && (

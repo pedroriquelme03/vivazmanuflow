@@ -18,7 +18,7 @@ type Equip = Tables<"equipamentos">;
 type Prop = Tables<"propriedades">;
 
 const inputCls =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 const MIGRATION_HINT =
   "Tabelas ainda não existem. Rode o SQL em supabase/migrations/20260728190000_areas_equipamentos.sql no Supabase.";
@@ -121,7 +121,7 @@ function ListaAreas({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <h1 className="text-xl font-bold">Áreas do Hotel</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         Cadastre áreas e os equipamentos de cada uma. Cada equipamento recebe um
@@ -180,7 +180,7 @@ function ListaAreas({
         {areas.map((a) => (
           <div
             key={a.id}
-            className={`flex flex-wrap items-center gap-3 rounded-xl border bg-white px-4 py-3 ${
+            className={`flex flex-col gap-2 rounded-xl border bg-white px-4 py-3 sm:flex-row sm:items-center ${
               a.ativo ? "border-slate-200" : "border-slate-100 opacity-60"
             }`}
           >
@@ -189,13 +189,14 @@ function ListaAreas({
               onClick={() => onAbrir(a.id)}
               className="min-w-0 flex-1 text-left"
             >
-              <p className="font-semibold text-slate-900">{a.nome}</p>
-              <p className="text-xs text-slate-500">
+              <p className="break-words font-semibold text-slate-900">{a.nome}</p>
+              <p className="break-words text-xs text-slate-500">
                 {nomeProp(a.propriedade_id)} · {qtd(a.id)} equipamento
                 {qtd(a.id) === 1 ? "" : "s"}
                 {!a.ativo && " · inativa"}
               </p>
             </button>
+            <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => onAbrir(a.id)}
@@ -210,6 +211,7 @@ function ListaAreas({
             >
               {a.ativo ? "Desativar" : "Ativar"}
             </button>
+            </div>
           </div>
         ))}
       </div>
@@ -272,7 +274,7 @@ function AreaDetalhe({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <button
         type="button"
         onClick={onVoltar}
@@ -339,14 +341,14 @@ function AreaDetalhe({
                 eq.ativo ? "border-slate-200" : "border-slate-100 opacity-60"
               }`}
             >
-              <div className="flex flex-wrap items-start gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-slate-900">{eq.nome}</p>
+                  <p className="break-words font-semibold text-slate-900">{eq.nome}</p>
                   <p className="mt-0.5 font-mono text-xs text-brand-700">
                     {eq.codigo}
                   </p>
                   {eq.descricao && (
-                    <p className="mt-1 text-xs text-slate-500">{eq.descricao}</p>
+                    <p className="mt-1 break-words text-xs text-slate-500">{eq.descricao}</p>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">

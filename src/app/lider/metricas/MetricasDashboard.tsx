@@ -302,10 +302,10 @@ export function MetricasDashboard({
       : null;
 
   const selectCls =
-    "rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+    "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+    <main className="mx-auto w-full min-h-0 min-w-0 max-w-5xl flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:py-6">
       <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-base font-bold text-slate-800">Relatórios</h1>
@@ -318,13 +318,13 @@ export function MetricasDashboard({
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
           {PERIODOS.map((p) => (
             <button
               key={p.dias}
               type="button"
               onClick={() => setFiltro("dias", p.dias)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+              className={`rounded-lg px-1 py-2 text-center text-[11px] font-semibold leading-tight transition sm:px-3 sm:py-1.5 sm:text-sm ${
                 filtros.dias === p.dias
                   ? "bg-brand-600 text-white"
                   : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
@@ -569,7 +569,6 @@ export function MetricasDashboard({
                   </p>
                   <BarList
                     itens={volumeLocaisDigitados(dados.por_sublocal)}
-                    rotuloLargo
                   />
                 </>
               )}
@@ -580,30 +579,48 @@ export function MetricasDashboard({
             {dados.ranking.length === 0 ? (
               <p className="text-sm text-slate-400">Sem conclusões no período.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-slate-400">
-                      <th className="pb-2 font-medium">Colaborador</th>
-                      <th className="pb-2 text-right font-medium">Concluídas</th>
-                      <th className="pb-2 text-right font-medium">Tempo médio</th>
-                      <th className="pb-2 text-right font-medium">No prazo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dados.ranking.map((r) => (
-                      <tr key={r.nome} className="border-t border-slate-100">
-                        <td className="py-2 font-medium text-slate-700">{r.nome}</td>
-                        <td className="py-2 text-right">{r.total}</td>
-                        <td className="py-2 text-right">{fmtMin(r.tempo_medio_min)}</td>
-                        <td className="py-2 text-right">
-                          {r.pct_prazo == null ? "—" : `${r.pct_prazo}%`}
-                        </td>
+              <>
+                <div className="grid gap-2 sm:hidden">
+                  {dados.ranking.map((r) => (
+                    <div
+                      key={r.nome}
+                      className="flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2 last:border-0 last:pb-0"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium text-slate-700">
+                        {r.nome}
+                      </span>
+                      <span className="shrink-0 text-xs text-slate-500">
+                        {r.total} · {fmtMin(r.tempo_medio_min)} ·{" "}
+                        {r.pct_prazo == null ? "—" : `${r.pct_prazo}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-400">
+                        <th className="pb-2 font-medium">Colaborador</th>
+                        <th className="pb-2 text-right font-medium">Concluídas</th>
+                        <th className="pb-2 text-right font-medium">Tempo médio</th>
+                        <th className="pb-2 text-right font-medium">No prazo</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {dados.ranking.map((r) => (
+                        <tr key={r.nome} className="border-t border-slate-100">
+                          <td className="py-2 font-medium text-slate-700">{r.nome}</td>
+                          <td className="py-2 text-right">{r.total}</td>
+                          <td className="py-2 text-right">{fmtMin(r.tempo_medio_min)}</td>
+                          <td className="py-2 text-right">
+                            {r.pct_prazo == null ? "—" : `${r.pct_prazo}%`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </Painel>
 
@@ -654,7 +671,7 @@ function Kpi({
   cor?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
       <p className="text-xs text-slate-500">{titulo}</p>
       <p className={`mt-1 text-2xl font-bold ${cor}`}>{valor}</p>
     </div>
@@ -663,7 +680,7 @@ function Kpi({
 
 function Painel({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
       <h2 className="mb-3 text-sm font-semibold text-slate-600">{titulo}</h2>
       {children}
     </section>
@@ -672,35 +689,30 @@ function Painel({ titulo, children }: { titulo: string; children: React.ReactNod
 
 function BarList({
   itens,
-  rotuloLargo = false,
 }: {
   itens: { rotulo: string; valor: number }[];
-  rotuloLargo?: boolean;
 }) {
   const max = Math.max(1, ...itens.map((i) => i.valor));
   if (itens.length === 0)
     return <p className="text-sm text-slate-400">Sem dados no período.</p>;
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-3">
       {itens.map((i, idx) => (
-        <div key={idx} className="flex items-center gap-2">
-          <span
-            className={`shrink-0 truncate text-xs text-slate-600 ${
-              rotuloLargo ? "w-40" : "w-28"
-            }`}
-            title={i.rotulo}
-          >
-            {i.rotulo}
-          </span>
-          <div className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
+        <div key={idx} className="min-w-0">
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <span className="min-w-0 break-words text-xs leading-snug text-slate-600">
+              {i.rotulo}
+            </span>
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">
+              {i.valor}
+            </span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded bg-brand-500"
+              className="h-full rounded-full bg-brand-500"
               style={{ width: `${(i.valor / max) * 100}%` }}
             />
           </div>
-          <span className="w-8 shrink-0 text-right text-xs font-medium text-slate-500">
-            {i.valor}
-          </span>
         </div>
       ))}
     </div>
@@ -711,20 +723,39 @@ function HourChart({ itens }: { itens: { hora: number; total: number }[] }) {
   const mapa = new Map(itens.map((i) => [i.hora, i.total]));
   const max = Math.max(1, ...itens.map((i) => i.total));
   return (
-    <div className="flex h-32 items-end gap-0.5">
-      {Array.from({ length: 24 }, (_, h) => {
-        const v = mapa.get(h) ?? 0;
-        return (
-          <div key={h} className="flex flex-1 flex-col items-center gap-1">
+    <div>
+      <div className="flex h-36 items-stretch gap-px">
+        {Array.from({ length: 24 }, (_, h) => {
+          const v = mapa.get(h) ?? 0;
+          return (
             <div
-              className="w-full rounded-t bg-brand-500"
-              style={{ height: `${(v / max) * 100}%`, minHeight: v > 0 ? "3px" : "0" }}
+              key={h}
+              className="flex min-w-0 flex-1 flex-col justify-end"
               title={`${h}h: ${v}`}
-            />
-            {h % 6 === 0 && <span className="text-[9px] text-slate-400">{h}h</span>}
-          </div>
-        );
-      })}
+            >
+              <div
+                className="w-full rounded-t bg-brand-500"
+                style={{
+                  height: v > 0 ? `${(v / max) * 100}%` : "2px",
+                  minHeight: v > 0 ? "4px" : "2px",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1 flex">
+        {Array.from({ length: 24 }, (_, h) => (
+          <span
+            key={h}
+            className={`min-w-0 flex-1 text-center text-[9px] ${
+              h % 6 === 0 ? "text-slate-400" : "text-transparent"
+            }`}
+          >
+            {h}h
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -733,6 +764,7 @@ function HourChartTi({ itens }: { itens: { hora: number; total: number }[] }) {
   const dia = horasDoDia(itens);
   const max = Math.max(1, ...dia.map((i) => i.total));
   const pico = picoHorario(dia);
+  const comVolume = dia.filter((item) => item.total > 0);
   const largura = 720;
   const altura = 200;
   const topo = 22;
@@ -755,76 +787,86 @@ function HourChartTi({ itens }: { itens: { hora: number; total: number }[] }) {
       ) : (
         <p className="mb-3 text-sm text-slate-400">Sem aberturas no período.</p>
       )}
-      <div className="-mx-1 overflow-x-auto">
+      <div className="md:hidden">
+        {comVolume.length > 0 && (
+          <BarList
+            itens={comVolume.map((item) => ({
+              rotulo: `${String(item.hora).padStart(2, "0")}h`,
+              valor: item.total,
+            }))}
+          />
+        )}
+      </div>
+      <div className="hidden md:block">
         <svg
           viewBox={`0 0 ${largura} ${altura}`}
-          className="h-auto w-full min-w-[560px]"
+          className="h-auto w-full"
           role="img"
           aria-label="Chamados abertos por hora do dia"
         >
-        {[0.25, 0.5, 0.75, 1].map((p) => (
-          <line
-            key={p}
-            x1={0}
-            x2={largura}
-            y1={topo + faixa * (1 - p)}
-            y2={topo + faixa * (1 - p)}
-            className="stroke-slate-100"
-            strokeWidth={1}
-          />
-        ))}
-        {dia.map((item) => {
-          const h =
-            item.total > 0 ? Math.max(8, (item.total / max) * faixa) : 3;
-          const x = item.hora * barra + 3;
-          const y = topo + faixa - h;
-          const ehPico =
-            pico != null && item.hora === pico.hora && item.total > 0;
-          return (
-            <g key={item.hora}>
-              <title>
-                {item.hora}h: {item.total}
-              </title>
-              <rect
-                x={x}
-                y={y}
-                width={barra - 6}
-                height={h}
-                rx={5}
-                className={
-                  ehPico
-                    ? "fill-brand-700"
-                    : item.total > 0
-                      ? "fill-brand-500"
-                      : "fill-slate-100"
-                }
-              />
-              {item.total > 0 && (
-                <text
-                  x={item.hora * barra + barra / 2}
-                  y={y - 5}
-                  textAnchor="middle"
-                  className={ehPico ? "fill-brand-800" : "fill-slate-700"}
-                  fontSize={11}
-                  fontWeight={700}
-                >
-                  {item.total}
-                </text>
-              )}
-              {item.hora % 3 === 0 && (
-                <text
-                  x={item.hora * barra + barra / 2}
-                  y={altura - 8}
-                  textAnchor="middle"
-                  className="fill-slate-500"
-                  fontSize={10}
-                >
-                  {item.hora}h
-                </text>
-              )}
-            </g>
-          );
-        })}
+          {[0.25, 0.5, 0.75, 1].map((p) => (
+            <line
+              key={p}
+              x1={0}
+              x2={largura}
+              y1={topo + faixa * (1 - p)}
+              y2={topo + faixa * (1 - p)}
+              className="stroke-slate-100"
+              strokeWidth={1}
+            />
+          ))}
+          {dia.map((item) => {
+            const h =
+              item.total > 0 ? Math.max(8, (item.total / max) * faixa) : 3;
+            const x = item.hora * barra + 3;
+            const y = topo + faixa - h;
+            const ehPico =
+              pico != null && item.hora === pico.hora && item.total > 0;
+            return (
+              <g key={item.hora}>
+                <title>
+                  {item.hora}h: {item.total}
+                </title>
+                <rect
+                  x={x}
+                  y={y}
+                  width={barra - 6}
+                  height={h}
+                  rx={5}
+                  className={
+                    ehPico
+                      ? "fill-brand-700"
+                      : item.total > 0
+                        ? "fill-brand-500"
+                        : "fill-slate-100"
+                  }
+                />
+                {item.total > 0 && (
+                  <text
+                    x={item.hora * barra + barra / 2}
+                    y={y - 5}
+                    textAnchor="middle"
+                    className={ehPico ? "fill-brand-800" : "fill-slate-700"}
+                    fontSize={11}
+                    fontWeight={700}
+                  >
+                    {item.total}
+                  </text>
+                )}
+                {item.hora % 3 === 0 && (
+                  <text
+                    x={item.hora * barra + barra / 2}
+                    y={altura - 8}
+                    textAnchor="middle"
+                    className="fill-slate-500"
+                    fontSize={10}
+                  >
+                    {item.hora}h
+                  </text>
+                )}
+              </g>
+            );
+          })}
         </svg>
       </div>
     </div>

@@ -10,7 +10,7 @@ type Evento = Tables<"eventos">;
 type Prop = Tables<"propriedades">;
 
 const inputCls =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 function formatarData(iso: string | null) {
   if (!iso) return "—";
@@ -81,7 +81,7 @@ export function EventosApp({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
+    <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <h1 className="text-xl font-bold">Eventos</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         Cadastre eventos para vincular demandas. Isso alimenta as métricas
@@ -162,21 +162,21 @@ export function EventosApp({
             {eventos.map((ev) => (
               <li
                 key={ev.id}
-                className="flex items-center justify-between gap-2 border-t border-slate-100 py-2.5 first:border-t-0"
+                className="flex flex-col gap-2 border-t border-slate-100 py-3 first:border-t-0 sm:flex-row sm:items-start sm:justify-between"
               >
-                <div className={ev.ativo ? "" : "opacity-50"}>
-                  <p className="text-sm font-medium text-slate-800">{ev.nome}</p>
-                  <p className="text-xs text-slate-400">
+                <div className={`min-w-0 ${ev.ativo ? "" : "opacity-50"}`}>
+                  <p className="break-words text-sm font-medium text-slate-800">{ev.nome}</p>
+                  <p className="break-words text-xs text-slate-400">
                     {nomeProp(ev.propriedade_id)}
                     {" · "}
                     {formatarData(ev.data_inicio)}
                     {ev.data_fim ? ` → ${formatarData(ev.data_fim)}` : ""}
                   </p>
                   {ev.descricao && (
-                    <p className="mt-0.5 text-xs text-slate-500">{ev.descricao}</p>
+                    <p className="mt-0.5 break-words text-xs text-slate-500">{ev.descricao}</p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 flex-wrap gap-1">
                   <button
                     type="button"
                     onClick={() => renomear(ev)}

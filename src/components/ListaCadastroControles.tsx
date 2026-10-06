@@ -6,10 +6,10 @@ export type PageSize = 10 | 50 | 100 | "todos";
 export type StatusFiltro = "todos" | "ativos" | "inativos";
 
 const selectCls =
-  "rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 const inputCls =
-  "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
+  "w-full min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
 
 export function useListaCadastro<T>(
   itens: T[],
@@ -119,10 +119,10 @@ export function ListaCadastroControles({
         : Math.min(pagina * pageSize, total);
 
   return (
-    <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+      <div className="grid grid-cols-2 gap-2">
         <input
-          className={`${inputCls} min-w-[180px] flex-1`}
+          className={`${inputCls} col-span-2`}
           placeholder={placeholder}
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
@@ -154,30 +154,30 @@ export function ListaCadastroControles({
         </select>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
         <span>
           {total === 0
             ? "Nenhum registro encontrado"
             : `Mostrando ${inicio}–${fim} de ${total}`}
         </span>
         {pageSize !== "todos" && totalPaginas > 1 && (
-          <div className="flex items-center gap-1">
+          <div className="grid grid-cols-3 items-center gap-1">
             <button
               type="button"
               disabled={pagina <= 1}
               onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              className="rounded-md border border-slate-200 px-2 py-1 font-medium hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-md border border-slate-200 px-2 py-1.5 font-medium hover:bg-slate-50 disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="px-2 font-medium text-slate-600">
+            <span className="text-center font-medium text-slate-600">
               {pagina} / {totalPaginas}
             </span>
             <button
               type="button"
               disabled={pagina >= totalPaginas}
               onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              className="rounded-md border border-slate-200 px-2 py-1 font-medium hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-md border border-slate-200 px-2 py-1.5 font-medium hover:bg-slate-50 disabled:opacity-40"
             >
               Próxima
             </button>

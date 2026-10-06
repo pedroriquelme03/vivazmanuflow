@@ -253,7 +253,7 @@ export function PainelShell({
           ambiente={ambiente}
           mostraTroca={mostraTroca}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>
       </div>
@@ -300,19 +300,27 @@ function MobileBar({
         </form>
       </div>
       {mostraTroca && (
-        <div className="px-4 pb-3">
+        <div className="px-4 pb-2">
           <TrocaAmbiente valor={ambiente} />
         </div>
       )}
-      <nav className="flex gap-1 overflow-x-auto px-2 pb-2">
+      <nav
+        className={`mx-4 mb-3 grid gap-1 rounded-xl bg-white/15 p-1 ${
+          itens.length <= 2 ? "grid-cols-2" : "grid-cols-3"
+        }`}
+      >
         {itens.map((item) => {
           const ativo = item.match(pathname);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                ativo ? "bg-white/20 text-white" : "text-white/65"
+              className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${
+                ativo
+                  ? ti
+                    ? "bg-white text-[#1E293B]"
+                    : "bg-[#0891b2] text-white"
+                  : "text-white/70"
               }`}
             >
               {item.rotulo}
