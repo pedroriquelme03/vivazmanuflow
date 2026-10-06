@@ -15,13 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Manutenção Vivaz — Vivaz Cataratas",
-  description:
-    "Sistema de gestão de demandas de manutenção do resort Vivaz Cataratas.",
-  applicationName: "Manutenção Vivaz",
+  title: "Chamados Vivaz — Vivaz Cataratas",
+  description: "Sistema de chamados do resort Vivaz Cataratas.",
+  applicationName: "Chamados Vivaz",
   appleWebApp: {
     capable: true,
-    title: "Manutenção Vivaz",
+    title: "Chamados Vivaz",
     statusBarStyle: "black-translucent",
   },
 };

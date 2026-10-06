@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
-import { getPerfil } from "@/lib/auth";
+import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PainelShell } from "@/components/AdminSidebar";
-import { DEMANDA_SELECT } from "@/lib/demanda-select";
+import { PainelComAmbiente } from "@/components/PainelComAmbiente";
+import { pessoaDoAmbiente, recursoAmbienteAusente } from "@/lib/ambiente-equipe";
+import { resolverAmbiente } from "@/lib/resolver-ambiente";
+import { listarQuadro } from "@/lib/quadro-ambiente";
 import { KanbanLider } from "./KanbanLider";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +12,15 @@ export const dynamic = "force-dynamic";
 export default async function LiderHome() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/lider");
-  if (perfil.role === "colaborador") redirect("/colaborador");
+  if (perfil.role === "colaborador" || perfil.role === "solicitante") {
+    redirect(rotaInicial(perfil.role));
+  }
 
   const supabase = await createClient();
+  const ambiente = await resolverAmbiente(perfil.ambientes, perfil.role);
   const [
-    { data: demandas },
-    { data: colaboradores },
+    demandas,
+    colaboradores,
     { data: sla },
     { data: propriedades },
     { data: solicitantes },
@@ -23,15 +28,8 @@ export default async function LiderHome() {
     projetosRes,
     membrosRes,
   ] = await Promise.all([
-    supabase.from("demandas").select(DEMANDA_SELECT).order("peso", {
-      ascending: false,
-    }).order("criado_em", { ascending: true }),
-    supabase
-      .from("usuarios")
-      .select("id, nome, propriedade_id")
-      .eq("role", "colaborador")
-      .eq("ativo", true)
-      .order("nome"),
+    listarQuadro(supabase, ambiente),
+    equipeAtribuivel(supabase, ambiente),
     supabase.from("sla_config").select("prioridade, horas_padrao").is(
       "propriedade_id",
       null,
@@ -63,16 +61,18 @@ export default async function LiderHome() {
   }
 
   return (
-    <PainelShell perfil={perfil}>
+    <PainelComAmbiente perfil={perfil}>
       <KanbanLider
-        demandasIniciais={demandas ?? []}
-        colaboradores={colaboradores ?? []}
+        ambiente={ambiente}
+        demandasIniciais={demandas}
+        colaboradores={colaboradores}
         slaHoras={slaHoras}
         agoraInicial={Date.now()}
         ehAdmin={perfil.role === "admin"}
+        eu={{ id: perfil.id, nome: perfil.nome }}
         ehGestor
         membrosPorProjeto={membrosPorProjeto}
-        equipeAtribuir={colaboradores ?? []}
+        equipeAtribuir={colaboradores}
         opcoesNovaDemanda={{
           propriedades: propriedades ?? [],
           solicitantes: solicitantes ?? [],
@@ -80,8 +80,38 @@ export default async function LiderHome() {
           projetos: projetosRes.data ?? [],
           nomeSolicitantePadrao: perfil.nome,
           propriedadePadrao: perfil.propriedade_id,
+          ambiente,
         }}
       />
-    </PainelShell>
+    </PainelComAmbiente>
   );
+}
+
+async function equipeAtribuivel(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ambiente: Awaited<ReturnType<typeof resolverAmbiente>>,
+) {
+  const comAmbiente = await supabase
+    .from("usuarios")
+    .select("id, nome, propriedade_id, ambientes")
+    .eq("role", "colaborador")
+    .eq("ativo", true)
+    .order("nome");
+
+  if (
+    comAmbiente.error &&
+    recursoAmbienteAusente(comAmbiente.error.message)
+  ) {
+    const legado = await supabase
+      .from("usuarios")
+      .select("id, nome, propriedade_id")
+      .eq("role", "colaborador")
+      .eq("ativo", true)
+      .order("nome");
+    return legado.data ?? [];
+  }
+
+  return (comAmbiente.data ?? [])
+    .filter((pessoa) => pessoaDoAmbiente(pessoa.ambientes, ambiente))
+    .map(({ id, nome, propriedade_id }) => ({ id, nome, propriedade_id }));
 }

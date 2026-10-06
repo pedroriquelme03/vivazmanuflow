@@ -3,11 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 /** Rotas que exigem login (área do staff). */
-const PROTECTED_PREFIXES = ["/lider", "/colaborador", "/admin"];
+const PROTECTED_PREFIXES = ["/lider", "/colaborador", "/admin", "/solicitante"];
 
 /**
  * Mantém a sessão do Supabase atualizada nos cookies e protege as áreas
- * internas. As páginas públicas (formulário e acompanhamento) passam livres.
+ * internas. Login e a home passam livres.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

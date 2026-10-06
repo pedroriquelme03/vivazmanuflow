@@ -47,6 +47,44 @@ export type Database = {
           },
         ]
       }
+      demanda_mensagens: {
+        Row: {
+          autor: string
+          autor_id: string | null
+          autor_nome: string
+          criado_em: string
+          demanda_id: string
+          id: string
+          texto: string
+        }
+        Insert: {
+          autor: string
+          autor_id?: string | null
+          autor_nome: string
+          criado_em?: string
+          demanda_id: string
+          id?: string
+          texto: string
+        }
+        Update: {
+          autor?: string
+          autor_id?: string | null
+          autor_nome?: string
+          criado_em?: string
+          demanda_id?: string
+          id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_mensagens_demanda_id_fkey"
+            columns: ["demanda_id"]
+            isOneToOne: false
+            referencedRelation: "demandas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demanda_historico: {
         Row: {
           criado_em: string
@@ -118,6 +156,7 @@ export type Database = {
           arquivado: boolean
           sublocal: string | null
           mensagem_devolucao: string | null
+          ambiente: Database["public"]["Enums"]["ambiente_equipe"]
         }
         Insert: {
           atribuido_em?: string | null
@@ -144,6 +183,7 @@ export type Database = {
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
+          ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
         }
         Update: {
           atribuido_em?: string | null
@@ -170,6 +210,7 @@ export type Database = {
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
+          ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
         }
         Relationships: [
           {
@@ -695,6 +736,7 @@ export type Database = {
           nome: string
           propriedade_id: string | null
           role: Database["public"]["Enums"]["user_role"]
+          ambientes: Database["public"]["Enums"]["ambiente_equipe"][]
         }
         Insert: {
           ativo?: boolean
@@ -706,6 +748,7 @@ export type Database = {
           nome: string
           propriedade_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          ambientes?: Database["public"]["Enums"]["ambiente_equipe"][]
         }
         Update: {
           ativo?: boolean
@@ -717,6 +760,7 @@ export type Database = {
           nome?: string
           propriedade_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          ambientes?: Database["public"]["Enums"]["ambiente_equipe"][]
         }
         Relationships: [
           {
@@ -727,6 +771,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      requisicoes_acesso: {
+        Row: {
+          criado_em: string
+          email: string
+          funcao: string
+          id: string
+          nome: string
+          resolvido_em: string | null
+          resolvido_por: string | null
+          setor: string
+          status: "pendente" | "atendida" | "recusada"
+          usuario_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          email: string
+          funcao: string
+          id?: string
+          nome: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          setor: string
+          status?: "pendente" | "atendida" | "recusada"
+          usuario_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          email?: string
+          funcao?: string
+          id?: string
+          nome?: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          setor?: string
+          status?: "pendente" | "atendida" | "recusada"
+          usuario_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -815,7 +898,52 @@ export type Database = {
       }
       rotulo_sublocal: { Args: { p_token: string }; Returns: string }
       acompanhar_demanda: { Args: { p_token: string }; Returns: Json }
+      listar_mensagens_chamado: { Args: { p_token: string }; Returns: Json }
+      enviar_mensagem_chamado: {
+        Args: { p_token: string; p_texto: string }
+        Returns: undefined
+      }
+      equipe_enviar_mensagem: {
+        Args: { p_demanda_id: string; p_texto: string }
+        Returns: undefined
+      }
+      solicitante_fechar_chamado: {
+        Args: { p_token: string; p_resolvido: boolean; p_descricao: string }
+        Returns: undefined
+      }
+      registrar_chamado_concluido: {
+        Args: {
+          p_solicitante_id: string
+          p_titulo: string
+          p_sublocal: string
+          p_descricao?: string
+          p_prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          p_ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
+          p_anexos?: Json
+          p_observacao?: string
+        }
+        Returns: {
+          demanda_id: string
+          token: string
+        }[]
+      }
       demandas_quadro_tv: { Args: Record<string, never>; Returns: Json }
+      solicitar_acesso: {
+        Args: {
+          p_nome: string
+          p_email: string
+          p_setor: string
+          p_funcao: string
+        }
+        Returns: undefined
+      }
+      marcar_ambiente_demanda: {
+        Args: {
+          p_demanda_id: string
+          p_ambiente: Database["public"]["Enums"]["ambiente_equipe"]
+        }
+        Returns: undefined
+      }
       admin_criar_usuario: {
         Args: {
           p_email: string
@@ -838,6 +966,10 @@ export type Database = {
         Args: { p_id: string; p_observacao: string }
         Returns: undefined
       }
+      admin_definir_ambientes: {
+        Args: { p_user_id: string; p_ambientes: string[] }
+        Returns: undefined
+      }
       admin_atualizar_usuario: {
         Args: {
           p_user_id: string
@@ -847,6 +979,10 @@ export type Database = {
           p_propriedade_id?: string | null
           p_senha?: string | null
         }
+        Returns: undefined
+      }
+      admin_apagar_usuario: {
+        Args: { p_user_id: string }
         Returns: undefined
       }
       metricas: {
@@ -862,6 +998,7 @@ export type Database = {
           p_somente_eventos?: boolean
           p_status?: Database["public"]["Enums"]["demanda_status"]
           p_arquivado?: boolean
+          p_ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
         }
         Returns: Json
       }
@@ -890,7 +1027,8 @@ export type Database = {
         | "aguardando_validacao"
         | "concluida"
         | "cancelada"
-      user_role: "admin" | "lider" | "colaborador"
+      user_role: "admin" | "lider" | "colaborador" | "solicitante"
+      ambiente_equipe: "manutencao" | "ti"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1029,7 +1167,8 @@ export const Constants = {
         "concluida",
         "cancelada",
       ],
-      user_role: ["admin", "lider", "colaborador"],
+      user_role: ["admin", "lider", "colaborador", "solicitante"],
+      ambiente_equipe: ["manutencao", "ti"],
     },
   },
 } as const

@@ -1,15 +1,22 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables, Enums } from "@/lib/database.types";
 import { formatarData } from "@/lib/demanda-ui";
 import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
+import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
+import { emailJaCadastrado } from "@/lib/requisicao-acesso";
+import { abrirRascunhoEmail, rascunhoAcessoOutlook } from "@/lib/email-acesso";
 import {
+  ambientesMarcados,
   payloadAtualizarUsuario,
+  payloadDefinirAmbientes,
+  rotuloAmbientes,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
+  validarExclusaoConta,
 } from "@/lib/equipe-edicao";
 import {
   idPrimeiraPropriedadeAtiva,
@@ -25,6 +32,7 @@ type Setor = Tables<"setores">;
 type Local = Tables<"locais">;
 type Solic = Tables<"solicitantes">;
 type Usuario = Tables<"usuarios">;
+type SolicAcesso = Tables<"requisicoes_acesso">;
 
 const ABAS = [
   "Locais principais",
@@ -33,6 +41,7 @@ const ABAS = [
   "Solicitantes",
   "Demandas pré-definidas",
   "Peso",
+  "Solicitações",
   "Equipe",
 ] as const;
 type Aba = (typeof ABAS)[number];
@@ -82,8 +91,14 @@ export function AdminApp(props: {
   emailsEquipe: Record<string, string>;
   predefinidas: Pred[];
   pesoConfig: PesoCfg | null;
+  solicitacoes?: SolicAcesso[];
+  avisoSolicitacoes?: string | null;
 }) {
   const [aba, setAba] = useState<Aba>("Locais principais");
+  const [preencherEquipe, setPreencherEquipe] = useState<{
+    nome: string;
+    email: string;
+  } | null>(null);
 
   return (
     <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
@@ -137,13 +152,27 @@ export function AdminApp(props: {
           />
         )}
         {aba === "Peso" && <PesoConfiguracao inicial={props.pesoConfig} />}
-        {aba === "Equipe" && (
+        {aba === "Solicitações" && (
+          <ListaSolicitacoes
+            itens={props.solicitacoes ?? []}
+            emailsEquipe={props.emailsEquipe}
+            usuarios={props.usuarios}
+            aviso={props.avisoSolicitacoes}
+            onCadastrar={(nome, email) => {
+              setPreencherEquipe({ nome, email });
+              setAba("Equipe");
+            }}
+          />
+        )}
+        <div className={aba === "Equipe" ? "block" : "hidden"}>
           <Equipe
             itens={props.usuarios}
             emails={props.emailsEquipe}
             propriedades={props.propriedades}
+            preencher={preencherEquipe}
+            onPreencherConsumido={() => setPreencherEquipe(null)}
           />
-        )}
+        </div>
       </div>
     </div>
   );
@@ -306,15 +335,22 @@ function ModalEditarEquipe({
   const [propId, setPropId] = useState(usuario.propriedade_id ?? "");
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
+  const ambientesAtuais = usuario.ambientes ?? ["manutencao"];
+  const [manutencao, setManutencao] = useState(
+    ambientesAtuais.includes("manutencao"),
+  );
+  const [ti, setTi] = useState(ambientesAtuais.includes("ti"));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [confirmacao, setConfirmacao] = useState("");
   const ultima = rotuloUltimaAlteracao(usuario.atualizado_em);
   const ultimaExibida =
     ultima === "Ainda não houve alteração" ? ultima : formatarData(usuario.atualizado_em);
 
   async function salvar() {
     setErro(null);
-    const falha = validarEdicaoEquipe({
+    const dados = {
       nome,
       email,
       senha,
@@ -322,24 +358,67 @@ function ModalEditarEquipe({
       ativo,
       propriedadeId: propId,
       userId: usuario.id,
-    });
+      ambientes:
+        usuario.role === "lider"
+          ? (["manutencao"] as const)
+          : usuario.role === "solicitante"
+            ? (["manutencao", "ti"] as const)
+            : ambientesMarcados(manutencao, ti),
+    };
+    const falha = validarEdicaoEquipe(dados);
     if (falha) return setErro(falha);
     setSalvando(true);
     const { error } = await supabase.rpc(
       "admin_atualizar_usuario",
-      payloadAtualizarUsuario({
-        nome,
-        email,
-        senha,
-        senha2,
-        ativo,
-        propriedadeId: propId,
-        userId: usuario.id,
-      }),
+      payloadAtualizarUsuario(dados),
+    );
+    if (error) {
+      setSalvando(false);
+      return setErro(error.message);
+    }
+    const { error: erroAmbiente } = await supabase.rpc(
+      "admin_definir_ambientes",
+      payloadDefinirAmbientes(dados),
     );
     setSalvando(false);
-    if (error) return setErro(error.message);
-    onSalvo("Dados do membro atualizados.");
+    if (erroAmbiente && !recursoAmbienteAusente(erroAmbiente.message)) {
+      return setErro(erroAmbiente.message);
+    }
+    onSalvo(
+      erroAmbiente
+        ? "Dados salvos. A marcação de Manutenção/TI ainda não está no banco, então ela não ficou gravada."
+        : "Dados do membro atualizados.",
+    );
+  }
+
+  async function apagarConta() {
+    setErro(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const falha = validarExclusaoConta({
+      confirmacao,
+      alvoId: usuario.id,
+      meuId: user?.id ?? null,
+    });
+    if (falha) return setErro(falha);
+    setExcluindo(true);
+    const { error } = await supabase.rpc("admin_apagar_usuario", {
+      p_user_id: usuario.id,
+    });
+    setExcluindo(false);
+    if (error) {
+      if (
+        error.message.includes("schema cache") ||
+        error.message.includes("Could not find")
+      ) {
+        return setErro(
+          "Rode o SQL admin_apagar_usuario no Supabase e tente de novo.",
+        );
+      }
+      return setErro(error.message);
+    }
+    onSalvo(`Conta de ${usuario.nome} apagada.`);
   }
 
   return (
@@ -379,6 +458,21 @@ function ModalEditarEquipe({
             <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
               {ROLE_LABEL[usuario.role]}
             </p>
+          </CampoModal>
+          <CampoModal rotulo="Ambientes">
+            {usuario.role === "solicitante" ? (
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                Solicitante abre chamado de TI e de Manutenção.
+              </p>
+            ) : (
+              <EscolhaAmbientes
+                manutencao={manutencao}
+                ti={ti}
+                onManutencao={setManutencao}
+                onTi={setTi}
+                soManutencao={usuario.role === "lider"}
+              />
+            )}
           </CampoModal>
           <CampoModal rotulo="Local">
             <select
@@ -443,17 +537,40 @@ function ModalEditarEquipe({
           <button
             type="button"
             onClick={onFechar}
-            className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="flex-1 cursor-pointer rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={() => void salvar()}
-            disabled={salvando}
-            className="flex-1 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            disabled={salvando || excluindo}
+            className="flex-1 cursor-pointer rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {salvando ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3">
+          <p className="text-xs font-semibold text-red-800">Excluir conta</p>
+          <p className="mt-1 text-[11px] text-red-700">
+            Apaga o login e o perfil. Demandas abertas desse colaborador voltam
+            para a fila. Digite EXCLUIR para confirmar.
+          </p>
+          <input
+            className={`${inputCls} mt-2 border-red-200 bg-white`}
+            value={confirmacao}
+            onChange={(e) => setConfirmacao(e.target.value)}
+            placeholder="EXCLUIR"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => void apagarConta()}
+            disabled={salvando || excluindo}
+            className="mt-2 w-full cursor-pointer rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+          >
+            {excluindo ? "Apagando…" : "Apagar conta"}
           </button>
         </div>
       </div>
@@ -1350,34 +1467,144 @@ const ROLE_LABEL: Record<Enums<"user_role">, string> = {
   admin: "Administrador",
   lider: "Líder",
   colaborador: "Colaborador",
+  solicitante: "Solicitante",
 };
+
+function ListaSolicitacoes({
+  itens,
+  emailsEquipe,
+  usuarios,
+  aviso,
+  onCadastrar,
+}: {
+  itens: SolicAcesso[];
+  emailsEquipe: Record<string, string>;
+  usuarios: Usuario[];
+  aviso?: string | null;
+  onCadastrar: (nome: string, email: string) => void;
+}) {
+  const emails = [
+    ...Object.values(emailsEquipe),
+    ...usuarios.map((u) => u.email),
+  ];
+  const ordenados = [...itens].sort((a, b) => {
+    const ca = emailJaCadastrado(a.email, emails);
+    const cb = emailJaCadastrado(b.email, emails);
+    if (ca === cb) return 0;
+    return ca ? 1 : -1;
+  });
+
+  return (
+    <Card>
+      <p className="mb-3 text-sm text-slate-500">
+        Só os dados que a pessoa pediu. Cadastrar abre a aba Equipe com nome e
+        e-mail já preenchidos; o pedido continua aqui.
+      </p>
+      {aviso && (
+        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {aviso}
+        </p>
+      )}
+      {itens.length === 0 && !aviso && (
+        <p className="text-sm text-slate-400">Nenhuma solicitação ainda.</p>
+      )}
+      <div className="grid gap-2">
+        {ordenados.map((pedido) => {
+          const cadastrado = emailJaCadastrado(pedido.email, emails);
+          return (
+            <div
+              key={pedido.id}
+              className={`rounded-xl border px-4 py-3 ${
+                cadastrado
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {pedido.nome}
+                  </p>
+                  <p className="text-xs text-slate-500">{pedido.email}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Setor: {pedido.setor}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Função: {pedido.funcao}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    {formatarData(pedido.criado_em)}
+                  </p>
+                </div>
+                {cadastrado ? (
+                  <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
+                    Já cadastrado
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onCadastrar(pedido.nome, pedido.email)}
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Cadastrar
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
 
 function Equipe({
   itens,
   emails,
   propriedades,
+  preencher,
+  onPreencherConsumido,
 }: {
   itens: Usuario[];
   emails: Record<string, string>;
   propriedades: Prop[];
+  preencher?: { nome: string; email: string } | null;
+  onPreencherConsumido?: () => void;
 }) {
   const { supabase, refresh, erro, setErro } = useAdmin();
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
+  const [nome, setNome] = useState(preencher?.nome ?? "");
+  const [email, setEmail] = useState(preencher?.email ?? "");
   const [senha, setSenha] = useState("");
-  const [role, setRole] = useState<Enums<"user_role">>("colaborador");
+  const [role, setRole] = useState<Enums<"user_role">>(
+    preencher ? "solicitante" : "colaborador",
+  );
+  const [manutencao, setManutencao] = useState(true);
+  const [ti, setTi] = useState(Boolean(preencher));
   const [propId, setPropId] = useState("");
   const [filtroRole, setFiltroRole] = useState("");
   const [filtroProp, setFiltroProp] = useState("");
   const [ok, setOk] = useState<string | null>(null);
+  const [conviteHref, setConviteHref] = useState<string | null>(null);
   const [ver, setVer] = useState<Usuario | null>(null);
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas";
   const locaisEscolha = propriedadesAtivas(propriedades);
 
+  useEffect(() => {
+    if (!preencher) return;
+    setNome(preencher.nome);
+    setEmail(preencher.email);
+    setRole("solicitante");
+    setManutencao(true);
+    setTi(true);
+    setOk(null);
+    setErro(null);
+    setConviteHref(null);
+  }, [preencher, setErro]);
+
   const getTexto = useCallback(
     (u: Usuario) =>
-      `${u.nome} ${u.email ?? ""} ${ROLE_LABEL[u.role]} ${nomeProp(u.propriedade_id)}`,
+      `${u.nome} ${u.email ?? ""} ${ROLE_LABEL[u.role]} ${rotuloAmbientes(u.ambientes)} ${nomeProp(u.propriedade_id)}`,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [propriedades],
   );
@@ -1393,7 +1620,21 @@ function Equipe({
   async function criar() {
     setErro(null);
     setOk(null);
-    const { error } = await supabase.rpc("admin_criar_usuario", {
+    setConviteHref(null);
+    const ambientes =
+      role === "lider"
+        ? (["manutencao"] as const)
+        : role === "solicitante"
+          ? (["manutencao", "ti"] as const)
+          : ambientesMarcados(manutencao, ti);
+    if (ambientes.length === 0) {
+      return setErro("Marque Manutenção, TI ou os dois.");
+    }
+    const veioDaSolicitacao = Boolean(preencher);
+    const nomeCriado = nome.trim();
+    const emailCriado = email.trim();
+    const senhaCriada = senha;
+    const { data: novoId, error } = await supabase.rpc("admin_criar_usuario", {
       p_nome: nome,
       p_email: email,
       p_senha: senha,
@@ -1401,32 +1642,68 @@ function Equipe({
       p_propriedade_id: propId || undefined,
     });
     if (error) return setErro(error.message);
-    if (role === "admin" || role === "lider") {
+    let ambienteAindaNaoGrava = false;
+    if (novoId) {
+      const { error: erroAmbiente } = await supabase.rpc(
+        "admin_definir_ambientes",
+        { p_user_id: novoId, p_ambientes: [...ambientes] },
+      );
+      if (erroAmbiente && !recursoAmbienteAusente(erroAmbiente.message)) {
+        setErro(erroAmbiente.message);
+        refresh();
+        return;
+      }
+      ambienteAindaNaoGrava = Boolean(erroAmbiente);
+    }
+    if (role === "admin" || role === "lider" || role === "solicitante") {
       await garantirSolicitantesGestor(supabase, {
         nome,
         propriedadeId: propId || null,
         propriedades,
       });
     }
-    setOk(
-      role === "admin" || role === "lider"
+    const criado =
+      role === "admin" || role === "lider" || role === "solicitante"
         ? `Usuário ${email} criado e incluído como solicitante.`
-        : `Usuário ${email} criado.`,
+        : `Usuário ${email} criado.`;
+    setOk(
+      ambienteAindaNaoGrava
+        ? `${criado} A marcação de Manutenção/TI ainda não está no banco, então ela não ficou gravada.`
+        : criado,
     );
+    const rascunho = rascunhoAcessoOutlook({
+      nome: nomeCriado,
+      email: emailCriado,
+      senha: senhaCriada,
+      papel: ROLE_LABEL[role],
+    });
+    setConviteHref(rascunho.href);
+    if (veioDaSolicitacao) abrirRascunhoEmail(rascunho.href);
     setNome("");
     setEmail("");
     setSenha("");
+    setRole("colaborador");
+    setTi(false);
+    setManutencao(true);
+    onPreencherConsumido?.();
     refresh();
   }
 
   return (
     <Card>
       <p className="mb-2 text-sm font-semibold text-slate-600">Novo membro da equipe</p>
-      <p className="mb-3 text-xs text-slate-500">
-        Líder e administrador só entram na lista de solicitantes se o nome
-        ainda não existir naquele local. Quem já está cadastrado continua o
-        mesmo registro.
-      </p>
+      {preencher ? (
+        <p className="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-800">
+          Nome e e-mail vieram da solicitação. Defina a senha, clique em Criar e
+          o Outlook abre com o e-mail de acesso pronto para enviar.
+        </p>
+      ) : (
+        <p className="mb-3 text-xs text-slate-500">
+          Líder e administrador só entram na lista de solicitantes se o nome
+          ainda não existir naquele local. Quem já está cadastrado continua o
+          mesmo registro.
+        </p>
+      )}
       <div className="grid gap-2 sm:grid-cols-2">
         <input className={inputCls} placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
         <input className={inputCls} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -1436,11 +1713,37 @@ function Equipe({
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
         />
-        <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value as Enums<"user_role">)}>
+        <select
+          className={inputCls}
+          value={role}
+          onChange={(e) => {
+            const proximo = e.target.value as Enums<"user_role">;
+            setRole(proximo);
+            if (proximo === "lider") setTi(false);
+            if (proximo === "solicitante") {
+              setManutencao(true);
+              setTi(true);
+            }
+          }}
+        >
           <option value="colaborador">Colaborador</option>
+          <option value="solicitante">Solicitante</option>
           <option value="lider">Líder</option>
           <option value="admin">Administrador</option>
         </select>
+        {role === "solicitante" ? (
+          <p className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500">
+            Solicitante abre chamado de TI e de Manutenção.
+          </p>
+        ) : (
+          <EscolhaAmbientes
+            manutencao={manutencao}
+            ti={ti}
+            onManutencao={setManutencao}
+            onTi={setTi}
+            soManutencao={role === "lider"}
+          />
+        )}
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
           <option value="">Todos os locais principais</option>
           {locaisEscolha.map((p) => (
@@ -1453,7 +1756,18 @@ function Equipe({
       </div>
       <ErroMsg erro={erro} />
       {ok && (
-        <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</p>
+        <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          <p>{ok}</p>
+          {conviteHref && (
+            <button
+              type="button"
+              onClick={() => abrirRascunhoEmail(conviteHref)}
+              className="mt-2 cursor-pointer rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
+            >
+              Abrir e-mail no Outlook
+            </button>
+          )}
+        </div>
       )}
 
       <ListaCadastroControles
@@ -1467,6 +1781,7 @@ function Equipe({
               onChange={(e) => setFiltroRole(e.target.value)}
             >
               <option value="">Todos os papéis</option>
+              <option value="solicitante">Solicitante</option>
               <option value="colaborador">Colaborador</option>
               <option value="lider">Líder</option>
               <option value="admin">Administrador</option>
@@ -1496,6 +1811,7 @@ function Equipe({
             extra={[
               u.email || emails[u.id] || "Sem e-mail",
               ROLE_LABEL[u.role],
+              rotuloAmbientes(u.ambientes),
               nomeProp(u.propriedade_id),
             ]
               .filter(Boolean)
@@ -1518,6 +1834,46 @@ function Equipe({
         />
       )}
     </Card>
+  );
+}
+
+function EscolhaAmbientes({
+  manutencao,
+  ti,
+  onManutencao,
+  onTi,
+  soManutencao = false,
+}: {
+  manutencao: boolean;
+  ti: boolean;
+  onManutencao: (valor: boolean) => void;
+  onTi: (valor: boolean) => void;
+  soManutencao?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2">
+      <span className="text-xs font-semibold text-slate-500">Ambientes</span>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={manutencao}
+          onChange={(e) => onManutencao(e.target.checked)}
+        />
+        Manutenção
+      </label>
+      {soManutencao ? (
+        <span className="text-xs text-slate-400">Líder só vê a Manutenção</span>
+      ) : (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={ti}
+            onChange={(e) => onTi(e.target.checked)}
+          />
+          TI
+        </label>
+      )}
+    </div>
   );
 }
 

@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import { BrandMark } from "@/components/BrandMark";
+import { TrocaAmbiente } from "@/components/TrocaAmbiente";
+import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 
 const ROLE_BADGE: Record<Perfil["role"], string> = {
   admin: "ADMIN",
   lider: "LÍDER",
   colaborador: "COLAB",
+  solicitante: "SOLIC",
 };
 
 type NavItem = {
@@ -18,6 +22,7 @@ type NavItem = {
   match: (path: string) => boolean;
   icone: React.ReactNode;
   soAdmin?: boolean;
+  soManutencao?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -42,6 +47,7 @@ const NAV: NavItem[] = [
     href: "/admin/projetos",
     rotulo: "Projetos",
     soAdmin: true,
+    soManutencao: true,
     match: (p) => p.startsWith("/admin/projetos"),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -53,6 +59,7 @@ const NAV: NavItem[] = [
     href: "/admin/eventos",
     rotulo: "Eventos",
     soAdmin: true,
+    soManutencao: true,
     match: (p) => p.startsWith("/admin/eventos"),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -65,6 +72,7 @@ const NAV: NavItem[] = [
     href: "/admin/areas",
     rotulo: "Áreas",
     soAdmin: true,
+    soManutencao: true,
     match: (p) => p.startsWith("/admin/areas"),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -101,18 +109,52 @@ const NAV: NavItem[] = [
   },
 ];
 
-export function AdminSidebar({ perfil }: { perfil: Perfil }) {
+export function AdminSidebar({
+  perfil,
+  ambiente = "manutencao",
+  mostraTroca = false,
+}: {
+  perfil: Perfil;
+  ambiente?: AmbienteEquipe;
+  mostraTroca?: boolean;
+}) {
   const pathname = usePathname();
-  const itens = NAV.filter((n) => !n.soAdmin || perfil.role === "admin");
+  const router = useRouter();
+  const ti = ambiente === "ti";
+  const itens = itensDoMenu(perfil.role === "admin", ti);
+  const destaque = ti ? "text-white" : "text-brand-500";
+  const ponto = ti ? "bg-white" : "bg-brand-500";
+
+  useEffect(() => {
+    if (!ti) return;
+    if (
+      pathname.startsWith("/admin/projetos") ||
+      pathname.startsWith("/admin/eventos") ||
+      pathname.startsWith("/admin/areas")
+    ) {
+      router.replace("/lider");
+    }
+  }, [ti, pathname, router]);
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col bg-[#063b45] text-white">
-      <div className="flex items-center gap-3 px-5 py-5">
-        <BrandMark className="h-10 w-10 rounded-xl bg-brand-500 shadow-inner" />
-        <div className="leading-tight">
-          <p className="text-sm font-bold tracking-wide">VIVAZ CATARATAS</p>
-          <p className="text-xs text-white/55">Manutenção</p>
+    <aside
+      className={`flex w-64 shrink-0 flex-col text-white ${ti ? "bg-[#1E293B]" : "bg-[#063b45]"}`}
+    >
+      <div className="px-5 pt-5">
+        <div className="flex items-center gap-3">
+          <BrandMark
+            className="h-10 w-10 rounded-xl bg-[#06b6d4] shadow-inner"
+          />
+          <div className="leading-tight">
+            <p className="text-sm font-bold tracking-wide">VIVAZ CATARATAS</p>
+            <p className="text-xs text-white/55">{ti ? "TI" : "Manutenção"}</p>
+          </div>
         </div>
+        {mostraTroca && (
+          <div className="pb-4 pt-4">
+            <TrocaAmbiente valor={ambiente} />
+          </div>
+        )}
       </div>
 
       <nav className="mt-2 flex flex-1 flex-col gap-1 px-3">
@@ -128,12 +170,12 @@ export function AdminSidebar({ perfil }: { perfil: Perfil }) {
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
-              <span className={ativo ? "text-brand-500" : "text-white/60"}>
+              <span className={ativo ? destaque : "text-white/60"}>
                 {item.icone}
               </span>
               <span className="flex-1">{item.rotulo}</span>
               {ativo && (
-                <span className="h-2 w-2 rounded-full bg-brand-500" />
+                <span className={`h-2 w-2 rounded-full ${ponto}`} />
               )}
             </Link>
           );
@@ -145,7 +187,9 @@ export function AdminSidebar({ perfil }: { perfil: Perfil }) {
           Usuário
         </p>
         <p className="mt-1 truncate text-sm font-semibold">{perfil.nome}</p>
-        <span className="mt-1.5 inline-block rounded-full bg-brand-500 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white">
+        <span
+          className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white ${ti ? "bg-white/20" : "bg-brand-500"}`}
+        >
           {ROLE_BADGE[perfil.role]}
         </span>
 
@@ -178,22 +222,37 @@ export function AdminSidebar({ perfil }: { perfil: Perfil }) {
 /** Shell com menu lateral (desktop) + drawer no mobile. */
 export function PainelShell({
   perfil,
+  ambiente = "manutencao",
+  mostraTroca = false,
   children,
 }: {
   perfil: Perfil;
+  ambiente?: AmbienteEquipe;
+  mostraTroca?: boolean;
   children: React.ReactNode;
 }) {
   return (
     // Altura de viewport + overflow travado: o menu lateral fica fixo e a
     // rolagem (inclusive a horizontal do quadro) acontece só na área de conteúdo.
-    <div className="flex h-dvh overflow-hidden">
+    <div
+      className="flex h-dvh overflow-hidden"
+      data-ambiente={ambiente}
+    >
       <div className="hidden md:flex">
-        <AdminSidebar perfil={perfil} />
+        <AdminSidebar
+          perfil={perfil}
+          ambiente={ambiente}
+          mostraTroca={mostraTroca}
+        />
       </div>
 
       {/* Mobile: barra superior + links */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileBar perfil={perfil} />
+        <MobileBar
+          perfil={perfil}
+          ambiente={ambiente}
+          mostraTroca={mostraTroca}
+        />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
           {children}
         </div>
@@ -202,15 +261,33 @@ export function PainelShell({
   );
 }
 
-function MobileBar({ perfil }: { perfil: Perfil }) {
+function itensDoMenu(ehAdmin: boolean, ti: boolean) {
+  return NAV.filter(
+    (item) =>
+      (!item.soAdmin || ehAdmin) && (!item.soManutencao || !ti),
+  );
+}
+
+function MobileBar({
+  perfil,
+  ambiente,
+  mostraTroca,
+}: {
+  perfil: Perfil;
+  ambiente: AmbienteEquipe;
+  mostraTroca: boolean;
+}) {
   const pathname = usePathname();
-  const itens = NAV.filter((n) => !n.soAdmin || perfil.role === "admin");
+  const ti = ambiente === "ti";
+  const itens = itensDoMenu(perfil.role === "admin", ti);
 
   return (
-    <div className="border-b border-slate-200 bg-[#063b45] text-white md:hidden">
+    <div
+      className={`border-b border-slate-200 text-white md:hidden ${ti ? "bg-[#1E293B]" : "bg-[#063b45]"}`}
+    >
       <div className="flex items-center justify-between px-4 py-3">
         <div className="leading-tight">
-          <p className="text-sm font-bold">Manutenção Vivaz</p>
+          <p className="text-sm font-bold">{ti ? "TI Vivaz" : "Manutenção Vivaz"}</p>
           <p className="text-xs text-white/55">{perfil.nome}</p>
         </div>
         <form action={logout}>
@@ -222,6 +299,11 @@ function MobileBar({ perfil }: { perfil: Perfil }) {
           </button>
         </form>
       </div>
+      {mostraTroca && (
+        <div className="px-4 pb-3">
+          <TrocaAmbiente valor={ambiente} />
+        </div>
+      )}
       <nav className="flex gap-1 overflow-x-auto px-2 pb-2">
         {itens.map((item) => {
           const ativo = item.match(pathname);

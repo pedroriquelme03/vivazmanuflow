@@ -7,6 +7,7 @@ const ROLE_LABEL: Record<Perfil["role"], string> = {
   admin: "Administrador",
   lider: "Líder",
   colaborador: "Colaborador",
+  solicitante: "Solicitante",
 };
 
 export function Topbar({ perfil }: { perfil: Perfil }) {

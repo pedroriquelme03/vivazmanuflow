@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  ambientesMarcados,
   mapaEmails,
   payloadAtualizarUsuario,
+  payloadDefinirAmbientes,
+  rotuloAmbientes,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
+  validarExclusaoConta,
 } from "@/lib/equipe-edicao";
 
 const base = {
@@ -14,6 +18,7 @@ const base = {
   senha2: "",
   ativo: true,
   propriedadeId: "prop-1",
+  ambientes: ["manutencao"] as const,
 };
 
 describe("validarEdicaoEquipe", () => {
@@ -52,6 +57,12 @@ describe("validarEdicaoEquipe", () => {
       validarEdicaoEquipe({ ...base, senha: "123456", senha2: "123456" }),
     ).toBeNull();
   });
+
+  it("exige Manutenção, TI ou os dois", () => {
+    expect(validarEdicaoEquipe({ ...base, ambientes: [] })).toBe(
+      "Marque Manutenção, TI ou os dois.",
+    );
+  });
 });
 
 describe("payloadAtualizarUsuario", () => {
@@ -80,6 +91,25 @@ describe("payloadAtualizarUsuario", () => {
   });
 });
 
+describe("ambientes", () => {
+  it("monta a lista marcada", () => {
+    expect(ambientesMarcados(true, true)).toEqual(["manutencao", "ti"]);
+    expect(ambientesMarcados(false, true)).toEqual(["ti"]);
+  });
+
+  it("rótulo para a lista da equipe", () => {
+    expect(rotuloAmbientes(["manutencao", "ti"])).toBe("Manutenção e TI");
+    expect(rotuloAmbientes(["ti"])).toBe("TI");
+    expect(rotuloAmbientes(undefined)).toBe("Manutenção");
+  });
+
+  it("envia os ambientes no payload", () => {
+    expect(
+      payloadDefinirAmbientes({ ...base, ambientes: ["ti"] }),
+    ).toEqual({ p_user_id: "u1", p_ambientes: ["ti"] });
+  });
+});
+
 describe("mapaEmails", () => {
   it("monta mapa id → e-mail", () => {
     expect(
@@ -98,5 +128,37 @@ describe("mapaEmails", () => {
 describe("rotuloUltimaAlteracao", () => {
   it("explica quando nunca alterou", () => {
     expect(rotuloUltimaAlteracao(null)).toBe("Ainda não houve alteração");
+  });
+});
+
+describe("validarExclusaoConta", () => {
+  it("bloqueia apagar a própria conta", () => {
+    expect(
+      validarExclusaoConta({
+        confirmacao: "EXCLUIR",
+        alvoId: "eu",
+        meuId: "eu",
+      }),
+    ).toBe("Você não pode apagar a própria conta.");
+  });
+
+  it("pede a palavra EXCLUIR", () => {
+    expect(
+      validarExclusaoConta({
+        confirmacao: "apagar",
+        alvoId: "outro",
+        meuId: "eu",
+      }),
+    ).toBe("Digite EXCLUIR para confirmar.");
+  });
+
+  it("aceita EXCLUIR em outra conta", () => {
+    expect(
+      validarExclusaoConta({
+        confirmacao: "excluir",
+        alvoId: "outro",
+        meuId: "eu",
+      }),
+    ).toBeNull();
   });
 });

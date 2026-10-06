@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { opcoesSentry, sentryDsn } from "@/lib/sentry";
 
 describe("Sentry", () => {
@@ -6,6 +6,7 @@ describe("Sentry", () => {
 
   afterEach(() => {
     process.env = { ...env };
+    vi.unstubAllEnvs();
   });
 
   it("fica desligado sem DSN", () => {
@@ -41,7 +42,7 @@ describe("Sentry", () => {
   });
 
   it("usa 20% de traces em produção", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";
     expect(opcoesSentry().tracesSampleRate).toBe(0.2);
   });

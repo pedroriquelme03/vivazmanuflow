@@ -24,9 +24,19 @@ export function NovaDemandaModal({
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Nova demanda</h2>
+            <h2 className="text-base font-bold text-slate-900">
+              {opcoes.destinarConcluido
+                ? "Registrar concluído"
+                : opcoes.ambiente === "ti"
+                  ? "Novo chamado"
+                  : "Nova demanda"}
+            </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              A demanda entra no quadro assim que for criada.
+              {opcoes.destinarConcluido
+                ? "Não entra na fila. Vai direto para Concluídas."
+                : opcoes.ambiente === "ti"
+                  ? "O chamado entra no quadro de TI assim que for criado."
+                  : "A demanda entra no quadro assim que for criada."}
             </p>
           </div>
           <button

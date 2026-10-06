@@ -2,10 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Manutenção Vivaz — Vivaz Cataratas",
-    short_name: "Manutenção Vivaz",
-    description:
-      "Sistema de gestão de demandas de manutenção do resort Vivaz Cataratas.",
+    name: "Chamados Vivaz — Vivaz Cataratas",
+    short_name: "Chamados Vivaz",
+    description: "Sistema de chamados do resort Vivaz Cataratas.",
     start_url: "/",
     display: "standalone",
     background_color: "#063b45",

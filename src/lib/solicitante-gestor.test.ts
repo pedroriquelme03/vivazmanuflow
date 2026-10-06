@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   garantirSolicitantesGestor,
   idSolicitantePorNome,
+  idsSolicitanteDoNome,
   solicitantesUnicos,
 } from "@/lib/solicitante-gestor";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -37,6 +38,21 @@ describe("idSolicitantePorNome", () => {
 
   it("vazio se não achar", () => {
     expect(idSolicitantePorNome(lista, "João", "v")).toBe("");
+  });
+});
+
+describe("idsSolicitanteDoNome", () => {
+  it("pega todos os cadastros com o mesmo nome", () => {
+    expect(
+      idsSolicitanteDoNome(
+        [
+          { id: "a", nome: "Eder Josué" },
+          { id: "b", nome: "Ana" },
+          { id: "c", nome: " eder josué " },
+        ],
+        "Eder Josué",
+      ),
+    ).toEqual(["a", "c"]);
   });
 });
 

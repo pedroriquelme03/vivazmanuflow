@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  DEMANDA_SELECT,
   type DemandaKanban,
   concluidaNosUltimos7Dias,
   ordenarFilaPorPeso,
@@ -23,6 +22,8 @@ import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { AtribuirModal } from "./AtribuirModal";
 import { DetalheDemandaModal } from "./DetalheDemandaModal";
 import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
+import { listarQuadro } from "@/lib/quadro-ambiente";
+import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   colaboradoresDoFiltroProjeto,
   filtrarQuadroProjetos,
@@ -119,32 +120,40 @@ function ColunaQuadro({
 }
 
 export function KanbanLider({
+  ambiente,
   demandasIniciais,
   colaboradores,
   slaHoras,
   agoraInicial,
   opcoesNovaDemanda,
   ehAdmin = false,
+  eu,
   ehGestor = false,
   membrosPorProjeto = {},
   equipeAtribuir = [],
 }: {
+  ambiente: AmbienteEquipe;
   demandasIniciais: DemandaKanban[];
   colaboradores: Colaborador[];
   slaHoras: Record<string, number>;
   agoraInicial: number;
   opcoesNovaDemanda: OpcoesNovaDemanda;
   ehAdmin?: boolean;
+  eu?: { id: string; nome: string };
   ehGestor?: boolean;
   membrosPorProjeto?: Record<string, string[]>;
   equipeAtribuir?: Colaborador[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [demandas, setDemandas] = useState<DemandaKanban[]>(demandasIniciais);
+
+  useEffect(() => {
+    setDemandas(demandasIniciais);
+  }, [demandasIniciais]);
   const [agora, setAgora] = useState(agoraInicial);
   const [editando, setEditando] = useState<DemandaKanban | null>(null);
   const [detalhe, setDetalhe] = useState<DemandaKanban | null>(null);
-  const [criando, setCriando] = useState(false);
+  const [criando, setCriando] = useState<"fila" | "concluido" | null>(null);
   const [novaModoProjeto, setNovaModoProjeto] =
     useState<ModoCampoProjeto>("oculto");
   const [novaProjetoPadrao, setNovaProjetoPadrao] = useState("");
@@ -157,13 +166,24 @@ export function KanbanLider({
   const [projetoFiltro, setProjetoFiltro] = useState("");
 
   const recarregar = useCallback(async () => {
-    const { data } = await supabase
-      .from("demandas")
-      .select(DEMANDA_SELECT)
-      .order("peso", { ascending: false })
-      .order("criado_em", { ascending: true });
-    if (data) setDemandas(data as unknown as DemandaKanban[]);
-  }, [supabase]);
+    const data = await listarQuadro(supabase, ambiente);
+    setDemandas(data);
+  }, [supabase, ambiente]);
+
+  useEffect(() => {
+    setDetalhe((atual) => {
+      if (!atual) return atual;
+      const fresco = demandas.find((d) => d.id === atual.id);
+      if (!fresco) return atual;
+      if (
+        fresco.status === atual.status &&
+        fresco.colaborador_id === atual.colaborador_id
+      ) {
+        return atual;
+      }
+      return fresco;
+    });
+  }, [demandas]);
 
   // Realtime: qualquer mudança em demandas recarrega o quadro.
   useEffect(() => {
@@ -272,8 +292,10 @@ export function KanbanLider({
       <div className="mb-3 flex shrink-0 flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <h1 className="text-lg font-bold">Demandas</h1>
-            {ehGestor && (
+            <h1 className="text-lg font-bold">
+              {ambiente === "ti" ? "Chamados" : "Demandas"}
+            </h1>
+            {ehGestor && ambiente !== "ti" && (
               <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-xs font-semibold">
                 <button
                   type="button"
@@ -328,17 +350,31 @@ export function KanbanLider({
             <button
               type="button"
               onClick={() => {
+                setNovaModoProjeto("oculto");
+                setNovaProjetoPadrao("");
+                setCriando("concluido");
+              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 sm:px-3"
+            >
+              <span className="sm:hidden">Concluído</span>
+              <span className="hidden sm:inline">Registrar concluído</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setNovaModoProjeto(modoCampoProjetoKanban(visao));
                 setNovaProjetoPadrao(
                   projetoIdInicialKanban(visao, projetoFiltro),
                 );
-                setCriando(true);
+                setCriando("fila");
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:px-3.5"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 sm:px-3.5"
             >
               <span className="text-base leading-none">＋</span>
               <span className="sm:hidden">Nova</span>
-              <span className="hidden sm:inline">Nova demanda</span>
+              <span className="hidden sm:inline">
+                {ambiente === "ti" ? "Novo chamado" : "Nova demanda"}
+              </span>
             </button>
           </div>
         </div>
@@ -505,12 +541,27 @@ export function KanbanLider({
           demanda={detalhe}
           agora={agora}
           ehAdmin={ehAdmin}
+          ambiente={ambiente}
+          eu={eu}
+          slaHoras={slaHoras}
           onFechar={() => setDetalhe(null)}
           onAtribuir={() => {
             setEditando(detalhe);
           }}
-          onAtualizou={() => {
-            setDetalhe(null);
+          onAtualizou={(fechar = true) => {
+            if (fechar) setDetalhe(null);
+            else if (eu) {
+              setDetalhe((atual) =>
+                atual
+                  ? {
+                      ...atual,
+                      status: "atribuida",
+                      colaborador_id: eu.id,
+                      colaborador: { nome: eu.nome },
+                    }
+                  : atual,
+              );
+            }
             recarregar();
           }}
         />
@@ -519,7 +570,7 @@ export function KanbanLider({
       {editando && (
         <AtribuirModal
           demanda={editando}
-          colaboradores={
+          colaboradores={comEuNaEquipe(
             editando.projeto_id
               ? (equipeAtribuir.length ? equipeAtribuir : colaboradores).filter(
                   (c) =>
@@ -527,13 +578,13 @@ export function KanbanLider({
                       c.id,
                     ),
                 )
-              : colaboradores
-          }
+              : colaboradores,
+            ambiente === "ti" ? eu : undefined,
+          )}
           slaHoras={slaHoras}
           onFechar={() => setEditando(null)}
           onSalvo={() => {
             setEditando(null);
-            setDetalhe(null);
             recarregar();
           }}
         />
@@ -543,13 +594,19 @@ export function KanbanLider({
         <NovaDemandaModal
           opcoes={{
             ...opcoesNovaDemanda,
-            modoProjeto: novaModoProjeto,
-            projetoIdPadrao: novaProjetoPadrao,
+            modoProjeto: criando === "concluido" ? "oculto" : novaModoProjeto,
+            projetoIdPadrao: criando === "concluido" ? "" : novaProjetoPadrao,
+            destinarConcluido: criando === "concluido",
           }}
-          onFechar={() => setCriando(false)}
+          onFechar={() => setCriando(null)}
           onSucesso={() => {
-            setCriando(false);
-            setSucesso("Demanda criada com sucesso!");
+            const jaConcluido = criando === "concluido";
+            setCriando(null);
+            setSucesso(
+              jaConcluido
+                ? "Registrado em Concluídas, sem entrar na fila."
+                : "Demanda criada com sucesso!",
+            );
             recarregar();
             window.setTimeout(() => setSucesso(null), 5000);
           }}
@@ -557,6 +614,14 @@ export function KanbanLider({
       )}
     </main>
   );
+}
+
+function comEuNaEquipe(
+  lista: Colaborador[],
+  eu?: { id: string; nome: string },
+) {
+  if (!eu || lista.some((c) => c.id === eu.id)) return lista;
+  return [{ id: eu.id, nome: `${eu.nome} (eu)`, propriedade_id: null }, ...lista];
 }
 
 function Card({

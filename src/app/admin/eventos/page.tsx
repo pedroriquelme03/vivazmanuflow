@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getPerfil } from "@/lib/auth";
+import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PainelShell } from "@/components/AdminSidebar";
+import { PainelComAmbiente } from "@/components/PainelComAmbiente";
 import { EventosApp } from "./EventosApp";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function EventosPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin/eventos");
-  if (perfil.role !== "admin")
-    redirect(perfil.role === "colaborador" ? "/colaborador" : "/lider");
+  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role));
 
   const supabase = await createClient();
   const [{ data: propriedades }, eventosRes] = await Promise.all([
@@ -22,11 +21,11 @@ export default async function EventosPage() {
   ]);
 
   return (
-    <PainelShell perfil={perfil}>
+    <PainelComAmbiente perfil={perfil}>
       <EventosApp
         eventos={eventosRes.data ?? []}
         propriedades={propriedades ?? []}
       />
-    </PainelShell>
+    </PainelComAmbiente>
   );
 }

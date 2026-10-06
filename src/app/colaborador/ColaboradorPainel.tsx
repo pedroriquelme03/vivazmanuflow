@@ -28,8 +28,12 @@ import {
   mensagemDevolucaoGestor,
 } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { ChatChamado } from "@/components/ChatChamado";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
+import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
+import { ambientesDoPapel } from "@/lib/ambiente-equipe";
+import { TrocaAmbiente } from "@/components/TrocaAmbiente";
 import {
   aplicarPegarNoPainel,
   aplicarReloadMinhas,
@@ -48,10 +52,12 @@ const ABAS: { id: Aba; rotulo: string; icone: string }[] = [
 ];
 
 export function ColaboradorPainel({
+  ambiente,
   demandasIniciais,
   geraisIniciais,
   perfil,
 }: {
+  ambiente: AmbienteEquipe;
   demandasIniciais: DemandaColab[];
   geraisIniciais: DemandaGeral[];
   perfil: Perfil;
@@ -76,9 +82,28 @@ export function ColaboradorPainel({
       .eq("colaborador_id", colaboradorId)
       .in("status", ["atribuida", "em_andamento"])
       .eq("arquivado", false)
+      .eq("ambiente", ambiente)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });
-    if (error || !data) return;
+    if (error || !data) {
+      if (!error) return;
+      const semAmbiente = await supabase
+        .from("demandas")
+        .select(COLAB_SELECT)
+        .eq("colaborador_id", colaboradorId)
+        .in("status", ["atribuida", "em_andamento"])
+        .eq("arquivado", false)
+        .order("peso", { ascending: false })
+        .order("criado_em", { ascending: true });
+      if (semAmbiente.error || !semAmbiente.data) return;
+      const listaLegada = semAmbiente.data as unknown as DemandaColab[];
+      setDemandas((atuais) =>
+        ordenarFilaPorPeso(
+          aplicarReloadMinhas(atuais, listaLegada, recemPegaId.current, false),
+        ),
+      );
+      return;
+    }
     const lista = data as unknown as DemandaColab[];
     setDemandas((atuais) =>
       ordenarFilaPorPeso(
@@ -88,7 +113,7 @@ export function ColaboradorPainel({
     if (lista.some((d) => d.id === recemPegaId.current)) {
       recemPegaId.current = null;
     }
-  }, [supabase, colaboradorId]);
+  }, [supabase, colaboradorId, ambiente]);
 
   const recarregarGerais = useCallback(async () => {
     // Pool visível para todos os colaboradores, sem filtro por local.
@@ -97,13 +122,26 @@ export function ColaboradorPainel({
       .select(GERAIS_SELECT)
       .eq("status", "aberta")
       .eq("arquivado", false)
+      .eq("ambiente", ambiente)
       .is("colaborador_id", null)
       .order("peso", { ascending: false })
       .order("criado_em", { ascending: true });
     if (data) {
       setGerais(ordenarFilaPorPeso(data as unknown as DemandaGeral[]));
+      return;
     }
-  }, [supabase]);
+    const semAmbiente = await supabase
+      .from("demandas")
+      .select(GERAIS_SELECT)
+      .eq("status", "aberta")
+      .eq("arquivado", false)
+      .is("colaborador_id", null)
+      .order("peso", { ascending: false })
+      .order("criado_em", { ascending: true });
+    if (semAmbiente.data) {
+      setGerais(ordenarFilaPorPeso(semAmbiente.data as unknown as DemandaGeral[]));
+    }
+  }, [supabase, ambiente]);
 
   useEffect(() => {
     const canal = supabase
@@ -152,8 +190,15 @@ export function ColaboradorPainel({
     void recarregar();
   }
 
+  const mostraTroca = ambientesDoPapel(perfil.role, perfil.ambientes).length > 1;
+
   return (
-    <div className="flex min-h-full flex-1 flex-col">
+    <div className="flex min-h-full flex-1 flex-col" data-ambiente={ambiente}>
+      {mostraTroca && (
+        <div className="flex justify-end border-b border-slate-200 bg-white px-4 py-2">
+          <TrocaAmbiente valor={ambiente} />
+        </div>
+      )}
       <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-6">
         {aba === "demandas" && (
           <ListaDemandas
@@ -162,6 +207,7 @@ export function ColaboradorPainel({
             agora={agora}
             colaboradorId={colaboradorId}
             onMudou={recarregar}
+            ambiente={ambiente}
           />
         )}
         {aba === "gerais" && (
@@ -231,12 +277,14 @@ function ListaDemandas({
   agora,
   colaboradorId,
   onMudou,
+  ambiente,
 }: {
   primeiroNome: string;
   demandas: DemandaColab[];
   agora: number;
   colaboradorId: string;
   onMudou: () => void;
+  ambiente: AmbienteEquipe;
 }) {
   return (
     <>
@@ -260,6 +308,7 @@ function ListaDemandas({
               agora={agora}
               colaboradorId={colaboradorId}
               onMudou={onMudou}
+              ambiente={ambiente}
             />
           ))}
         </div>
@@ -712,11 +761,13 @@ function CardColab({
   agora,
   colaboradorId,
   onMudou,
+  ambiente,
 }: {
   demanda: DemandaColab;
   agora: number;
   colaboradorId: string;
   onMudou: () => void;
+  ambiente: AmbienteEquipe;
 }) {
   const supabase = createClient();
   const [passo, setPasso] = useState<Passo>("inicio");
@@ -911,6 +962,10 @@ function CardColab({
         )}
 
         <AnexosDoSolicitante anexos={demanda.anexos} />
+
+        {ambiente === "ti" && (
+          <ChatChamado demandaId={demanda.id} lado="equipe" />
+        )}
 
         {msgDevolucao && demanda.status === "em_andamento" && (
           <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3">

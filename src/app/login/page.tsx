@@ -4,6 +4,9 @@ import { useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
+import { BrandMark } from "@/components/BrandMark";
+import { CartaoEntrada } from "@/components/CartaoEntrada";
+import { MolduraEntrada } from "@/components/MolduraEntrada";
 import { login, type LoginState } from "./actions";
 
 function LoginForm() {
@@ -65,39 +68,29 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 pb-20">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <Link
-            href="/"
-            className="text-sm text-slate-400 hover:text-brand-700"
-          >
-            ← Manutenção Vivaz
-          </Link>
-          <h1 className="mt-2 text-xl font-bold">Entrar</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Acesso da equipe de manutenção
-          </p>
-        </div>
+    <MolduraEntrada>
+      <main className="flex flex-1 flex-col items-center justify-center px-5 py-12">
+        <CartaoEntrada className="max-w-sm p-8 sm:max-w-md sm:p-10 lg:max-w-lg lg:p-12">
+          <div className="mb-6 text-center">
+            <BrandMark className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-brand-600 shadow-lg shadow-brand-600/30" />
+            <h1 className="text-xl font-bold">Entrar</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Use o e-mail e a senha cadastrados pela equipe.
+            </p>
+          </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <Suspense>
             <LoginForm />
           </Suspense>
-        </div>
-      </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-slate-50/95 px-4 py-3 text-center text-xs text-slate-500 backdrop-blur-sm">
-        © 2026 Vivaz Cataratas Resort • Dev by{" "}
-        <a
-          href="https://pedroriquelme.com.br/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-brand-700 hover:underline"
-        >
-          Pedro Riquelme
-        </a>
-      </footer>
-    </main>
+          <Link
+            href="/"
+            className="mt-6 block text-center text-sm text-slate-400 transition hover:text-brand-700"
+          >
+            ← Voltar
+          </Link>
+        </CartaoEntrada>
+      </main>
+    </MolduraEntrada>
   );
 }

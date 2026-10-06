@@ -22,6 +22,8 @@ import {
 } from "@/lib/demanda-gestor";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { VideoAnexo } from "@/components/VideoAnexo";
+import { ChatChamado } from "@/components/ChatChamado";
+import { equipePodeMandarMensagem } from "@/lib/chamado-chat";
 import type { Enums } from "@/lib/database.types";
 
 type HistoricoItem = {
@@ -44,6 +46,9 @@ export function DetalheDemandaModal({
   demanda,
   agora,
   ehAdmin = false,
+  ambiente = "manutencao",
+  eu,
+  slaHoras = {},
   onFechar,
   onAtribuir,
   onAtualizou,
@@ -51,9 +56,12 @@ export function DetalheDemandaModal({
   demanda: DemandaKanban;
   agora: number;
   ehAdmin?: boolean;
+  ambiente?: "manutencao" | "ti";
+  eu?: { id: string; nome: string };
+  slaHoras?: Record<string, number>;
   onFechar: () => void;
   onAtribuir: () => void;
-  onAtualizou: () => void;
+  onAtualizou: (fechar?: boolean) => void;
 }) {
   const supabase = createClient();
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
@@ -75,6 +83,13 @@ export function DetalheDemandaModal({
       demanda.status === "atribuida" ||
       demanda.status === "em_andamento");
   const podeConcluirAdmin = ehAdmin && podeAtribuir;
+  const podePegarParaMim =
+    ambiente === "ti" &&
+    ehAdmin &&
+    Boolean(eu) &&
+    !arquivado &&
+    demanda.status === "aberta" &&
+    demanda.colaborador_id !== eu?.id;
 
   const urgencia =
     demanda.status === "concluida" ||
@@ -109,6 +124,35 @@ export function DetalheDemandaModal({
       ativo = false;
     };
   }, [demanda.id, supabase]);
+
+  async function atribuirAMim() {
+    if (!eu) return;
+    setErro(null);
+    setOcupado(true);
+    const horas = slaHoras[demanda.prioridade] ?? 24;
+    const { error } = await supabase
+      .from("demandas")
+      .update({
+        colaborador_id: eu.id,
+        status: "atribuida",
+        atribuido_em: new Date().toISOString(),
+        prazo_confirmado: new Date(Date.now() + horas * 3600_000).toISOString(),
+      })
+      .eq("id", demanda.id);
+    if (error) {
+      setOcupado(false);
+      setErro("Não foi possível atribuir a você. Tente novamente.");
+      return;
+    }
+    await supabase.from("demanda_historico").insert({
+      demanda_id: demanda.id,
+      status_anterior: demanda.status,
+      status_novo: "atribuida",
+      observacao: `${eu.nome} atribuiu a demanda a si`,
+    });
+    setOcupado(false);
+    onAtualizou(false);
+  }
 
   async function arquivar(valor: boolean) {
     setErro(null);
@@ -260,6 +304,17 @@ export function DetalheDemandaModal({
             <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
               {demanda.descricao}
             </p>
+          )}
+
+          {ambiente === "ti" && (
+            <ChatChamado
+              demandaId={demanda.id}
+              lado="equipe"
+              podeEnviar={equipePodeMandarMensagem(
+                demanda.colaborador_id,
+                demanda.status,
+              )}
+            />
           )}
 
           <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
@@ -468,6 +523,17 @@ export function DetalheDemandaModal({
             </div>
           )}
 
+          {podePegarParaMim && (
+            <button
+              type="button"
+              onClick={atribuirAMim}
+              disabled={ocupado}
+              className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+            >
+              {ocupado ? "Atribuindo…" : "Atribuir a mim"}
+            </button>
+          )}
+
           {podeAtribuir && (
             <button
               type="button"
@@ -493,20 +559,28 @@ export function DetalheDemandaModal({
                 className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {confirmandoConcluir
-                  ? "Cancelar conclusão"
-                  : "Marcar como concluída"}
+                  ? "Cancelar registro"
+                  : ambiente === "ti"
+                    ? "Registrar conclusão"
+                    : "Marcar como concluída"}
               </button>
               {confirmandoConcluir && (
                 <div className="grid gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                   <label className="text-xs font-medium text-emerald-900">
-                    Por que está concluindo agora?{" "}
+                    {ambiente === "ti"
+                      ? "O que foi feito?"
+                      : "Por que está concluindo agora?"}{" "}
                     <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={msgConclusao}
                     onChange={(e) => setMsgConclusao(e.target.value)}
                     rows={3}
-                    placeholder="Explique o motivo de fechar a demanda neste estágio…"
+                    placeholder={
+                      ambiente === "ti"
+                        ? "Registre o atendimento feito neste chamado…"
+                        : "Explique o motivo de fechar a demanda neste estágio…"
+                    }
                     className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
                   />
                   <button
@@ -515,7 +589,11 @@ export function DetalheDemandaModal({
                     disabled={ocupado}
                     className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60"
                   >
-                    {ocupado ? "Concluindo…" : "Confirmar conclusão"}
+                    {ocupado
+                      ? "Salvando…"
+                      : ambiente === "ti"
+                        ? "Registrar"
+                        : "Confirmar conclusão"}
                   </button>
                 </div>
               )}

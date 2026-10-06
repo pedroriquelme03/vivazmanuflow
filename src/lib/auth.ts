@@ -37,5 +37,7 @@ export async function getPerfil(): Promise<Perfil | null> {
 
 /** Caminho inicial de cada papel. */
 export function rotaInicial(role: Tables<"usuarios">["role"]) {
-  return role === "colaborador" ? "/colaborador" : "/lider";
+  if (role === "colaborador") return "/colaborador";
+  if (role === "solicitante") return "/solicitante";
+  return "/lider";
 }

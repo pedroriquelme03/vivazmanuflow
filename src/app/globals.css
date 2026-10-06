@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
@@ -13,8 +13,26 @@
   --color-brand-800: #155e75;
 }
 
+/* Ambiente TI: mesma marca, grafite nos botões e destaques. A logo fica de fora. */
+[data-ambiente="ti"] {
+  --color-brand-50: #f1f5f9;
+  --color-brand-100: #e2e8f0;
+  --color-brand-200: #cbd5e1;
+  --color-brand-300: #94a3b8;
+  --color-brand-400: #64748b;
+  --color-brand-500: #475569;
+  --color-brand-600: #475569;
+  --color-brand-700: #334155;
+  --color-brand-800: #1e293b;
+}
+
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* O overlay de dev do Next (nextjs-portal) fica por cima dos botões no celular. */
+nextjs-portal {
+  pointer-events: none !important;
 }
 
 /* Borda piscando — demandas que afetam a experiência do hóspede (peso máximo) */

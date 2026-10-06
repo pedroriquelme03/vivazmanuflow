@@ -1,5 +1,7 @@
 /** Helpers de edição da equipe (Cadastros) — validado em 11/09/2026. */
 
+export type AmbienteEquipe = "manutencao" | "ti";
+
 export type DadosEdicaoEquipe = {
   nome: string;
   email: string;
@@ -8,6 +10,7 @@ export type DadosEdicaoEquipe = {
   ativo: boolean;
   propriedadeId: string;
   userId: string;
+  ambientes: readonly AmbienteEquipe[];
 };
 
 export function rotuloUltimaAlteracao(iso: string | null | undefined) {
@@ -25,7 +28,28 @@ export function validarEdicaoEquipe(d: DadosEdicaoEquipe): string | null {
       return "A senha deve ter no mínimo 6 caracteres.";
     }
   }
+  if (d.ambientes.length === 0) return "Marque Manutenção, TI ou os dois.";
   return null;
+}
+
+export function ambientesMarcados(
+  manutencao: boolean,
+  ti: boolean,
+): AmbienteEquipe[] {
+  const lista: AmbienteEquipe[] = [];
+  if (manutencao) lista.push("manutencao");
+  if (ti) lista.push("ti");
+  return lista;
+}
+
+export function rotuloAmbientes(
+  ambientes: readonly string[] | null | undefined,
+) {
+  const temManutencao = !ambientes || ambientes.includes("manutencao");
+  const temTi = Boolean(ambientes?.includes("ti"));
+  if (temManutencao && temTi) return "Manutenção e TI";
+  if (temTi) return "TI";
+  return "Manutenção";
 }
 
 export function payloadAtualizarUsuario(d: DadosEdicaoEquipe) {
@@ -37,6 +61,27 @@ export function payloadAtualizarUsuario(d: DadosEdicaoEquipe) {
     p_propriedade_id: d.propriedadeId || null,
     p_senha: d.senha.trim() ? d.senha.trim() : undefined,
   };
+}
+
+export function payloadDefinirAmbientes(d: DadosEdicaoEquipe) {
+  return {
+    p_user_id: d.userId,
+    p_ambientes: [...d.ambientes],
+  };
+}
+
+export function validarExclusaoConta(opts: {
+  confirmacao: string;
+  alvoId: string;
+  meuId: string | null;
+}) {
+  if (opts.meuId && opts.alvoId === opts.meuId) {
+    return "Você não pode apagar a própria conta.";
+  }
+  if (opts.confirmacao.trim().toUpperCase() !== "EXCLUIR") {
+    return "Digite EXCLUIR para confirmar.";
+  }
+  return null;
 }
 
 export function mapaEmails(

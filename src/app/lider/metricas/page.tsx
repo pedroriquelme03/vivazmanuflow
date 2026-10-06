@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
-import { getPerfil } from "@/lib/auth";
+import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PainelShell } from "@/components/AdminSidebar";
+import { PainelComAmbiente } from "@/components/PainelComAmbiente";
+import {
+  pessoaDoAmbiente,
+  recursoAmbienteAusente,
+} from "@/lib/ambiente-equipe";
+import { resolverAmbiente } from "@/lib/resolver-ambiente";
 import { MetricasDashboard } from "./MetricasDashboard";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function MetricasPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/lider/metricas");
-  if (perfil.role === "colaborador") redirect("/colaborador");
+  if (perfil.role === "colaborador" || perfil.role === "solicitante") {
+    redirect(rotaInicial(perfil.role));
+  }
 
   const supabase = await createClient();
+  const ambiente = await resolverAmbiente(perfil.ambientes, perfil.role);
   const [
-    { data: colaboradores },
+    equipeRes,
     { data: setores },
     { data: propriedades },
     { data: locais },
@@ -21,7 +29,7 @@ export default async function MetricasPage() {
   ] = await Promise.all([
     supabase
       .from("usuarios")
-      .select("id, nome")
+      .select("id, nome, ambientes")
       .eq("role", "colaborador")
       .eq("ativo", true)
       .order("nome"),
@@ -35,15 +43,34 @@ export default async function MetricasPage() {
     supabase.from("eventos").select("id, nome").eq("ativo", true).order("nome"),
   ]);
 
+  let colaboradores = (equipeRes.data ?? []).map(({ id, nome }) => ({
+    id,
+    nome,
+  }));
+  if (equipeRes.error && recursoAmbienteAusente(equipeRes.error.message)) {
+    const legado = await supabase
+      .from("usuarios")
+      .select("id, nome")
+      .eq("role", "colaborador")
+      .eq("ativo", true)
+      .order("nome");
+    colaboradores = legado.data ?? [];
+  } else {
+    colaboradores = (equipeRes.data ?? [])
+      .filter((pessoa) => pessoaDoAmbiente(pessoa.ambientes, ambiente))
+      .map(({ id, nome }) => ({ id, nome }));
+  }
+
   return (
-    <PainelShell perfil={perfil}>
+    <PainelComAmbiente perfil={perfil}>
       <MetricasDashboard
+        ambiente={ambiente}
         colaboradores={colaboradores ?? []}
         setores={setores ?? []}
         propriedades={propriedades ?? []}
         locais={locais ?? []}
         eventos={eventosRes.data ?? []}
       />
-    </PainelShell>
+    </PainelComAmbiente>
   );
 }

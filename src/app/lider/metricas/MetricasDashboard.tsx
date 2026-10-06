@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Database, Enums } from "@/lib/database.types";
+import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
+import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
+import {
+  horasDoDia,
+  picoHorario,
+  volumeLocaisDigitados,
+} from "@/lib/metricas-ti";
 
 type MetricasArgs = Database["public"]["Functions"]["metricas"]["Args"];
 
@@ -17,6 +24,7 @@ type Metricas = {
   por_prioridade: { prioridade: string; total: number; tempo_medio_min: number | null }[];
   por_setor: { setor: string; total: number }[];
   por_local: { local: string; total: number }[];
+  por_sublocal?: { local: string; total: number }[];
   ranking: { nome: string; total: number; tempo_medio_min: number | null; pct_prazo: number | null }[];
   por_hora: { hora: number; total: number }[];
   por_dia_semana: { dow: number; total: number }[];
@@ -68,6 +76,23 @@ const STATUS_FILTRO_LABEL: Record<string, string> = Object.fromEntries(
   COLUNAS_STATUS.map((c) => [c.valor, c.rotulo]),
 );
 
+const METRICAS_ZERADAS: Metricas = {
+  total_criadas: 0,
+  concluidas: 0,
+  abertas_agora: 0,
+  canceladas: 0,
+  tempo_medio_min: null,
+  sla_total: 0,
+  sla_cumprido: 0,
+  por_prioridade: [],
+  por_setor: [],
+  por_local: [],
+  por_sublocal: [],
+  ranking: [],
+  por_hora: [],
+  por_dia_semana: [],
+};
+
 const FILTROS_VAZIOS: Filtros = {
   dias: 30,
   colaboradorId: "",
@@ -89,12 +114,14 @@ function fmtMin(min: number | null): string {
 }
 
 export function MetricasDashboard({
+  ambiente,
   colaboradores,
   setores,
   propriedades,
   locais,
   eventos,
 }: {
+  ambiente: AmbienteEquipe;
   colaboradores: Opcao[];
   setores: SetorOpcao[];
   propriedades: Opcao[];
@@ -133,7 +160,7 @@ export function MetricasDashboard({
         `Colaborador: ${colaboradores.find((c) => c.id === filtros.colaboradorId)?.nome ?? "?"}`,
       );
     }
-    if (filtros.setorId) {
+    if (ambiente !== "ti" && filtros.setorId) {
       tags.push(`Setor: ${setores.find((s) => s.id === filtros.setorId)?.nome ?? "?"}`);
     }
     if (filtros.propriedadeId) {
@@ -141,22 +168,26 @@ export function MetricasDashboard({
         `Local: ${propriedades.find((p) => p.id === filtros.propriedadeId)?.nome ?? "?"}`,
       );
     }
-    if (filtros.localId) {
+    if (ambiente !== "ti" && filtros.localId) {
       tags.push(`Sublocal: ${locais.find((l) => l.id === filtros.localId)?.nome ?? "?"}`);
     }
     if (filtros.prioridade) {
       tags.push(`Prioridade: ${PRIO_LABEL[filtros.prioridade]}`);
     }
-    if (filtros.eventoId) {
+    if (ambiente !== "ti" && filtros.eventoId) {
       tags.push(`Evento: ${eventos.find((e) => e.id === filtros.eventoId)?.nome ?? "?"}`);
     }
-    if (filtros.somenteEventos === "sim") tags.push("Somente eventos");
-    if (filtros.somenteEventos === "nao") tags.push("Somente rotina");
+    if (ambiente !== "ti" && filtros.somenteEventos === "sim") {
+      tags.push("Somente eventos");
+    }
+    if (ambiente !== "ti" && filtros.somenteEventos === "nao") {
+      tags.push("Somente rotina");
+    }
     if (filtros.status) {
       tags.push(`Status: ${STATUS_FILTRO_LABEL[filtros.status] ?? filtros.status}`);
     }
     return tags;
-  }, [filtros, colaboradores, setores, propriedades, locais, eventos]);
+  }, [filtros, colaboradores, setores, propriedades, locais, eventos, ambiente]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -169,13 +200,17 @@ export function MetricasDashboard({
       p_fim: fim.toISOString(),
     };
     if (filtros.colaboradorId) args.p_colaborador_id = filtros.colaboradorId;
-    if (filtros.setorId) args.p_setor_id = filtros.setorId;
+    if (ambiente !== "ti" && filtros.setorId) args.p_setor_id = filtros.setorId;
     if (filtros.propriedadeId) args.p_propriedade_id = filtros.propriedadeId;
-    if (filtros.localId) args.p_local_id = filtros.localId;
+    if (ambiente !== "ti" && filtros.localId) args.p_local_id = filtros.localId;
     if (filtros.prioridade) args.p_prioridade = filtros.prioridade;
-    if (filtros.eventoId) args.p_evento_id = filtros.eventoId;
-    if (filtros.somenteEventos === "sim") args.p_somente_eventos = true;
-    if (filtros.somenteEventos === "nao") args.p_somente_eventos = false;
+    if (ambiente !== "ti" && filtros.eventoId) args.p_evento_id = filtros.eventoId;
+    if (ambiente !== "ti" && filtros.somenteEventos === "sim") {
+      args.p_somente_eventos = true;
+    }
+    if (ambiente !== "ti" && filtros.somenteEventos === "nao") {
+      args.p_somente_eventos = false;
+    }
     if (filtros.status === "arquivado") {
       args.p_arquivado = true;
     } else if (filtros.status) {
@@ -183,7 +218,23 @@ export function MetricasDashboard({
       args.p_arquivado = false;
     }
 
-    const { data, error } = await supabase.rpc("metricas", args);
+    const comAmbiente = { ...args, p_ambiente: ambiente };
+    let { data, error } = await supabase.rpc("metricas", comAmbiente);
+    const filtroIndisponivel =
+      error != null &&
+      (recursoAmbienteAusente(error.message) ||
+        error.message.includes("p_ambiente") ||
+        error.message.includes("Could not find"));
+    if (filtroIndisponivel && ambiente === "ti") {
+      setDados(METRICAS_ZERADAS);
+      setCarregando(false);
+      return;
+    }
+    if (filtroIndisponivel) {
+      const semAmbiente = await supabase.rpc("metricas", args);
+      data = semAmbiente.data;
+      error = semAmbiente.error;
+    }
     if (error) {
       setErro(
         error.message.includes("Could not find") || error.message.includes("function")
@@ -195,11 +246,44 @@ export function MetricasDashboard({
       setDados(data as unknown as Metricas);
     }
     setCarregando(false);
-  }, [supabase, filtros]);
+  }, [supabase, filtros, ambiente]);
 
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    setFiltros((atual) => {
+      let mudou = false;
+      const next = { ...atual };
+      if (ambiente === "ti") {
+        if (next.setorId) {
+          next.setorId = "";
+          mudou = true;
+        }
+        if (next.localId) {
+          next.localId = "";
+          mudou = true;
+        }
+        if (next.eventoId) {
+          next.eventoId = "";
+          mudou = true;
+        }
+        if (next.somenteEventos) {
+          next.somenteEventos = "";
+          mudou = true;
+        }
+      }
+      if (
+        atual.colaboradorId &&
+        !colaboradores.some((c) => c.id === atual.colaboradorId)
+      ) {
+        next.colaboradorId = "";
+        mudou = true;
+      }
+      return mudou ? next : atual;
+    });
+  }, [ambiente, colaboradores]);
 
   function setFiltro<K extends keyof Filtros>(chave: K, valor: Filtros[K]) {
     setFiltros((atual) => {
@@ -265,31 +349,35 @@ export function MetricasDashboard({
             ))}
           </select>
 
-          <select
-            className={selectCls}
-            value={filtros.localId}
-            onChange={(e) => setFiltro("localId", e.target.value)}
-          >
-            <option value="">Todos os sublocais</option>
-            {locaisFiltrados.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nome}
-              </option>
-            ))}
-          </select>
+          {ambiente !== "ti" && (
+            <>
+              <select
+                className={selectCls}
+                value={filtros.localId}
+                onChange={(e) => setFiltro("localId", e.target.value)}
+              >
+                <option value="">Todos os sublocais</option>
+                {locaisFiltrados.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.nome}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            className={selectCls}
-            value={filtros.setorId}
-            onChange={(e) => setFiltro("setorId", e.target.value)}
-          >
-            <option value="">Todos os setores</option>
-            {setoresFiltrados.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
+              <select
+                className={selectCls}
+                value={filtros.setorId}
+                onChange={(e) => setFiltro("setorId", e.target.value)}
+              >
+                <option value="">Todos os setores</option>
+                {setoresFiltrados.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
 
           <select
             className={selectCls}
@@ -335,33 +423,37 @@ export function MetricasDashboard({
             <option value="baixa">Baixa</option>
           </select>
 
-          <select
-            className={selectCls}
-            value={filtros.eventoId}
-            onChange={(e) => setFiltro("eventoId", e.target.value)}
-          >
-            <option value="">Todos os eventos</option>
-            {eventos.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nome}
-              </option>
-            ))}
-          </select>
+          {ambiente !== "ti" && (
+            <>
+              <select
+                className={selectCls}
+                value={filtros.eventoId}
+                onChange={(e) => setFiltro("eventoId", e.target.value)}
+              >
+                <option value="">Todos os eventos</option>
+                {eventos.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nome}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            className={selectCls}
-            value={filtros.somenteEventos}
-            onChange={(e) =>
-              setFiltro(
-                "somenteEventos",
-                e.target.value as Filtros["somenteEventos"],
-              )
-            }
-          >
-            <option value="">Rotina + eventos</option>
-            <option value="sim">Somente demandas de evento</option>
-            <option value="nao">Somente manutenção de rotina</option>
-          </select>
+              <select
+                className={selectCls}
+                value={filtros.somenteEventos}
+                onChange={(e) =>
+                  setFiltro(
+                    "somenteEventos",
+                    e.target.value as Filtros["somenteEventos"],
+                  )
+                }
+              >
+                <option value="">Rotina + eventos</option>
+                <option value="sim">Somente demandas de evento</option>
+                <option value="nao">Somente manutenção de rotina</option>
+              </select>
+            </>
+          )}
         </div>
 
         {filtrosAtivos.length > 0 && (
@@ -436,18 +528,53 @@ export function MetricasDashboard({
               />
             </Painel>
 
-            <Painel titulo="Volume por setor solicitante">
-              <BarList
-                itens={dados.por_setor.map((s) => ({ rotulo: s.setor, valor: s.total }))}
-              />
-            </Painel>
+            {ambiente !== "ti" && (
+              <>
+                <Painel titulo="Volume por setor solicitante">
+                  <BarList
+                    itens={dados.por_setor.map((s) => ({
+                      rotulo: s.setor,
+                      valor: s.total,
+                    }))}
+                  />
+                </Painel>
 
-            <Painel titulo="Volume por local (top 8)">
-              <BarList
-                itens={dados.por_local.map((l) => ({ rotulo: l.local, valor: l.total }))}
-              />
-            </Painel>
+                <Painel titulo="Volume por local (top 8)">
+                  <BarList
+                    itens={dados.por_local.map((l) => ({
+                      rotulo: l.local,
+                      valor: l.total,
+                    }))}
+                  />
+                </Painel>
+              </>
+            )}
           </div>
+
+          {ambiente === "ti" && (
+            <Painel titulo="Volume pelo local digitado">
+              {dados.por_sublocal == null ? (
+                <p className="text-sm text-amber-800">
+                  Rode o SQL em{" "}
+                  <code className="text-xs">
+                    supabase/migrations/20261006180000_metricas_ti_sublocal.sql
+                  </code>{" "}
+                  no Supabase para listar os locais como a pessoa digitou.
+                </p>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-slate-400">
+                    Agrupa o texto escrito no chamado, sem cadastro de setor ou
+                    sublocal (ex.: Recepção, computador da governança).
+                  </p>
+                  <BarList
+                    itens={volumeLocaisDigitados(dados.por_sublocal)}
+                    rotuloLargo
+                  />
+                </>
+              )}
+            </Painel>
+          )}
 
           <Painel titulo="Ranking de colaboradores">
             {dados.ranking.length === 0 ? (
@@ -480,19 +607,37 @@ export function MetricasDashboard({
             )}
           </Painel>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <Painel titulo="Horários de pico (abertura)">
-              <HourChart itens={dados.por_hora} />
-            </Painel>
-            <Painel titulo="Dias de pico (abertura)">
-              <BarList
-                itens={[0, 1, 2, 3, 4, 5, 6].map((d) => ({
-                  rotulo: DOW[d],
-                  valor: dados.por_dia_semana.find((x) => x.dow === d)?.total ?? 0,
-                }))}
-              />
-            </Painel>
-          </div>
+          {ambiente === "ti" ? (
+            <>
+              <Painel titulo="Horários de pico (abertura)">
+                <HourChartTi itens={dados.por_hora} />
+              </Painel>
+              <Painel titulo="Dias de pico (abertura)">
+                <BarList
+                  itens={[0, 1, 2, 3, 4, 5, 6].map((d) => ({
+                    rotulo: DOW[d],
+                    valor:
+                      dados.por_dia_semana.find((x) => x.dow === d)?.total ?? 0,
+                  }))}
+                />
+              </Painel>
+            </>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              <Painel titulo="Horários de pico (abertura)">
+                <HourChart itens={dados.por_hora} />
+              </Painel>
+              <Painel titulo="Dias de pico (abertura)">
+                <BarList
+                  itens={[0, 1, 2, 3, 4, 5, 6].map((d) => ({
+                    rotulo: DOW[d],
+                    valor:
+                      dados.por_dia_semana.find((x) => x.dow === d)?.total ?? 0,
+                  }))}
+                />
+              </Painel>
+            </div>
+          )}
         </div>
       )}
     </main>
@@ -525,7 +670,13 @@ function Painel({ titulo, children }: { titulo: string; children: React.ReactNod
   );
 }
 
-function BarList({ itens }: { itens: { rotulo: string; valor: number }[] }) {
+function BarList({
+  itens,
+  rotuloLargo = false,
+}: {
+  itens: { rotulo: string; valor: number }[];
+  rotuloLargo?: boolean;
+}) {
   const max = Math.max(1, ...itens.map((i) => i.valor));
   if (itens.length === 0)
     return <p className="text-sm text-slate-400">Sem dados no período.</p>;
@@ -533,7 +684,12 @@ function BarList({ itens }: { itens: { rotulo: string; valor: number }[] }) {
     <div className="grid gap-2">
       {itens.map((i, idx) => (
         <div key={idx} className="flex items-center gap-2">
-          <span className="w-28 shrink-0 truncate text-xs text-slate-600" title={i.rotulo}>
+          <span
+            className={`shrink-0 truncate text-xs text-slate-600 ${
+              rotuloLargo ? "w-40" : "w-28"
+            }`}
+            title={i.rotulo}
+          >
             {i.rotulo}
           </span>
           <div className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
@@ -542,7 +698,7 @@ function BarList({ itens }: { itens: { rotulo: string; valor: number }[] }) {
               style={{ width: `${(i.valor / max) * 100}%` }}
             />
           </div>
-          <span className="w-6 shrink-0 text-right text-xs font-medium text-slate-500">
+          <span className="w-8 shrink-0 text-right text-xs font-medium text-slate-500">
             {i.valor}
           </span>
         </div>
@@ -569,6 +725,108 @@ function HourChart({ itens }: { itens: { hora: number; total: number }[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function HourChartTi({ itens }: { itens: { hora: number; total: number }[] }) {
+  const dia = horasDoDia(itens);
+  const max = Math.max(1, ...dia.map((i) => i.total));
+  const pico = picoHorario(dia);
+  const largura = 720;
+  const altura = 200;
+  const topo = 22;
+  const base = 28;
+  const faixa = altura - topo - base;
+  const barra = largura / 24;
+
+  return (
+    <div>
+      {pico ? (
+        <p className="mb-3 text-sm text-slate-600">
+          Pico às{" "}
+          <span className="font-bold text-slate-900">
+            {String(pico.hora).padStart(2, "0")}h
+          </span>
+          {" · "}
+          <span className="font-bold text-brand-700">{pico.total}</span>{" "}
+          chamado{pico.total === 1 ? "" : "s"}
+        </p>
+      ) : (
+        <p className="mb-3 text-sm text-slate-400">Sem aberturas no período.</p>
+      )}
+      <div className="-mx-1 overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${largura} ${altura}`}
+          className="h-auto w-full min-w-[560px]"
+          role="img"
+          aria-label="Chamados abertos por hora do dia"
+        >
+        {[0.25, 0.5, 0.75, 1].map((p) => (
+          <line
+            key={p}
+            x1={0}
+            x2={largura}
+            y1={topo + faixa * (1 - p)}
+            y2={topo + faixa * (1 - p)}
+            className="stroke-slate-100"
+            strokeWidth={1}
+          />
+        ))}
+        {dia.map((item) => {
+          const h =
+            item.total > 0 ? Math.max(8, (item.total / max) * faixa) : 3;
+          const x = item.hora * barra + 3;
+          const y = topo + faixa - h;
+          const ehPico =
+            pico != null && item.hora === pico.hora && item.total > 0;
+          return (
+            <g key={item.hora}>
+              <title>
+                {item.hora}h: {item.total}
+              </title>
+              <rect
+                x={x}
+                y={y}
+                width={barra - 6}
+                height={h}
+                rx={5}
+                className={
+                  ehPico
+                    ? "fill-brand-700"
+                    : item.total > 0
+                      ? "fill-brand-500"
+                      : "fill-slate-100"
+                }
+              />
+              {item.total > 0 && (
+                <text
+                  x={item.hora * barra + barra / 2}
+                  y={y - 5}
+                  textAnchor="middle"
+                  className={ehPico ? "fill-brand-800" : "fill-slate-700"}
+                  fontSize={11}
+                  fontWeight={700}
+                >
+                  {item.total}
+                </text>
+              )}
+              {item.hora % 3 === 0 && (
+                <text
+                  x={item.hora * barra + barra / 2}
+                  y={altura - 8}
+                  textAnchor="middle"
+                  className="fill-slate-500"
+                  fontSize={10}
+                >
+                  {item.hora}h
+                </text>
+              )}
+            </g>
+          );
+        })}
+        </svg>
+      </div>
     </div>
   );
 }

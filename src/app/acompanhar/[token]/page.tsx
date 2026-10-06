@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPerfil } from "@/lib/auth";
 import { CopiarLink } from "@/components/CopiarLink";
+import { ChatChamado } from "@/components/ChatChamado";
 import {
   STATUS_LABEL,
   STATUS_BADGE,
@@ -9,7 +11,9 @@ import {
 } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { VideoAnexo } from "@/components/VideoAnexo";
+import { parseChatChamado, recursoChatAusente } from "@/lib/chamado-chat";
 import { ValidacaoSolicitante } from "./ValidacaoSolicitante";
+import { FecharChamadoTi } from "./FecharChamadoTi";
 import type { Enums } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -44,12 +48,23 @@ export default async function AcompanharToken({
   const { nova, sublocal: sublocalQuery } = await searchParams;
 
   const supabase = await createClient();
-  const [{ data }, sublocalRpc] = await Promise.all([
+  const [{ data }, sublocalRpc, chatRes, perfil] = await Promise.all([
     supabase.rpc("acompanhar_demanda", { p_token: token }),
     supabase.rpc("rotulo_sublocal", { p_token: token }),
+    supabase.rpc("listar_mensagens_chamado", { p_token: token }),
+    getPerfil(),
   ]);
   const d = data as Detalhe | null;
   if (!d || !d.id) notFound();
+  const chat =
+    chatRes.error && recursoChatAusente(chatRes.error.message)
+      ? null
+      : parseChatChamado(chatRes.data);
+  const ehTi = chat?.ambiente === "ti";
+  const voltarHref =
+    perfil?.role === "solicitante" ? "/solicitante?aba=chamados" : "/";
+  const voltarRotulo =
+    perfil?.role === "solicitante" ? "← Meus chamados" : "← Manutenção Vivaz";
 
   const sublocalExibido =
     textoLivre(sublocalRpc.data) ||
@@ -60,8 +75,11 @@ export default async function AcompanharToken({
   return (
     <main className="flex-1 px-4 py-8">
       <div className="mx-auto w-full max-w-lg">
-        <Link href="/" className="text-sm text-slate-400 hover:text-brand-700">
-          ← Manutenção Vivaz
+        <Link
+          href={voltarHref}
+          className="text-sm text-slate-400 hover:text-brand-700"
+        >
+          {voltarRotulo}
         </Link>
 
         {nova && (
@@ -104,8 +122,20 @@ export default async function AcompanharToken({
           </dl>
         </div>
 
-        {d.status === "aguardando_validacao" && (
-          <ValidacaoSolicitante token={token} />
+        {ehTi ? (
+          <>
+            <ChatChamado
+              token={token}
+              demandaId={d.id}
+              lado="solicitante"
+              mensagensIniciais={chat?.mensagens}
+            />
+            <FecharChamadoTi token={token} status={d.status} />
+          </>
+        ) : (
+          d.status === "aguardando_validacao" && (
+            <ValidacaoSolicitante token={token} />
+          )
         )}
 
         {d.anexos.length > 0 && (

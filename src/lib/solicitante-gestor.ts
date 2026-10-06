@@ -20,6 +20,17 @@ export function solicitantesUnicos<T extends { nome: string; propriedade_id: str
   });
 }
 
+export function idsSolicitanteDoNome<T extends { id: string; nome: string }>(
+  lista: T[],
+  nome: string | null | undefined,
+): string[] {
+  const n = nome?.trim().toLowerCase();
+  if (!n) return [];
+  return lista
+    .filter((s) => s.nome.trim().toLowerCase() === n)
+    .map((s) => s.id);
+}
+
 export function idSolicitantePorNome<
   T extends { id: string; nome: string; propriedade_id: string },
 >(lista: T[], nome: string | null | undefined, propriedadeId: string): string {

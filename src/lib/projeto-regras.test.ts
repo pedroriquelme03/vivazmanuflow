@@ -139,7 +139,7 @@ describe("campo projeto no formulário", () => {
     expect(idProjetoParaVincular("obrigatorio", "p-teste")).toBe("p-teste");
   });
 
-  it("público /abrir: opcional, vazio vai para a fila", () => {
+  it("projeto opcional: vazio vai para a fila", () => {
     expect(validarCampoProjeto("opcional", "")).toBeNull();
     expect(idProjetoParaVincular("opcional", "")).toBeNull();
   });

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getPerfil } from "@/lib/auth";
+import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PainelShell } from "@/components/AdminSidebar";
+import { PainelComAmbiente } from "@/components/PainelComAmbiente";
 import { ProjetosApp } from "./ProjetosApp";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjetosPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin/projetos");
-  if (perfil.role !== "admin")
-    redirect(perfil.role === "colaborador" ? "/colaborador" : "/lider");
+  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role));
 
   const supabase = await createClient();
   const [{ data: propriedades }, projetosRes, membrosRes, equipeRes] =
@@ -27,13 +26,13 @@ export default async function ProjetosPage() {
     ]);
 
   return (
-    <PainelShell perfil={perfil}>
+    <PainelComAmbiente perfil={perfil}>
       <ProjetosApp
         projetos={projetosRes.data ?? []}
         propriedades={propriedades ?? []}
         membros={membrosRes.data ?? []}
         equipe={equipeRes.data ?? []}
       />
-    </PainelShell>
+    </PainelComAmbiente>
   );
 }

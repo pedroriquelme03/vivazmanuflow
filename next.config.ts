@@ -6,7 +6,7 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 const raiz = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["10.0.1.55"],
+  allowedDevOrigins: ["10.0.1.75", "10.0.1.55"],
   turbopack: {
     root: raiz,
   },
