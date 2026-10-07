@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  decidirSolicitanteRegistro,
   garantirSolicitantesGestor,
   idSolicitantePorNome,
   idsSolicitanteDoNome,
@@ -75,6 +76,69 @@ function clienteFake(opts: {
     inFn: typeof inFn;
   } & SupabaseClient<Database>;
 }
+
+describe("decidirSolicitanteRegistro", () => {
+  const lista = [
+    { id: "ana", nome: "Ana Paula", propriedade_id: "v" },
+    { id: "jose", nome: "José", propriedade_id: "v" },
+    { id: "gabriel", nome: "Gabriel", propriedade_id: "v" },
+    { id: "ana-outra", nome: "Ana Paula", propriedade_id: "x" },
+  ];
+
+  it("usa a pessoa escolhida na lista", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "ana", "")).toEqual({
+      tipo: "existente",
+      id: "ana",
+    });
+  });
+
+  it("não troca a escolha pelo usuário logado", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "ana", "  ")).toEqual({
+      tipo: "existente",
+      id: "ana",
+    });
+  });
+
+  it("nome digitado de quem já está cadastrado reaproveita o cadastro", () => {
+    expect(
+      decidirSolicitanteRegistro(lista, "v", "gabriel", "jose"),
+    ).toEqual({ tipo: "existente", id: "jose" });
+  });
+
+  it("ignora acento e maiúscula ao achar o cadastro", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "", "JOSE")).toEqual({
+      tipo: "existente",
+      id: "jose",
+    });
+  });
+
+  it("não mistura o mesmo nome de outro local", () => {
+    expect(decidirSolicitanteRegistro(lista, "x", "", "Ana Paula")).toEqual({
+      tipo: "existente",
+      id: "ana-outra",
+    });
+  });
+
+  it("nome que não existe pede criação, sem usar outra pessoa", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "gabriel", "Visitante")).toEqual(
+      { tipo: "criar", nome: "Visitante" },
+    );
+  });
+
+  it("sem lista e sem nome pede para informar", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "", "")).toEqual({
+      tipo: "erro",
+      mensagem: "Escolha quem solicitou ou digite o nome.",
+    });
+  });
+
+  it("id de outro local não vale", () => {
+    expect(decidirSolicitanteRegistro(lista, "v", "ana-outra", "")).toEqual({
+      tipo: "erro",
+      mensagem: "Escolha quem solicitou ou digite o nome.",
+    });
+  });
+});
 
 describe("garantirSolicitantesGestor (integração com cliente mock)", () => {
   const props = [

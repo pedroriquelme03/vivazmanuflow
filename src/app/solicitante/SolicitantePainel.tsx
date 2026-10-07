@@ -84,26 +84,26 @@ export function SolicitantePainel({
 
 function AbaAbrir({ nome }: { nome: string }) {
   return (
-    <>
+    <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col items-center justify-center text-center">
       <h1 className="text-xl font-bold">Olá, {nome}</h1>
       <p className="mt-0.5 text-sm text-slate-500">
         Abra um chamado de TI ou de Manutenção.
       </p>
-      <div className="mt-6 grid gap-3">
+      <div className="mt-6 grid w-full max-w-xs gap-3">
         <Link
           href="/solicitante/abrir?tipo=ti"
-          className="block rounded-2xl bg-brand-600 px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700"
+          className="block rounded-2xl bg-[#1E293B] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#0f172a]"
         >
           Abrir chamado de TI
         </Link>
         <Link
           href="/solicitante/abrir?tipo=manutencao"
-          className="block rounded-2xl border border-slate-300 bg-white px-5 py-4 text-center text-base font-semibold text-slate-800 shadow-sm transition hover:border-brand-400"
+          className="block rounded-2xl bg-[#0891b2] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-[#0e7490]"
         >
           Abrir chamado de Manutenção
         </Link>
       </div>
-    </>
+    </div>
   );
 }
 

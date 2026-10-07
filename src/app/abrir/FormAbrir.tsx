@@ -8,6 +8,7 @@ import { idUnico } from "@/lib/id-unico";
 import { uploadAnexo } from "@/lib/upload-anexo";
 import { EscolherMidia } from "@/components/EscolherMidia";
 import {
+  decidirSolicitanteRegistro,
   garantirSolicitantesGestor,
   idSolicitantePorNome,
   solicitantesUnicos,
@@ -98,12 +99,15 @@ export function FormAbrir({
     idLocalPadrao(propriedades, propriedadePadrao),
   );
   const [solicitanteId, setSolicitanteId] = useState(() =>
-    idSolicitantePorNome(
-      solicitantes,
-      nomeSolicitantePadrao,
-      idLocalPadrao(propriedades, propriedadePadrao),
-    ),
+    destinarConcluido
+      ? ""
+      : idSolicitantePorNome(
+          solicitantes,
+          nomeSolicitantePadrao,
+          idLocalPadrao(propriedades, propriedadePadrao),
+        ),
   );
+  const [nomeDigitado, setNomeDigitado] = useState("");
   const [sublocal, setSublocal] = useState("");
   const [eventoId, setEventoId] = useState("");
   const [projetoId, setProjetoId] = useState(
@@ -145,7 +149,9 @@ export function FormAbrir({
   function trocarPropriedade(id: string) {
     setPropriedadeId(id);
     setSolicitanteId(
-      idSolicitantePorNome(solicitantes, nomeSolicitantePadrao, id),
+      destinarConcluido
+        ? ""
+        : idSolicitantePorNome(solicitantes, nomeSolicitantePadrao, id),
     );
     setSublocal("");
     setEventoId("");
@@ -176,26 +182,62 @@ export function FormAbrir({
     setErro(null);
 
     if (!sublocal.trim()) return setErro("Informe o local.");
-    let quemSolicita = solicitanteTravado
-      ? solicitanteIdLogado
-      : solicitanteId;
-    if (!quemSolicita && nomeSolicitantePadrao?.trim() && propriedadeId) {
-      const nomePedido = nomeSolicitantePadrao.trim();
-      await garantirSolicitantesGestor(supabase, {
-        nome: nomePedido,
+    let quemSolicita = "";
+    if (destinarConcluido) {
+      const decisao = decidirSolicitanteRegistro(
+        solicitantes,
         propriedadeId,
-        propriedades: propriedades.map((p) => ({ id: p.id, ativo: true })),
-      });
-      const { data: lista } = await supabase
-        .from("solicitantes")
-        .select("id, nome, propriedade_id")
-        .eq("propriedade_id", propriedadeId)
-        .eq("ativo", true);
-      quemSolicita = idSolicitantePorNome(
-        lista ?? [],
-        nomePedido,
-        propriedadeId,
+        solicitanteId,
+        nomeDigitado,
       );
+      if (decisao.tipo === "erro") return setErro(decisao.mensagem);
+      if (decisao.tipo === "existente") {
+        quemSolicita = decisao.id;
+      } else {
+        const criou = await garantirSolicitantesGestor(supabase, {
+          nome: decisao.nome,
+          propriedadeId,
+          propriedades: propriedades.map((p) => ({ id: p.id, ativo: true })),
+        });
+        const { data: lista, error: listaErro } = await supabase
+          .from("solicitantes")
+          .select("id, nome, propriedade_id")
+          .eq("propriedade_id", propriedadeId)
+          .eq("ativo", true);
+        if (listaErro) return setErro(listaErro.message);
+        quemSolicita = idSolicitantePorNome(
+          lista ?? [],
+          decisao.nome,
+          propriedadeId,
+        );
+        if (!quemSolicita) {
+          return setErro(
+            criou
+              ? "Nome gravado, mas não deu para vinculá-lo ao chamado. Tente de novo."
+              : "Não foi possível gravar esse nome. Tente de novo.",
+          );
+        }
+      }
+    } else {
+      quemSolicita = solicitanteTravado ? solicitanteIdLogado : solicitanteId;
+      if (!quemSolicita && nomeSolicitantePadrao?.trim() && propriedadeId) {
+        const nomePedido = nomeSolicitantePadrao.trim();
+        await garantirSolicitantesGestor(supabase, {
+          nome: nomePedido,
+          propriedadeId,
+          propriedades: propriedades.map((p) => ({ id: p.id, ativo: true })),
+        });
+        const { data: lista } = await supabase
+          .from("solicitantes")
+          .select("id, nome, propriedade_id")
+          .eq("propriedade_id", propriedadeId)
+          .eq("ativo", true);
+        quemSolicita = idSolicitantePorNome(
+          lista ?? [],
+          nomePedido,
+          propriedadeId,
+        );
+      }
     }
     if (!quemSolicita) {
       return setErro(
@@ -482,19 +524,41 @@ export function FormAbrir({
             )}
           </>
         ) : (
-          <select
-            value={solicitanteId}
-            onChange={(e) => setSolicitanteId(e.target.value)}
-            className={inputCls}
-            required
-          >
-            <option value="">Selecione seu nome…</option>
-            {solicitantesFiltrados.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
+          <>
+            <select
+              value={solicitanteId}
+              onChange={(e) => setSolicitanteId(e.target.value)}
+              className={inputCls}
+              required={!destinarConcluido}
+            >
+              <option value="">
+                {destinarConcluido
+                  ? "Selecione quem solicitou…"
+                  : "Selecione seu nome…"}
               </option>
-            ))}
-          </select>
+              {solicitantesFiltrados.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+            {destinarConcluido && (
+              <>
+                <input
+                  value={nomeDigitado}
+                  onChange={(e) => setNomeDigitado(e.target.value)}
+                  placeholder="Ou digite o nome, se não estiver na lista"
+                  className={`${inputCls} mt-2`}
+                  maxLength={120}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Você continua como responsável. Se o nome já existir no
+                  cadastro, o setor dessa pessoa segue nas métricas. Nome novo
+                  entra sem setor.
+                </p>
+              </>
+            )}
+          </>
         )}
       </Campo>
       )}

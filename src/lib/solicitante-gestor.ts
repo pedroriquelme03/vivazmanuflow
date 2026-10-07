@@ -45,6 +45,55 @@ export function idSolicitantePorNome<
   );
 }
 
+export function normalizarNomeSolicitante(nome: string) {
+  return nome
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export type DecisaoSolicitante =
+  | { tipo: "existente"; id: string }
+  | { tipo: "criar"; nome: string }
+  | { tipo: "erro"; mensagem: string };
+
+/**
+ * Quem pediu o serviço no registro já concluído.
+ * Nome digitado que já existe no local reaproveita o cadastro (e o setor).
+ * Nome novo só cria a pessoa, sem setor. Nunca cai no usuário logado.
+ */
+export function decidirSolicitanteRegistro(
+  lista: { id: string; nome: string; propriedade_id: string }[],
+  propriedadeId: string,
+  selecionadoId: string,
+  nomeDigitado: string,
+): DecisaoSolicitante {
+  const digitado = nomeDigitado.trim();
+  if (digitado) {
+    const alvo = normalizarNomeSolicitante(digitado);
+    const achou = lista.find(
+      (s) =>
+        s.propriedade_id === propriedadeId &&
+        normalizarNomeSolicitante(s.nome) === alvo,
+    );
+    if (achou) return { tipo: "existente", id: achou.id };
+    return { tipo: "criar", nome: digitado };
+  }
+  if (
+    selecionadoId &&
+    lista.some(
+      (s) => s.id === selecionadoId && s.propriedade_id === propriedadeId,
+    )
+  ) {
+    return { tipo: "existente", id: selecionadoId };
+  }
+  return {
+    tipo: "erro",
+    mensagem: "Escolha quem solicitou ou digite o nome.",
+  };
+}
+
 /** Só cria se aquele nome ainda não existe naquele local. */
 export async function garantirSolicitantesGestor(
   supabase: SupabaseClient<Database>,
