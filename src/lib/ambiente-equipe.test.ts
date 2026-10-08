@@ -66,9 +66,15 @@ describe("ambienteEscolhido", () => {
 });
 
 describe("ambientesDoPapel", () => {
-  it("líder não entra no TI mesmo com os dois marcados", () => {
+  it("líder que já está só na manutenção continua só nela", () => {
+    expect(ambientesDoPapel("lider", ["manutencao"])).toEqual(["manutencao"]);
+  });
+
+  it("líder marcado em TI entra no TI", () => {
+    expect(ambientesDoPapel("lider", ["ti"])).toEqual(["ti"]);
     expect(ambientesDoPapel("lider", ["manutencao", "ti"])).toEqual([
       "manutencao",
+      "ti",
     ]);
   });
 

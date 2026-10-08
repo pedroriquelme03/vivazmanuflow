@@ -371,6 +371,7 @@ function ModalEditarEquipe({
     ambientesAtuais.includes("manutencao"),
   );
   const [ti, setTi] = useState(ambientesAtuais.includes("ti"));
+  const [role, setRole] = useState(usuario.role);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState(false);
@@ -389,12 +390,11 @@ function ModalEditarEquipe({
       ativo,
       propriedadeId: propId,
       userId: usuario.id,
+      role,
       ambientes:
-        usuario.role === "lider"
-          ? (["manutencao"] as const)
-          : usuario.role === "solicitante"
-            ? (["manutencao", "ti"] as const)
-            : ambientesMarcados(manutencao, ti),
+        role === "solicitante"
+          ? (["manutencao", "ti"] as const)
+          : ambientesMarcados(manutencao, ti),
     };
     const falha = validarEdicaoEquipe(dados);
     if (falha) return setErro(falha);
@@ -405,6 +405,14 @@ function ModalEditarEquipe({
     );
     if (error) {
       setSalvando(false);
+      if (
+        error.message.includes("schema cache") ||
+        error.message.includes("Could not find")
+      ) {
+        return setErro(
+          "Rode o SQL admin_atualizar_usuario no Supabase e tente de novo.",
+        );
+      }
       return setErro(error.message);
     }
     const { error: erroAmbiente } = await supabase.rpc(
@@ -486,12 +494,26 @@ function ModalEditarEquipe({
             />
           </CampoModal>
           <CampoModal rotulo="Papel">
-            <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-              {ROLE_LABEL[usuario.role]}
-            </p>
+            <select
+              className={inputCls}
+              value={role}
+              onChange={(e) => {
+                const proximo = e.target.value as Enums<"user_role">;
+                setRole(proximo);
+                if (proximo === "solicitante") {
+                  setManutencao(true);
+                  setTi(true);
+                }
+              }}
+            >
+              <option value="colaborador">Colaborador</option>
+              <option value="solicitante">Solicitante</option>
+              <option value="lider">Líder</option>
+              <option value="admin">Administrador</option>
+            </select>
           </CampoModal>
           <CampoModal rotulo="Ambientes">
-            {usuario.role === "solicitante" ? (
+            {role === "solicitante" ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                 Solicitante abre chamado de TI e de Manutenção.
               </p>
@@ -501,7 +523,6 @@ function ModalEditarEquipe({
                 ti={ti}
                 onManutencao={setManutencao}
                 onTi={setTi}
-                soManutencao={usuario.role === "lider"}
               />
             )}
           </CampoModal>
@@ -1655,11 +1676,9 @@ function Equipe({
     setOk(null);
     setConviteHref(null);
     const ambientes =
-      role === "lider"
-        ? (["manutencao"] as const)
-        : role === "solicitante"
-          ? (["manutencao", "ti"] as const)
-          : ambientesMarcados(manutencao, ti);
+      role === "solicitante"
+        ? (["manutencao", "ti"] as const)
+        : ambientesMarcados(manutencao, ti);
     if (ambientes.length === 0) {
       return setErro("Marque Manutenção, TI ou os dois.");
     }
@@ -1752,7 +1771,6 @@ function Equipe({
           onChange={(e) => {
             const proximo = e.target.value as Enums<"user_role">;
             setRole(proximo);
-            if (proximo === "lider") setTi(false);
             if (proximo === "solicitante") {
               setManutencao(true);
               setTi(true);
@@ -1774,7 +1792,6 @@ function Equipe({
             ti={ti}
             onManutencao={setManutencao}
             onTi={setTi}
-            soManutencao={role === "lider"}
           />
         )}
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>

@@ -1,6 +1,7 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import { useEffect, type ChangeEvent } from "react";
+import { imagensDoClipboard } from "@/lib/colar-imagem";
 
 type Props = {
   accept?: string;
@@ -51,6 +52,17 @@ export function EscolherMidia({
 
   const incluiVideo = accept.includes("video");
 
+  useEffect(() => {
+    function aoColar(e: ClipboardEvent) {
+      const imagens = imagensDoClipboard(e.clipboardData);
+      if (imagens.length === 0) return;
+      e.preventDefault();
+      onEscolheu(imagens);
+    }
+    document.addEventListener("paste", aoColar);
+    return () => document.removeEventListener("paste", aoColar);
+  }, [onEscolheu]);
+
   return (
     <div className="grid gap-2">
       <div className="grid grid-cols-2 gap-2">
@@ -87,6 +99,7 @@ export function EscolherMidia({
           </label>
         ) : null}
       </div>
+      <p className="text-center text-xs text-slate-400">Ctrl+V cola a print.</p>
       {arquivoNome ? (
         <p className="truncate text-center text-xs text-slate-500">
           📸 {arquivoNome}

@@ -49,11 +49,10 @@ export function ambienteEscolhido(
   return ambientes.includes("manutencao") ? "manutencao" : ambientes[0];
 }
 
-/** Líder opera só a Manutenção. Admin e colaborador seguem o que está marcado. */
+/** Líder, admin e colaborador seguem o que está marcado. Solicitante não usa esta lista. */
 export function ambientesDoPapel(
-  role: string | null | undefined,
+  _role: string | null | undefined,
   valor: readonly string[] | null | undefined,
 ): AmbienteEquipe[] {
-  if (role === "lider") return ["manutencao"];
   return listaAmbientes(valor);
 }

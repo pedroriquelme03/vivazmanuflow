@@ -10,6 +10,7 @@ export type DadosEdicaoEquipe = {
   ativo: boolean;
   propriedadeId: string;
   userId: string;
+  role: "admin" | "lider" | "colaborador" | "solicitante";
   ambientes: readonly AmbienteEquipe[];
 };
 
@@ -60,6 +61,7 @@ export function payloadAtualizarUsuario(d: DadosEdicaoEquipe) {
     p_ativo: d.ativo,
     p_propriedade_id: d.propriedadeId || null,
     p_senha: d.senha.trim() ? d.senha.trim() : undefined,
+    p_role: d.role,
   };
 }
 

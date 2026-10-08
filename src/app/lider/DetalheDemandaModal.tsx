@@ -23,7 +23,11 @@ import {
 import { PrioridadeTag } from "@/components/PrioridadeTag";
 import { VideoAnexo } from "@/components/VideoAnexo";
 import { ChatChamado } from "@/components/ChatChamado";
+import { EscolherMidia } from "@/components/EscolherMidia";
 import { equipePodeMandarMensagem } from "@/lib/chamado-chat";
+import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { idUnico } from "@/lib/id-unico";
+import { uploadAnexo } from "@/lib/upload-anexo";
 import type { Enums } from "@/lib/database.types";
 
 type HistoricoItem = {
@@ -74,6 +78,7 @@ export function DetalheDemandaModal({
   const [msgDevolucao, setMsgDevolucao] = useState("");
   const [confirmandoDevolver, setConfirmandoDevolver] = useState(false);
   const [msgConclusao, setMsgConclusao] = useState("");
+  const [printsConclusao, setPrintsConclusao] = useState<File[]>([]);
   const [confirmandoConcluir, setConfirmandoConcluir] = useState(false);
 
   const arquivado = Boolean(demanda.arquivado);
@@ -179,23 +184,51 @@ export function DetalheDemandaModal({
     onFechar();
   }
 
+  async function enviarPrintConclusao(arquivoOrigem: File) {
+    const arquivo = await comprimirImagem(arquivoOrigem);
+    const caminho = `conclusao/${idUnico()}.jpg`;
+    const tipo = arquivo.type && arquivo.type !== "" ? arquivo.type : "image/jpeg";
+    const { error: upErro } = await uploadAnexo(supabase, caminho, arquivo, tipo);
+    if (upErro) throw new Error(upErro.message);
+    const url = supabase.storage.from("anexos").getPublicUrl(caminho).data.publicUrl;
+    const { error: anxErro } = await supabase.from("demanda_anexos").insert({
+      demanda_id: demanda.id,
+      tipo: "foto",
+      url,
+      enviado_por: "colaborador",
+    });
+    if (anxErro) throw new Error(anxErro.message);
+  }
+
   async function concluirComoAdmin() {
     setErro(null);
     setOcupado(true);
-    const erroConc = await concluirDemandaAdmin(
-      supabase,
-      demanda.id,
-      msgConclusao,
-      demanda.status,
-      arquivado,
-    );
-    setOcupado(false);
-    if (erroConc) {
-      setErro(erroConc);
-      return;
+    try {
+      for (const arquivo of printsConclusao) {
+        await enviarPrintConclusao(arquivo);
+      }
+      const erroConc = await concluirDemandaAdmin(
+        supabase,
+        demanda.id,
+        msgConclusao,
+        demanda.status,
+        arquivado,
+      );
+      if (erroConc) {
+        setErro(erroConc);
+        setOcupado(false);
+        return;
+      }
+      onAtualizou();
+      onFechar();
+    } catch (err) {
+      setErro(
+        err instanceof Error && err.message
+          ? `Não deu para enviar a print: ${err.message}`
+          : "Não deu para enviar a print.",
+      );
+      setOcupado(false);
     }
-    onAtualizou();
-    onFechar();
   }
 
   async function devolverParaAndamento() {
@@ -583,6 +616,45 @@ export function DetalheDemandaModal({
                     }
                     className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
                   />
+                  <EscolherMidia
+                    multiple
+                    arquivoNome={
+                      printsConclusao.length > 0
+                        ? `${printsConclusao.length} print(s)`
+                        : null
+                    }
+                    onEscolheu={(files) =>
+                      setPrintsConclusao((atual) =>
+                        [...atual, ...files].slice(0, 5),
+                      )
+                    }
+                  />
+                  {printsConclusao.length > 0 && (
+                    <ul className="grid gap-1.5">
+                      {printsConclusao.map((arquivo, i) => (
+                        <li
+                          key={`${arquivo.name}-${i}-${arquivo.size}`}
+                          className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
+                        >
+                          <span className="truncate">
+                            {arquivo.name?.trim() || `Print ${i + 1}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPrintsConclusao((atual) =>
+                                atual.filter((_, idx) => idx !== i),
+                              )
+                            }
+                            className="ml-2 shrink-0 text-slate-400 hover:text-red-600"
+                            aria-label="Remover"
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <button
                     type="button"
                     onClick={concluirComoAdmin}

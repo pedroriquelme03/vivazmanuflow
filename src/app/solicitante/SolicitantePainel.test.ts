@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { chamadosDoAmbiente, type ChamadoSolicitante } from "./SolicitantePainel";
+import { chamadosDoAmbiente, chamadosVisiveis, type ChamadoSolicitante } from "./SolicitantePainel";
 
 function item(
   id: string,
   ambiente: ChamadoSolicitante["ambiente"],
+  status: ChamadoSolicitante["status"] = "aberta",
 ): ChamadoSolicitante {
   return {
     id,
     titulo: id,
-    status: "aberta",
+    status,
     prioridade: "media",
     criado_em: "2026-10-06T12:00:00Z",
     ambiente,
@@ -31,6 +32,28 @@ describe("chamadosDoAmbiente", () => {
     expect(chamadosDoAmbiente(lista, "manutencao").map((c) => c.id)).toEqual([
       "man1",
       "legado",
+    ]);
+  });
+});
+
+describe("chamadosVisiveis", () => {
+  const lista = [
+    item("aberto", "ti", "aberta"),
+    item("feito", "ti", "concluida"),
+    item("cancelado", "ti", "cancelada"),
+    item("manutencao", "manutencao", "concluida"),
+  ];
+
+  it("em aberto esconde concluído e cancelado", () => {
+    expect(chamadosVisiveis(lista, "ti", false).map((c) => c.id)).toEqual([
+      "aberto",
+    ]);
+  });
+
+  it("histórico mostra só o que já fechou naquele ambiente", () => {
+    expect(chamadosVisiveis(lista, "ti", true).map((c) => c.id)).toEqual([
+      "feito",
+      "cancelado",
     ]);
   });
 });

@@ -18,6 +18,7 @@ const base = {
   senha2: "",
   ativo: true,
   propriedadeId: "prop-1",
+  role: "colaborador",
   ambientes: ["manutencao"] as const,
 };
 
@@ -74,6 +75,7 @@ describe("payloadAtualizarUsuario", () => {
       p_ativo: true,
       p_propriedade_id: "prop-1",
       p_senha: undefined,
+      p_role: "colaborador",
     });
   });
 
@@ -103,7 +105,13 @@ describe("ambientes", () => {
     expect(rotuloAmbientes(undefined)).toBe("Manutenção");
   });
 
-  it("envia os ambientes no payload", () => {
+  it("envia o papel escolhido", () => {
+    expect(payloadAtualizarUsuario({ ...base, role: "admin" }).p_role).toBe(
+      "admin",
+    );
+  });
+
+  it("administrador só de TI vai no payload de ambientes", () => {
     expect(
       payloadDefinirAmbientes({ ...base, ambientes: ["ti"] }),
     ).toEqual({ p_user_id: "u1", p_ambientes: ["ti"] });

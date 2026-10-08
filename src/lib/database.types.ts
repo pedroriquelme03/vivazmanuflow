@@ -978,6 +978,7 @@ export type Database = {
           p_ativo: boolean
           p_propriedade_id?: string | null
           p_senha?: string | null
+          p_role?: Database["public"]["Enums"]["user_role"]
         }
         Returns: undefined
       }
