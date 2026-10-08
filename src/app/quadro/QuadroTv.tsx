@@ -96,7 +96,7 @@ export function QuadroTv() {
       );
       return;
     }
-    const next = comoDemandas(data);
+    const next = comoDemandas(data).filter((d) => d.ambiente !== "ti");
     setErro(null);
     setAoVivo(true);
 
