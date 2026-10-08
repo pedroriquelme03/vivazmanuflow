@@ -18,6 +18,9 @@ export default async function LiderHome() {
 
   const supabase = await createClient();
   const ambiente = await resolverAmbiente(perfil.ambientes, perfil.role);
+  if (ambiente === "manutencao") {
+    await supabase.rpc("abrir_preventivas_vencidas");
+  }
   const [
     demandas,
     colaboradores,

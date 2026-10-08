@@ -153,6 +153,7 @@ export type Database = {
           afeta_experiencia: boolean
           evento_id: string | null
           projeto_id: string | null
+          preventiva_id: string | null
           arquivado: boolean
           sublocal: string | null
           mensagem_devolucao: string | null
@@ -180,6 +181,7 @@ export type Database = {
           afeta_experiencia?: boolean
           evento_id?: string | null
           projeto_id?: string | null
+          preventiva_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -207,6 +209,7 @@ export type Database = {
           afeta_experiencia?: boolean
           evento_id?: string | null
           projeto_id?: string | null
+          preventiva_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -384,6 +387,82 @@ export type Database = {
             columns: ["propriedade_id"]
             isOneToOne: false
             referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preventiva_locais: {
+        Row: {
+          id: string
+          nome: string
+          propriedade_id: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          propriedade_id: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          propriedade_id?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preventiva_locais_propriedade_id_fkey"
+            columns: ["propriedade_id"]
+            isOneToOne: false
+            referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preventivas: {
+        Row: {
+          id: string
+          local_id: string
+          titulo: string
+          descricao: string | null
+          intervalo_quantidade: number
+          intervalo_unidade: string
+          proxima_abertura: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          local_id: string
+          titulo: string
+          descricao?: string | null
+          intervalo_quantidade?: number
+          intervalo_unidade?: string
+          proxima_abertura: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          local_id?: string
+          titulo?: string
+          descricao?: string | null
+          intervalo_quantidade?: number
+          intervalo_unidade?: string
+          proxima_abertura?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preventivas_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "preventiva_locais"
             referencedColumns: ["id"]
           },
         ]
@@ -816,6 +895,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      abrir_preventivas_vencidas: {
+        Args: Record<string, never>
+        Returns: number
+      }
       abrir_demanda: {
         Args: {
           p_anexos?: Json

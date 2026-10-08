@@ -85,11 +85,27 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/lider/preventivas",
+    rotulo: "Preventivas",
+    soManutencao: true,
+    match: (p) => p.startsWith("/lider/preventivas"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <rect x="3" y="4" width="7" height="7" rx="1.5" />
+        <rect x="14" y="4" width="7" height="7" rx="1.5" />
+        <rect x="3" y="15" width="7" height="6" rx="1.5" />
+        <rect x="14" y="15" width="7" height="6" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/lider",
     rotulo: "Quadro",
     match: (p) =>
       p === "/lider" ||
-      (p.startsWith("/lider/") && !p.startsWith("/lider/metricas")),
+      (p.startsWith("/lider/") &&
+        !p.startsWith("/lider/metricas") &&
+        !p.startsWith("/lider/preventivas")),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
         <rect x="3" y="4" width="7" height="16" rx="1.5" />
@@ -130,7 +146,8 @@ export function AdminSidebar({
     if (
       pathname.startsWith("/admin/projetos") ||
       pathname.startsWith("/admin/eventos") ||
-      pathname.startsWith("/admin/areas")
+      pathname.startsWith("/admin/areas") ||
+      pathname.startsWith("/lider/preventivas")
     ) {
       router.replace("/lider");
     }
