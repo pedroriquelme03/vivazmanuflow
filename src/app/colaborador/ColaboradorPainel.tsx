@@ -800,15 +800,16 @@ function CardColab({
 
   async function enviarFotoColaborador(pasta: string, arquivoOrigem: File) {
     const arquivo = await comprimirImagem(arquivoOrigem);
-    const caminho = `${pasta}/${idUnico()}.jpg`;
-    const tipo = arquivo.type && arquivo.type !== "" ? arquivo.type : "image/jpeg";
+    const video = arquivo.type.startsWith("video/");
+    const caminho = `${pasta}/${idUnico()}.${video ? "mp4" : "jpg"}`;
+    const tipo = video ? arquivo.type || "video/mp4" : "image/jpeg";
     const { error: upErro } = await uploadAnexo(supabase, caminho, arquivo, tipo);
     if (upErro) throw new Error(upErro.message);
 
     const url = supabase.storage.from("anexos").getPublicUrl(caminho).data.publicUrl;
     const { error: anxErro } = await supabase.from("demanda_anexos").insert({
       demanda_id: demanda.id,
-      tipo: "foto",
+      tipo: video ? "video" : "foto",
       url,
       enviado_por: "colaborador",
     });
@@ -816,7 +817,8 @@ function CardColab({
   }
 
   async function concluir() {
-    if (fotosConclusao.length === 0) {
+    const temFoto = fotosConclusao.some((a) => !a.type.startsWith("video/"));
+    if (!temFoto) {
       setErro("Envie pelo menos uma foto do serviço concluído.");
       return;
     }
@@ -1020,9 +1022,10 @@ function CardColab({
             <div className="grid gap-3">
               <EscolherMidia
                 multiple
+                accept="image/*,video/*"
                 arquivoNome={
                   fotosConclusao.length > 0
-                    ? `${fotosConclusao.length} foto(s)`
+                    ? `${fotosConclusao.length} arquivo(s)`
                     : null
                 }
                 onEscolheu={(files) => {
@@ -1059,7 +1062,7 @@ function CardColab({
                 </ul>
               )}
               <p className="text-center text-xs text-slate-400">
-                Até 5 fotos. Pode tirar de novo ou pegar da galeria.
+                Pelo menos uma foto. O vídeo é opcional. Até 5 arquivos.
               </p>
               <div className="grid gap-1.5">
                 <label className="text-sm font-medium text-slate-700">
