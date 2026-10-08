@@ -620,6 +620,7 @@ export function KanbanLider({
           ambiente={ambiente}
           eu={eu}
           slaHoras={slaHoras}
+          solicitantes={opcoesNovaDemanda.solicitantes}
           onFechar={() => setDetalhe(null)}
           onAtribuir={() => {
             setEditando(detalhe);

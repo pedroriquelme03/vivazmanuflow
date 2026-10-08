@@ -7,6 +7,7 @@ import type { DemandaKanban } from "@/lib/demanda-select";
 import {
   STATUS_BADGE,
   STATUS_LABEL,
+  PRIORIDADE_LABEL,
   formatarData,
   calcularUrgencia,
   PRAZO_COR,
@@ -28,6 +29,7 @@ import { equipePodeMandarMensagem } from "@/lib/chamado-chat";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
 import { uploadAnexo } from "@/lib/upload-anexo";
+import { solicitantesUnicos } from "@/lib/solicitante-gestor";
 import type { Enums } from "@/lib/database.types";
 
 type HistoricoItem = {
@@ -53,6 +55,7 @@ export function DetalheDemandaModal({
   ambiente = "manutencao",
   eu,
   slaHoras = {},
+  solicitantes = [],
   onFechar,
   onAtribuir,
   onAtualizou,
@@ -63,6 +66,7 @@ export function DetalheDemandaModal({
   ambiente?: "manutencao" | "ti";
   eu?: { id: string; nome: string };
   slaHoras?: Record<string, number>;
+  solicitantes?: { id: string; nome: string; propriedade_id: string }[];
   onFechar: () => void;
   onAtribuir: () => void;
   onAtualizou: (fechar?: boolean) => void;
@@ -80,6 +84,18 @@ export function DetalheDemandaModal({
   const [msgConclusao, setMsgConclusao] = useState("");
   const [printsConclusao, setPrintsConclusao] = useState<File[]>([]);
   const [confirmandoConcluir, setConfirmandoConcluir] = useState(false);
+  const [editandoConteudo, setEditandoConteudo] = useState(false);
+  const [tituloEdit, setTituloEdit] = useState(demanda.titulo);
+  const [descricaoEdit, setDescricaoEdit] = useState(demanda.descricao ?? "");
+  const [sublocalEdit, setSublocalEdit] = useState(demanda.sublocal ?? "");
+  const [solicitanteEdit, setSolicitanteEdit] = useState(demanda.solicitante_id);
+  const [prioridadeEdit, setPrioridadeEdit] = useState(demanda.prioridade);
+  const [afetaEdit, setAfetaEdit] = useState(demanda.afeta_experiencia);
+  const [ambienteEdit, setAmbienteEdit] = useState<"manutencao" | "ti">(
+    demanda.ambiente === "ti" || demanda.ambiente === "manutencao"
+      ? demanda.ambiente
+      : ambiente,
+  );
 
   const arquivado = Boolean(demanda.arquivado);
   const podeAtribuir =
@@ -129,6 +145,31 @@ export function DetalheDemandaModal({
       ativo = false;
     };
   }, [demanda.id, supabase]);
+
+  useEffect(() => {
+    if (editandoConteudo) return;
+    setTituloEdit(demanda.titulo);
+    setDescricaoEdit(demanda.descricao ?? "");
+    setSublocalEdit(demanda.sublocal ?? "");
+    setSolicitanteEdit(demanda.solicitante_id);
+    setPrioridadeEdit(demanda.prioridade);
+    setAfetaEdit(demanda.afeta_experiencia);
+    setAmbienteEdit(
+      demanda.ambiente === "ti" || demanda.ambiente === "manutencao"
+        ? demanda.ambiente
+        : ambiente,
+    );
+  }, [
+    editandoConteudo,
+    ambiente,
+    demanda.titulo,
+    demanda.descricao,
+    demanda.sublocal,
+    demanda.solicitante_id,
+    demanda.prioridade,
+    demanda.afeta_experiencia,
+    demanda.ambiente,
+  ]);
 
   async function atribuirAMim() {
     if (!eu) return;
@@ -261,6 +302,54 @@ export function DetalheDemandaModal({
     onAtualizou();
   }
 
+  async function salvarConteudo() {
+    const titulo = tituloEdit.trim();
+    if (!titulo) {
+      setErro("Escreva o título do chamado.");
+      return;
+    }
+    if (!solicitanteEdit) {
+      setErro("Escolha quem solicitou.");
+      return;
+    }
+    setOcupado(true);
+    setErro(null);
+    const descricao = descricaoEdit.trim();
+    const sublocal = sublocalEdit.trim();
+    const { error } = await supabase
+      .from("demandas")
+      .update({
+        titulo,
+        descricao: descricao || null,
+        sublocal: sublocal || null,
+        solicitante_id: solicitanteEdit,
+        prioridade: prioridadeEdit,
+        afeta_experiencia: afetaEdit,
+        ambiente: ambienteEdit,
+      })
+      .eq("id", demanda.id);
+    if (error) {
+      setOcupado(false);
+      setErro(error.message);
+      return;
+    }
+    await supabase.from("demanda_historico").insert({
+      demanda_id: demanda.id,
+      status_anterior: demanda.status,
+      status_novo: demanda.status,
+      observacao: "Administrador alterou o chamado",
+    });
+    setOcupado(false);
+    onAtualizou();
+  }
+
+  const opcoesSolicitante = solicitantesUnicos(
+    solicitantes.filter((s) => s.propriedade_id === demanda.propriedade_id),
+  ).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const solicitanteAtualNaLista = opcoesSolicitante.some(
+    (s) => s.id === demanda.solicitante_id,
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4"
@@ -315,7 +404,7 @@ export function DetalheDemandaModal({
             )}
           </div>
 
-          {demanda.afeta_experiencia && (
+          {demanda.afeta_experiencia && !editandoConteudo && (
             <p className="mt-2 text-xs font-semibold text-red-600">
               Afeta a experiência do hóspede
             </p>
@@ -333,7 +422,154 @@ export function DetalheDemandaModal({
             </p>
           )}
 
-          {demanda.descricao && (
+          {ehAdmin && !editandoConteudo && (
+            <button
+              type="button"
+              onClick={() => setEditandoConteudo(true)}
+              className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Editar chamado
+            </button>
+          )}
+
+          {editandoConteudo && (
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void salvarConteudo();
+              }}
+            >
+              <label className="block text-xs font-medium text-slate-600">
+                Título
+                <input
+                  value={tituloEdit}
+                  onChange={(e) => setTituloEdit(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                  required
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                Descrição
+                <textarea
+                  value={descricaoEdit}
+                  onChange={(e) => setDescricaoEdit(e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                Local
+                <input
+                  value={sublocalEdit}
+                  onChange={(e) => setSublocalEdit(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                Quem solicitou
+                <select
+                  value={solicitanteEdit}
+                  onChange={(e) => setSolicitanteEdit(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                >
+                  {!solicitanteAtualNaLista && demanda.solicitante_id && (
+                    <option value={demanda.solicitante_id}>
+                      {demanda.solicitante?.nome ?? "Solicitante atual"}
+                    </option>
+                  )}
+                  {opcoesSolicitante.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                Prioridade
+                <select
+                  value={prioridadeEdit}
+                  onChange={(e) =>
+                    setPrioridadeEdit(
+                      e.target.value as Enums<"demanda_prioridade">,
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                >
+                  {(
+                    Object.keys(PRIORIDADE_LABEL) as Enums<"demanda_prioridade">[]
+                  ).map((p) => (
+                    <option key={p} value={p}>
+                      {PRIORIDADE_LABEL[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={afetaEdit}
+                  onChange={(e) => setAfetaEdit(e.target.checked)}
+                />
+                Afeta a experiência do hóspede
+              </label>
+              <label className="block text-xs font-medium text-slate-600">
+                Quadro
+                <select
+                  value={ambienteEdit}
+                  onChange={(e) =>
+                    setAmbienteEdit(e.target.value as "manutencao" | "ti")
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                >
+                  <option value="manutencao">Manutenção</option>
+                  <option value="ti">TI</option>
+                </select>
+                <span className="mt-1 block font-normal text-slate-500">
+                  Depois de salvar, o chamado fica nesse quadro.
+                </span>
+              </label>
+              {erro && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {erro}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={ocupado}
+                  className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                >
+                  {ocupado ? "Salvando…" : "Salvar"}
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => {
+                    setTituloEdit(demanda.titulo);
+                    setDescricaoEdit(demanda.descricao ?? "");
+                    setSublocalEdit(demanda.sublocal ?? "");
+                    setSolicitanteEdit(demanda.solicitante_id);
+                    setPrioridadeEdit(demanda.prioridade);
+                    setAfetaEdit(demanda.afeta_experiencia);
+                    setAmbienteEdit(
+                      demanda.ambiente === "ti" ||
+                        demanda.ambiente === "manutencao"
+                        ? demanda.ambiente
+                        : ambiente,
+                    );
+                    setEditandoConteudo(false);
+                    setErro(null);
+                  }}
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!editandoConteudo && demanda.descricao && (
             <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
               {demanda.descricao}
             </p>
@@ -351,7 +587,9 @@ export function DetalheDemandaModal({
           )}
 
           <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-            <Info rotulo="Solicitante" valor={demanda.solicitante?.nome} />
+            {!editandoConteudo && (
+              <Info rotulo="Solicitante" valor={demanda.solicitante?.nome} />
+            )}
             <Info
               rotulo="Colaborador"
               valor={demanda.colaborador?.nome ?? "Sem responsável"}

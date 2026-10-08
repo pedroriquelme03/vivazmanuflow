@@ -6,6 +6,7 @@ export const DEMANDA_SELECT = `
   iniciado_em, concluido_em, prazo_confirmado, colaborador_id,
   propriedade_id, motivo_nao_conclusao, peso, afeta_experiencia,
   evento_id, projeto_id, arquivado, token_acompanhamento, sublocal,
+  solicitante_id,
   solicitante:solicitantes(nome),
   local:locais(nome),
   propriedade:propriedades(nome),
@@ -38,6 +39,9 @@ export type DemandaKanban = {
   arquivado: boolean;
   token_acompanhamento: string;
   sublocal: string | null;
+  solicitante_id: string;
+  /** Presente quando a coluna de quadro já existe no banco. */
+  ambiente?: "manutencao" | "ti" | null;
   solicitante: Rel;
   local: Rel;
   propriedade: Rel;

@@ -18,7 +18,7 @@ const base = {
   senha2: "",
   ativo: true,
   propriedadeId: "prop-1",
-  role: "colaborador",
+  role: "colaborador" as const,
   ambientes: ["manutencao"] as const,
 };
 
@@ -60,7 +60,7 @@ describe("validarEdicaoEquipe", () => {
   });
 
   it("exige Manutenção, TI ou os dois", () => {
-    expect(validarEdicaoEquipe({ ...base, ambientes: [] })).toBe(
+    expect(validarEdicaoEquipe({ ...base, ambientes: [] as const })).toBe(
       "Marque Manutenção, TI ou os dois.",
     );
   });
@@ -106,14 +106,14 @@ describe("ambientes", () => {
   });
 
   it("envia o papel escolhido", () => {
-    expect(payloadAtualizarUsuario({ ...base, role: "admin" }).p_role).toBe(
+    expect(payloadAtualizarUsuario({ ...base, role: "admin" as const }).p_role).toBe(
       "admin",
     );
   });
 
   it("administrador só de TI vai no payload de ambientes", () => {
     expect(
-      payloadDefinirAmbientes({ ...base, ambientes: ["ti"] }),
+      payloadDefinirAmbientes({ ...base, ambientes: ["ti"] as const }),
     ).toEqual({ p_user_id: "u1", p_ambientes: ["ti"] });
   });
 });
