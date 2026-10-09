@@ -154,6 +154,7 @@ export type Database = {
           evento_id: string | null
           projeto_id: string | null
           preventiva_id: string | null
+          sistema_id: string | null
           arquivado: boolean
           sublocal: string | null
           mensagem_devolucao: string | null
@@ -182,6 +183,7 @@ export type Database = {
           evento_id?: string | null
           projeto_id?: string | null
           preventiva_id?: string | null
+          sistema_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -210,6 +212,7 @@ export type Database = {
           evento_id?: string | null
           projeto_id?: string | null
           preventiva_id?: string | null
+          sistema_id?: string | null
           arquivado?: boolean
           sublocal?: string | null
           mensagem_devolucao?: string | null
@@ -256,6 +259,13 @@ export type Database = {
             columns: ["solicitante_id"]
             isOneToOne: false
             referencedRelation: "solicitantes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demandas_sistema_id_fkey"
+            columns: ["sistema_id"]
+            isOneToOne: false
+            referencedRelation: "sistemas"
             referencedColumns: ["id"]
           },
         ]
@@ -390,6 +400,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sistemas: {
+        Row: {
+          id: string
+          nome: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
       }
       preventiva_locais: {
         Row: {
@@ -933,6 +964,14 @@ export type Database = {
         Args: { p_token: string; p_sublocal: string }
         Returns: undefined
       }
+      definir_sistema_demanda: {
+        Args: { p_token: string; p_sistema_id: string | null }
+        Returns: undefined
+      }
+      rotulo_sistema: {
+        Args: { p_token: string }
+        Returns: string
+      }
       vincular_evento_demanda: {
         Args: { p_token: string; p_evento_id: string }
         Returns: undefined
@@ -1004,6 +1043,7 @@ export type Database = {
           p_ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
           p_anexos?: Json
           p_observacao?: string
+          p_sistema_id?: string
         }
         Returns: {
           demanda_id: string

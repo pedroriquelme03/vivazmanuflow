@@ -53,6 +53,8 @@ function textoDemanda(d: DemandaKanban) {
       d.colaborador?.nome,
       d.projeto?.nome,
       d.evento?.nome,
+      d.sistema?.nome,
+      d.sublocal,
     ]
       .filter(Boolean)
       .join(" "),
@@ -135,6 +137,7 @@ export function KanbanLider({
   ehGestor = false,
   membrosPorProjeto = {},
   equipeAtribuir = [],
+  sistemas = [],
 }: {
   ambiente: AmbienteEquipe;
   demandasIniciais: DemandaKanban[];
@@ -147,6 +150,7 @@ export function KanbanLider({
   ehGestor?: boolean;
   membrosPorProjeto?: Record<string, string[]>;
   equipeAtribuir?: Colaborador[];
+  sistemas?: { id: string; nome: string }[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [demandas, setDemandas] = useState<DemandaKanban[]>(demandasIniciais);
@@ -165,6 +169,7 @@ export function KanbanLider({
   const [busca, setBusca] = useState("");
   const [colaboradorFiltro, setColaboradorFiltro] = useState("");
   const [prioridadeFiltro, setPrioridadeFiltro] = useState<"" | Prioridade>("");
+  const [sistemaFiltro, setSistemaFiltro] = useState("");
   const [verArquivado, setVerArquivado] = useState(false);
   const [visao, setVisao] = useState<"fila" | "projetos">("fila");
   const [projetoFiltro, setProjetoFiltro] = useState("");
@@ -215,12 +220,17 @@ export function KanbanLider({
 
   const buscaNorm = normalizar(busca.trim());
   const temBusca = buscaNorm.length > 0;
-  const temFiltro = temBusca || Boolean(colaboradorFiltro) || Boolean(prioridadeFiltro);
+  const temFiltro =
+    temBusca ||
+    Boolean(colaboradorFiltro) ||
+    Boolean(prioridadeFiltro) ||
+    Boolean(sistemaFiltro);
 
   const demandasFiltradas = useMemo(() => {
     const base = demandas.filter((d) => {
       if (colaboradorFiltro && d.colaborador_id !== colaboradorFiltro) return false;
       if (prioridadeFiltro && d.prioridade !== prioridadeFiltro) return false;
+      if (sistemaFiltro && d.sistema_id !== sistemaFiltro) return false;
       if (temBusca && !textoDemanda(d).includes(buscaNorm)) return false;
       return true;
     });
@@ -232,6 +242,7 @@ export function KanbanLider({
     temBusca,
     colaboradorFiltro,
     prioridadeFiltro,
+    sistemaFiltro,
     ehGestor,
     visao,
     projetoFiltro,
@@ -429,6 +440,20 @@ export function KanbanLider({
                 </option>
               ))}
             </select>
+            {ambiente === "ti" && (
+              <select
+                value={sistemaFiltro}
+                onChange={(e) => setSistemaFiltro(e.target.value)}
+                className={`min-w-0 w-full sm:w-auto ${filtroCls}`}
+              >
+                <option value="">Todos os sistemas</option>
+                {sistemas.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+            )}
             {ehGestor && visao === "projetos" && (
               <select
                 value={projetoFiltro}
@@ -453,6 +478,7 @@ export function KanbanLider({
                   setBusca("");
                   setColaboradorFiltro("");
                   setPrioridadeFiltro("");
+                  setSistemaFiltro("");
                 }}
                 className="col-span-2 py-1 text-center text-xs font-semibold text-slate-500 hover:text-slate-800 sm:col-span-1 sm:text-left"
               >
@@ -621,6 +647,7 @@ export function KanbanLider({
           eu={eu}
           slaHoras={slaHoras}
           solicitantes={opcoesNovaDemanda.solicitantes}
+          sistemas={opcoesNovaDemanda.sistemas ?? []}
           onFechar={() => setDetalhe(null)}
           onAtribuir={() => {
             setEditando(detalhe);
@@ -785,11 +812,19 @@ function Card({
 
       <p className="mt-1 text-xs text-slate-500">
         {demanda.propriedade?.nome ? `${demanda.propriedade.nome}` : ""}
-        {nomeSublocal(demanda.sublocal, demanda.local?.nome)
-          ? ` · ${nomeSublocal(demanda.sublocal, demanda.local?.nome)}`
-          : ""}
+        {demanda.sistema?.nome
+          ? `${demanda.propriedade?.nome ? " · " : ""}Sistema: ${demanda.sistema.nome}`
+          : nomeSublocal(demanda.sublocal, demanda.local?.nome)
+            ? ` · ${nomeSublocal(demanda.sublocal, demanda.local?.nome)}`
+            : ""}
         {demanda.solicitante?.nome
-          ? `${demanda.propriedade?.nome || nomeSublocal(demanda.sublocal, demanda.local?.nome) ? " · " : ""}${demanda.solicitante.nome}`
+          ? `${
+              demanda.propriedade?.nome ||
+              demanda.sistema?.nome ||
+              nomeSublocal(demanda.sublocal, demanda.local?.nome)
+                ? " · "
+                : ""
+            }${demanda.solicitante.nome}`
           : ""}
       </p>
 

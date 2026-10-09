@@ -40,6 +40,7 @@ export type DemandaKanban = {
   token_acompanhamento: string;
   sublocal: string | null;
   solicitante_id: string;
+  sistema_id?: string | null;
   /** Presente quando a coluna de quadro já existe no banco. */
   ambiente?: "manutencao" | "ti" | null;
   solicitante: Rel;
@@ -48,6 +49,7 @@ export type DemandaKanban = {
   colaborador: Rel;
   evento: Rel;
   projeto: Rel;
+  sistema?: Rel;
   anexos: AnexoDemanda[];
 };
 

@@ -21,7 +21,7 @@ export default async function SolicitanteAbrirPage({
   const ambiente = tipo === "manutencao" ? "manutencao" : "ti";
 
   const supabase = await createClient();
-  const [{ data: propriedades }, { data: solicitantes }] = await Promise.all([
+  const [{ data: propriedades }, { data: solicitantes }, sistemasRes] = await Promise.all([
     supabase
       .from("propriedades")
       .select("id, nome")
@@ -32,6 +32,13 @@ export default async function SolicitanteAbrirPage({
       .select("id, nome, propriedade_id")
       .eq("ativo", true)
       .order("nome"),
+    ambiente === "ti"
+      ? supabase
+          .from("sistemas")
+          .select("id, nome")
+          .eq("ativo", true)
+          .order("nome")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   return (
@@ -61,6 +68,7 @@ export default async function SolicitanteAbrirPage({
             solicitantes={solicitantes ?? []}
             nomeSolicitantePadrao={perfil.nome}
             propriedadePadrao={perfil.propriedade_id}
+            sistemas={sistemasRes.data ?? []}
           />
         </div>
       </main>

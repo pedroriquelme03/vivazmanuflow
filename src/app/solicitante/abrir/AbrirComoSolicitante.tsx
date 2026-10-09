@@ -10,12 +10,14 @@ export function AbrirComoSolicitante({
   solicitantes,
   nomeSolicitantePadrao,
   propriedadePadrao,
+  sistemas = [],
 }: {
   ambiente: AmbienteEquipe;
   propriedades: { id: string; nome: string }[];
   solicitantes: { id: string; nome: string; propriedade_id: string }[];
   nomeSolicitantePadrao: string;
   propriedadePadrao: string | null;
+  sistemas?: { id: string; nome: string }[];
 }) {
   const router = useRouter();
   return (
@@ -26,6 +28,7 @@ export function AbrirComoSolicitante({
       eventos={[]}
       nomeSolicitantePadrao={nomeSolicitantePadrao}
       propriedadePadrao={propriedadePadrao}
+      sistemas={sistemas}
       onSucesso={() => router.push("/solicitante?aba=chamados")}
     />
   );

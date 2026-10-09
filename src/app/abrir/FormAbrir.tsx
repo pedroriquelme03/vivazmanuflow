@@ -65,6 +65,8 @@ export type FormAbrirProps = {
   propriedadePadrao?: string | null;
   /** Quadro em que o chamado nasce. Sem isso, fica em Manutenção. */
   ambiente?: "manutencao" | "ti";
+  /** Programas cadastrados no TI. Só aparecem nesse ambiente. */
+  sistemas?: Opcao[];
   /**
    * Se informado, é chamado após criar a demanda (com o token) em vez de
    * redirecionar para o acompanhamento. Usado no modal "Nova demanda" do quadro.
@@ -84,6 +86,7 @@ export function FormAbrir({
   nomeSolicitantePadrao,
   propriedadePadrao,
   ambiente = "manutencao",
+  sistemas = [],
   onSucesso,
   destinarConcluido = false,
 }: FormAbrirProps) {
@@ -109,6 +112,7 @@ export function FormAbrir({
   );
   const [nomeDigitado, setNomeDigitado] = useState("");
   const [sublocal, setSublocal] = useState("");
+  const [sistemaId, setSistemaId] = useState("");
   const [eventoId, setEventoId] = useState("");
   const [projetoId, setProjetoId] = useState(
     () => (modoProjeto === "oculto" ? "" : projetoIdPadrao ?? ""),
@@ -138,6 +142,7 @@ export function FormAbrir({
 
   const mostrarLocalPrincipal = propriedadesVisiveis.length > 1;
   const ehTi = ambiente === "ti";
+  const comSistema = ehTi && Boolean(sistemaId);
   const solicitanteTravado =
     Boolean(nomeSolicitantePadrao?.trim()) && !destinarConcluido;
   const solicitanteIdLogado = idSolicitantePorNome(
@@ -181,7 +186,7 @@ export function FormAbrir({
     e.preventDefault();
     setErro(null);
 
-    if (!sublocal.trim()) return setErro("Informe o local.");
+    if (!comSistema && !sublocal.trim()) return setErro("Informe o local.");
     let quemSolicita = "";
     if (destinarConcluido) {
       const decisao = decidirSolicitanteRegistro(
@@ -290,21 +295,23 @@ export function FormAbrir({
           {
             p_solicitante_id: quemSolicita,
             p_titulo: titulo.trim(),
-            p_sublocal: sublocal.trim(),
+            p_sublocal: comSistema ? "" : sublocal.trim(),
             p_descricao: descricao.trim(),
             p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
             p_ambiente: ambiente,
             p_anexos: anexos,
             p_observacao: descricao.trim(),
+            p_sistema_id: comSistema ? sistemaId : undefined,
           },
         );
         if (error) {
           if (
             error.message.includes("schema cache") ||
-            error.message.includes("Could not find")
+            error.message.includes("Could not find") ||
+            error.message.includes("p_sistema_id")
           ) {
             throw new Error(
-              "Rode o SQL registrar_chamado_concluido no Supabase e tente de novo.",
+              "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase e tente de novo.",
             );
           }
           throw new Error(error.message);
@@ -353,14 +360,29 @@ export function FormAbrir({
         }
 
         {
-          const { error: subErro } = await supabase.rpc("definir_sublocal", {
-            p_token: String(token),
-            p_sublocal: sublocal.trim(),
-          });
-          if (subErro) {
-            throw new Error(
-              "Chamado criado, mas o local não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
+          if (comSistema) {
+            const { error: sisErro } = await supabase.rpc(
+              "definir_sistema_demanda",
+              { p_token: String(token), p_sistema_id: sistemaId },
             );
+            if (sisErro) {
+              throw new Error(
+                sisErro.message.includes("schema cache") ||
+                  sisErro.message.includes("Could not find")
+                  ? "Chamado criado, mas o sistema não gravou. Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase."
+                  : sisErro.message,
+              );
+            }
+          } else {
+            const { error: subErro } = await supabase.rpc("definir_sublocal", {
+              p_token: String(token),
+              p_sublocal: sublocal.trim(),
+            });
+            if (subErro) {
+              throw new Error(
+                "Chamado criado, mas o local não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
+              );
+            }
           }
         }
 
@@ -492,6 +514,34 @@ export function FormAbrir({
         </Campo>
       )}
 
+      {ehTi && (
+        <Campo label="Sistema">
+          <select
+            value={sistemaId}
+            onChange={(e) => {
+              setSistemaId(e.target.value);
+              setSublocal("");
+            }}
+            className={inputCls}
+          >
+            <option value="">Não é de um sistema</option>
+            {sistemas.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nome}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-400">
+            {comSistema
+              ? "O chamado fica nesse sistema. Não precisa informar o local."
+              : sistemas.length === 0
+                ? "Nenhum sistema cadastrado. Sem escolha, informe o local abaixo."
+                : "Deixe assim se o problema não for de um programa. Aí o local é obrigatório."}
+          </p>
+        </Campo>
+      )}
+
+      {!comSistema && (
       <Campo label="Local">
         <input
           value={sublocal}
@@ -506,6 +556,7 @@ export function FormAbrir({
           required
         />
       </Campo>
+      )}
 
       {(!ehTi || destinarConcluido) && (
       <Campo label="Quem está solicitando?">

@@ -23,6 +23,7 @@ type NavItem = {
   icone: React.ReactNode;
   soAdmin?: boolean;
   soManutencao?: boolean;
+  soTi?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -99,13 +100,26 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/lider/sistemas",
+    rotulo: "Sistemas",
+    soTi: true,
+    match: (p) => p.startsWith("/lider/sistemas"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <rect x="3" y="4" width="18" height="12" rx="2" />
+        <path strokeLinecap="round" d="M8 20h8M12 16v4" />
+      </svg>
+    ),
+  },
+  {
     href: "/lider",
     rotulo: "Quadro",
     match: (p) =>
       p === "/lider" ||
       (p.startsWith("/lider/") &&
         !p.startsWith("/lider/metricas") &&
-        !p.startsWith("/lider/preventivas")),
+        !p.startsWith("/lider/preventivas") &&
+        !p.startsWith("/lider/sistemas")),
     icone: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
         <rect x="3" y="4" width="7" height="16" rx="1.5" />
@@ -142,13 +156,18 @@ export function AdminSidebar({
   const ponto = ti ? "bg-white" : "bg-brand-500";
 
   useEffect(() => {
-    if (!ti) return;
-    if (
-      pathname.startsWith("/admin/projetos") ||
-      pathname.startsWith("/admin/eventos") ||
-      pathname.startsWith("/admin/areas") ||
-      pathname.startsWith("/lider/preventivas")
-    ) {
+    if (ti) {
+      if (
+        pathname.startsWith("/admin/projetos") ||
+        pathname.startsWith("/admin/eventos") ||
+        pathname.startsWith("/admin/areas") ||
+        pathname.startsWith("/lider/preventivas")
+      ) {
+        router.replace("/lider");
+      }
+      return;
+    }
+    if (pathname.startsWith("/lider/sistemas")) {
       router.replace("/lider");
     }
   }, [ti, pathname, router]);
@@ -281,7 +300,9 @@ export function PainelShell({
 function itensDoMenu(ehAdmin: boolean, ti: boolean) {
   return NAV.filter(
     (item) =>
-      (!item.soAdmin || ehAdmin) && (!item.soManutencao || !ti),
+      (!item.soAdmin || ehAdmin) &&
+      (!item.soManutencao || !ti) &&
+      (!item.soTi || ti),
   );
 }
 

@@ -30,6 +30,7 @@ export default async function LiderHome() {
     eventosRes,
     projetosRes,
     membrosRes,
+    sistemasRes,
   ] = await Promise.all([
     listarQuadro(supabase, ambiente),
     equipeAtribuivel(supabase, ambiente),
@@ -50,6 +51,9 @@ export default async function LiderHome() {
       .order("data_inicio", { ascending: false, nullsFirst: false }),
     supabase.rpc("listar_projetos_ativos"),
     supabase.from("projeto_membros").select("projeto_id, usuario_id"),
+    ambiente === "ti"
+      ? supabase.from("sistemas").select("id, nome, ativo").order("nome")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const slaHoras: Record<string, number> = {};
@@ -84,7 +88,11 @@ export default async function LiderHome() {
           nomeSolicitantePadrao: perfil.nome,
           propriedadePadrao: perfil.propriedade_id,
           ambiente,
+          sistemas: (sistemasRes.data ?? [])
+            .filter((s) => s.ativo)
+            .map(({ id, nome }) => ({ id, nome })),
         }}
+        sistemas={(sistemasRes.data ?? []).map(({ id, nome }) => ({ id, nome }))}
       />
     </PainelComAmbiente>
   );

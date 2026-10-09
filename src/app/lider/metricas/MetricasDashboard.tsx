@@ -25,6 +25,7 @@ type Metricas = {
   por_setor: { setor: string; total: number }[];
   por_local: { local: string; total: number }[];
   por_sublocal?: { local: string; total: number }[];
+  por_sistema?: { sistema: string; total: number }[];
   ranking: { nome: string; total: number; tempo_medio_min: number | null; pct_prazo: number | null }[];
   por_hora: { hora: number; total: number }[];
   por_dia_semana: { dow: number; total: number }[];
@@ -40,7 +41,8 @@ type ColunaQuadro =
   | "arquivado";
 
 type Filtros = {
-  dias: number;
+  inicio: string;
+  fim: string;
   colaboradorId: string;
   setorId: string;
   propriedadeId: string;
@@ -51,13 +53,31 @@ type Filtros = {
   status: ColunaQuadro;
 };
 
-const PERIODOS = [
-  { dias: 7, rotulo: "7 dias" },
-  { dias: 30, rotulo: "30 dias" },
-  { dias: 90, rotulo: "90 dias" },
-  { dias: 180, rotulo: "6 meses" },
-  { dias: 365, rotulo: "1 ano" },
-];
+function hojeSp() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
+}
+
+function somarDias(iso: string, dias: number) {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + dias);
+  return dt.toISOString().slice(0, 10);
+}
+
+function periodoPadrao() {
+  const fim = hojeSp();
+  return { inicio: somarDias(fim, -30), fim };
+}
+
+/** Começo e fim do dia civil em São Paulo, para a função metricas. */
+function intervaloSp(inicio: string, fim: string) {
+  return {
+    p_inicio: new Date(`${inicio}T00:00:00-03:00`).toISOString(),
+    p_fim: new Date(`${fim}T23:59:59.999-03:00`).toISOString(),
+  };
+}
 
 const DOW = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const PRIO_LABEL: Record<string, string> = { alta: "Alta", media: "Média", baixa: "Baixa" };
@@ -88,22 +108,25 @@ const METRICAS_ZERADAS: Metricas = {
   por_setor: [],
   por_local: [],
   por_sublocal: [],
+  por_sistema: [],
   ranking: [],
   por_hora: [],
   por_dia_semana: [],
 };
 
-const FILTROS_VAZIOS: Filtros = {
-  dias: 30,
-  colaboradorId: "",
-  setorId: "",
-  propriedadeId: "",
-  localId: "",
-  prioridade: "",
-  eventoId: "",
-  somenteEventos: "",
-  status: "",
-};
+function filtrosPadrao(): Filtros {
+  return {
+    ...periodoPadrao(),
+    colaboradorId: "",
+    setorId: "",
+    propriedadeId: "",
+    localId: "",
+    prioridade: "",
+    eventoId: "",
+    somenteEventos: "",
+    status: "",
+  };
+}
 
 function fmtMin(min: number | null): string {
   if (min == null) return "—";
@@ -129,7 +152,7 @@ export function MetricasDashboard({
   eventos: Opcao[];
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS);
+  const [filtros, setFiltros] = useState<Filtros>(filtrosPadrao);
   const [dados, setDados] = useState<Metricas | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -189,16 +212,20 @@ export function MetricasDashboard({
     return tags;
   }, [filtros, colaboradores, setores, propriedades, locais, eventos, ambiente]);
 
+  const periodoInvalido =
+    !filtros.inicio || !filtros.fim || filtros.inicio > filtros.fim;
+
   const carregar = useCallback(async () => {
+    if (!filtros.inicio || !filtros.fim || filtros.inicio > filtros.fim) {
+      setErro(null);
+      setDados(null);
+      setCarregando(false);
+      return;
+    }
     setCarregando(true);
     setErro(null);
-    const fim = new Date();
-    const inicio = new Date(fim.getTime() - filtros.dias * 86400_000);
 
-    const args: MetricasArgs = {
-      p_inicio: inicio.toISOString(),
-      p_fim: fim.toISOString(),
-    };
+    const args: MetricasArgs = intervaloSp(filtros.inicio, filtros.fim);
     if (filtros.colaboradorId) args.p_colaborador_id = filtros.colaboradorId;
     if (ambiente !== "ti" && filtros.setorId) args.p_setor_id = filtros.setorId;
     if (filtros.propriedadeId) args.p_propriedade_id = filtros.propriedadeId;
@@ -311,29 +338,40 @@ export function MetricasDashboard({
           <h1 className="text-base font-bold text-slate-800">Relatórios</h1>
           <button
             type="button"
-            onClick={() => setFiltros(FILTROS_VAZIOS)}
+            onClick={() => setFiltros(filtrosPadrao())}
             className="text-xs font-medium text-slate-500 hover:text-brand-700"
           >
             Limpar filtros
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.dias}
-              type="button"
-              onClick={() => setFiltro("dias", p.dias)}
-              className={`rounded-lg px-1 py-2 text-center text-[11px] font-semibold leading-tight transition sm:px-3 sm:py-1.5 sm:text-sm ${
-                filtros.dias === p.dias
-                  ? "bg-brand-600 text-white"
-                  : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {p.rotulo}
-            </button>
-          ))}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="text-xs font-medium text-slate-600">
+            De
+            <input
+              type="date"
+              className={`${selectCls} mt-1`}
+              value={filtros.inicio}
+              onChange={(e) => setFiltro("inicio", e.target.value)}
+            />
+          </label>
+          <label className="text-xs font-medium text-slate-600">
+            Até
+            <input
+              type="date"
+              className={`${selectCls} mt-1`}
+              value={filtros.fim}
+              onChange={(e) => setFiltro("fim", e.target.value)}
+            />
+          </label>
         </div>
+        {periodoInvalido && (
+          <p className="mt-2 text-sm text-red-700">
+            {filtros.inicio && filtros.fim
+              ? "A data inicial não pode ser depois da final."
+              : "Informe as duas datas."}
+          </p>
+        )}
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <select
@@ -528,52 +566,57 @@ export function MetricasDashboard({
               />
             </Painel>
 
+            {/* Volume por setor solicitante — fora da tela por enquanto.
             {ambiente !== "ti" && (
-              <>
-                <Painel titulo="Volume por setor solicitante">
-                  <BarList
-                    itens={dados.por_setor.map((s) => ({
-                      rotulo: s.setor,
-                      valor: s.total,
-                    }))}
-                  />
-                </Painel>
-
-                <Painel titulo="Volume por local (top 8)">
-                  <BarList
-                    itens={dados.por_local.map((l) => ({
-                      rotulo: l.local,
-                      valor: l.total,
-                    }))}
-                  />
-                </Painel>
-              </>
+              <Painel titulo="Volume por setor solicitante">
+                <BarList
+                  itens={dados.por_setor.map((s) => ({
+                    rotulo: s.setor,
+                    valor: s.total,
+                  }))}
+                />
+              </Painel>
             )}
+            */}
           </div>
 
-          {ambiente === "ti" && (
-            <Painel titulo="Volume pelo local digitado">
-              {dados.por_sublocal == null ? (
-                <p className="text-sm text-amber-800">
-                  Rode o SQL em{" "}
-                  <code className="text-xs">
-                    supabase/migrations/20261006180000_metricas_ti_sublocal.sql
-                  </code>{" "}
-                  no Supabase para listar os locais como a pessoa digitou.
+          <Painel
+            titulo={
+              ambiente === "ti" ? "Volume pelo local digitado" : "Volume por local"
+            }
+          >
+            {dados.por_sublocal == null ? (
+              <p className="text-sm text-amber-800">
+                Rode o SQL em{" "}
+                <code className="text-xs">
+                  supabase/migrations/20261006180000_metricas_ti_sublocal.sql
+                </code>{" "}
+                no Supabase para listar os locais como a pessoa digitou.
+              </p>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-slate-400">
+                  {ambiente === "ti"
+                    ? "Agrupa o texto escrito no chamado. Chamado de sistema não entra aqui."
+                    : "Agrupa o texto escrito no chamado, sem o cadastro de local (ex.: Cozinha, quarto 204)."}
                 </p>
-              ) : (
-                <>
-                  <p className="mb-3 text-xs text-slate-400">
-                    Agrupa o texto escrito no chamado, sem cadastro de setor ou
-                    sublocal (ex.: Recepção, computador da governança).
-                  </p>
-                  <BarList
-                    itens={volumeLocaisDigitados(dados.por_sublocal)}
-                  />
-                </>
-              )}
-            </Painel>
-          )}
+                <BarList itens={volumeLocaisDigitados(dados.por_sublocal)} />
+                {ambiente === "ti" && dados.por_sistema != null && (
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <p className="mb-3 text-xs font-semibold text-slate-600">
+                      Por sistema
+                    </p>
+                    <BarList
+                      itens={dados.por_sistema.map((s) => ({
+                        rotulo: s.sistema,
+                        valor: s.total,
+                      }))}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </Painel>
 
           <Painel titulo="Ranking de colaboradores">
             {dados.ranking.length === 0 ? (

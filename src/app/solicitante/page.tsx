@@ -17,6 +17,11 @@ const CHAMADO_SELECT = `
   propriedade:propriedades(nome)
 `;
 
+const CHAMADO_SELECT_SISTEMA = `
+  ${CHAMADO_SELECT},
+  sistema:sistemas(nome)
+`;
+
 export default async function SolicitanteHome({
   searchParams,
 }: {
@@ -36,12 +41,24 @@ export default async function SolicitanteHome({
 
   let chamados: ChamadoSolicitante[] = [];
   if (ids.length > 0) {
-    const comAmbiente = await supabase
+    const comSistema = await supabase
       .from("demandas")
-      .select(CHAMADO_SELECT)
+      .select(CHAMADO_SELECT_SISTEMA)
       .in("solicitante_id", ids)
       .eq("arquivado", false)
       .order("criado_em", { ascending: false });
+    const faltaSistema =
+      comSistema.error != null &&
+      (comSistema.error.message.includes("sistemas") ||
+        comSistema.error.message.includes("schema cache"));
+    const comAmbiente = faltaSistema
+      ? await supabase
+          .from("demandas")
+          .select(CHAMADO_SELECT)
+          .in("solicitante_id", ids)
+          .eq("arquivado", false)
+          .order("criado_em", { ascending: false })
+      : comSistema;
     if (comAmbiente.error && recursoAmbienteAusente(comAmbiente.error.message)) {
       const semAmbiente = await supabase
         .from("demandas")

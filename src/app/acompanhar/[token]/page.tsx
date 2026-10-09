@@ -48,9 +48,10 @@ export default async function AcompanharToken({
   const { nova, sublocal: sublocalQuery } = await searchParams;
 
   const supabase = await createClient();
-  const [{ data }, sublocalRpc, chatRes, perfil] = await Promise.all([
+  const [{ data }, sublocalRpc, sistemaRpc, chatRes, perfil] = await Promise.all([
     supabase.rpc("acompanhar_demanda", { p_token: token }),
     supabase.rpc("rotulo_sublocal", { p_token: token }),
+    supabase.rpc("rotulo_sistema", { p_token: token }),
     supabase.rpc("listar_mensagens_chamado", { p_token: token }),
     getPerfil(),
   ]);
@@ -66,6 +67,7 @@ export default async function AcompanharToken({
   const voltarRotulo =
     perfil?.role === "solicitante" ? "← Meus chamados" : "← Manutenção Vivaz";
 
+  const sistemaNome = sistemaRpc.error ? "" : textoLivre(sistemaRpc.data);
   const sublocalExibido =
     textoLivre(sublocalRpc.data) ||
     sublocalQuery?.trim() ||
@@ -115,7 +117,11 @@ export default async function AcompanharToken({
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <Info titulo="Local principal" valor={d.propriedade} />
-            <Info titulo="Sublocal" valor={sublocalExibido} />
+            {sistemaNome ? (
+              <Info titulo="Sistema" valor={sistemaNome} />
+            ) : (
+              <Info titulo="Sublocal" valor={sublocalExibido} />
+            )}
             <Info titulo="Solicitante" valor={d.solicitante} />
             <Info titulo="Responsável" valor={d.colaborador ?? "A definir"} />
             <Info titulo="Prazo" valor={formatarData(d.prazo)} />

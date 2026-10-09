@@ -23,6 +23,7 @@ export type ChamadoSolicitante = {
   criado_em: string;
   ambiente: AmbienteEquipe | null;
   sublocal: string | null;
+  sistema?: { nome: string } | null;
   token_acompanhamento: string;
   local: { nome: string } | null;
   propriedade: { nome: string } | null;
@@ -216,9 +217,11 @@ function AbaChamados({
                 <PrioridadeTag prioridade={c.prioridade} />
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                {nomeSublocal(c.sublocal, c.local?.nome) ||
-                  c.propriedade?.nome ||
-                  "—"}
+                {c.sistema?.nome
+                  ? `Sistema: ${c.sistema.nome}`
+                  : nomeSublocal(c.sublocal, c.local?.nome) ||
+                    c.propriedade?.nome ||
+                    "—"}
               </p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span

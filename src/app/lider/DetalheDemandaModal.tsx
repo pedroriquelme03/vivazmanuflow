@@ -56,6 +56,7 @@ export function DetalheDemandaModal({
   eu,
   slaHoras = {},
   solicitantes = [],
+  sistemas = [],
   onFechar,
   onAtribuir,
   onAtualizou,
@@ -67,6 +68,7 @@ export function DetalheDemandaModal({
   eu?: { id: string; nome: string };
   slaHoras?: Record<string, number>;
   solicitantes?: { id: string; nome: string; propriedade_id: string }[];
+  sistemas?: { id: string; nome: string }[];
   onFechar: () => void;
   onAtribuir: () => void;
   onAtualizou: (fechar?: boolean) => void;
@@ -88,6 +90,7 @@ export function DetalheDemandaModal({
   const [tituloEdit, setTituloEdit] = useState(demanda.titulo);
   const [descricaoEdit, setDescricaoEdit] = useState(demanda.descricao ?? "");
   const [sublocalEdit, setSublocalEdit] = useState(demanda.sublocal ?? "");
+  const [sistemaEdit, setSistemaEdit] = useState(demanda.sistema_id ?? "");
   const [solicitanteEdit, setSolicitanteEdit] = useState(demanda.solicitante_id);
   const [prioridadeEdit, setPrioridadeEdit] = useState(demanda.prioridade);
   const [afetaEdit, setAfetaEdit] = useState(demanda.afeta_experiencia);
@@ -151,6 +154,7 @@ export function DetalheDemandaModal({
     setTituloEdit(demanda.titulo);
     setDescricaoEdit(demanda.descricao ?? "");
     setSublocalEdit(demanda.sublocal ?? "");
+    setSistemaEdit(demanda.sistema_id ?? "");
     setSolicitanteEdit(demanda.solicitante_id);
     setPrioridadeEdit(demanda.prioridade);
     setAfetaEdit(demanda.afeta_experiencia);
@@ -165,6 +169,7 @@ export function DetalheDemandaModal({
     demanda.titulo,
     demanda.descricao,
     demanda.sublocal,
+    demanda.sistema_id,
     demanda.solicitante_id,
     demanda.prioridade,
     demanda.afeta_experiencia,
@@ -312,10 +317,16 @@ export function DetalheDemandaModal({
       setErro("Escolha quem solicitou.");
       return;
     }
+    const quadroTi = ambienteEdit === "ti";
+    const sistema = quadroTi ? sistemaEdit : "";
+    if (quadroTi && !sistema && !sublocalEdit.trim()) {
+      setErro("Informe o local ou escolha um sistema.");
+      return;
+    }
     setOcupado(true);
     setErro(null);
     const descricao = descricaoEdit.trim();
-    const sublocal = sublocalEdit.trim();
+    const sublocal = sistema ? "" : sublocalEdit.trim();
     const { error } = await supabase
       .from("demandas")
       .update({
@@ -326,11 +337,20 @@ export function DetalheDemandaModal({
         prioridade: prioridadeEdit,
         afeta_experiencia: afetaEdit,
         ambiente: ambienteEdit,
+        ...(demanda.sistema_id !== undefined || sistema
+          ? { sistema_id: sistema || null }
+          : {}),
       })
       .eq("id", demanda.id);
     if (error) {
       setOcupado(false);
-      setErro(error.message);
+      setErro(
+        error.message.includes("sistema_id") ||
+          (error.message.includes("schema cache") &&
+            error.message.includes("sistema"))
+          ? "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase."
+          : error.message,
+      );
       return;
     }
     await supabase.from("demanda_historico").insert({
@@ -349,6 +369,16 @@ export function DetalheDemandaModal({
   const solicitanteAtualNaLista = opcoesSolicitante.some(
     (s) => s.id === demanda.solicitante_id,
   );
+  const opcoesSistema = [...sistemas];
+  if (
+    demanda.sistema_id &&
+    !opcoesSistema.some((s) => s.id === demanda.sistema_id)
+  ) {
+    opcoesSistema.unshift({
+      id: demanda.sistema_id,
+      nome: demanda.sistema?.nome ?? "Sistema atual",
+    });
+  }
 
   return (
     <div
@@ -365,7 +395,12 @@ export function DetalheDemandaModal({
               {demanda.titulo}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              {[demanda.propriedade?.nome, nomeSublocal(demanda.sublocal, demanda.local?.nome)]
+              {[
+                demanda.propriedade?.nome,
+                demanda.sistema?.nome
+                  ? `Sistema: ${demanda.sistema.nome}`
+                  : nomeSublocal(demanda.sublocal, demanda.local?.nome),
+              ]
                 .filter(Boolean)
                 .join(" · ") || "Sem local"}
             </p>
@@ -458,6 +493,32 @@ export function DetalheDemandaModal({
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
                 />
               </label>
+              {ambienteEdit === "ti" && (
+                <label className="block text-xs font-medium text-slate-600">
+                  Sistema
+                  <select
+                    value={sistemaEdit}
+                    onChange={(e) => {
+                      setSistemaEdit(e.target.value);
+                      if (e.target.value) setSublocalEdit("");
+                    }}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">Não é de um sistema</option>
+                    {opcoesSistema.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {sistemaEdit && (
+                    <span className="mt-1 block font-normal text-slate-500">
+                      Com sistema, o local não é necessário.
+                    </span>
+                  )}
+                </label>
+              )}
+              {!(ambienteEdit === "ti" && sistemaEdit) && (
               <label className="block text-xs font-medium text-slate-600">
                 Local
                 <input
@@ -466,6 +527,7 @@ export function DetalheDemandaModal({
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
                 />
               </label>
+              )}
               <label className="block text-xs font-medium text-slate-600">
                 Quem solicitou
                 <select
@@ -517,9 +579,13 @@ export function DetalheDemandaModal({
                 Quadro
                 <select
                   value={ambienteEdit}
-                  onChange={(e) =>
-                    setAmbienteEdit(e.target.value as "manutencao" | "ti")
-                  }
+                  onChange={(e) => {
+                    const proximo = e.target.value as "manutencao" | "ti";
+                    setAmbienteEdit(proximo);
+                    if (proximo !== "ti") {
+                      setSistemaEdit("");
+                    }
+                  }}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
                 >
                   <option value="manutencao">Manutenção</option>
@@ -549,6 +615,7 @@ export function DetalheDemandaModal({
                     setTituloEdit(demanda.titulo);
                     setDescricaoEdit(demanda.descricao ?? "");
                     setSublocalEdit(demanda.sublocal ?? "");
+                    setSistemaEdit(demanda.sistema_id ?? "");
                     setSolicitanteEdit(demanda.solicitante_id);
                     setPrioridadeEdit(demanda.prioridade);
                     setAfetaEdit(demanda.afeta_experiencia);
