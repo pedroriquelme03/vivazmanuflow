@@ -159,6 +159,15 @@ export type Database = {
           sublocal: string | null
           mensagem_devolucao: string | null
           ambiente: Database["public"]["Enums"]["ambiente_equipe"]
+          sentry_issue_id: string | null
+          sentry_ocorrencias: number | null
+          sentry_usuarios: number | null
+          sentry_primeira_em: string | null
+          sentry_ultima_em: string | null
+          sentry_rota: string | null
+          sentry_quadro: string | null
+          sentry_url: string | null
+          sentry_posthog_url: string | null
         }
         Insert: {
           atribuido_em?: string | null
@@ -188,6 +197,15 @@ export type Database = {
           sublocal?: string | null
           mensagem_devolucao?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
+          sentry_issue_id?: string | null
+          sentry_ocorrencias?: number | null
+          sentry_usuarios?: number | null
+          sentry_primeira_em?: string | null
+          sentry_ultima_em?: string | null
+          sentry_rota?: string | null
+          sentry_quadro?: string | null
+          sentry_url?: string | null
+          sentry_posthog_url?: string | null
         }
         Update: {
           atribuido_em?: string | null
@@ -217,6 +235,15 @@ export type Database = {
           sublocal?: string | null
           mensagem_devolucao?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
+          sentry_issue_id?: string | null
+          sentry_ocorrencias?: number | null
+          sentry_usuarios?: number | null
+          sentry_primeira_em?: string | null
+          sentry_ultima_em?: string | null
+          sentry_rota?: string | null
+          sentry_quadro?: string | null
+          sentry_url?: string | null
+          sentry_posthog_url?: string | null
         }
         Relationships: [
           {
@@ -405,20 +432,50 @@ export type Database = {
         Row: {
           id: string
           nome: string
+          slug: string | null
           ativo: boolean
           criado_em: string
         }
         Insert: {
           id?: string
           nome: string
+          slug?: string | null
           ativo?: boolean
           criado_em?: string
         }
         Update: {
           id?: string
           nome?: string
+          slug?: string | null
           ativo?: boolean
           criado_em?: string
+        }
+        Relationships: []
+      }
+      sentry_alertas_log: {
+        Row: {
+          id: string
+          criado_em: string
+          slug: string | null
+          issue_id: string | null
+          acao: string
+          detalhe: string | null
+        }
+        Insert: {
+          id?: string
+          criado_em?: string
+          slug?: string | null
+          issue_id?: string | null
+          acao: string
+          detalhe?: string | null
+        }
+        Update: {
+          id?: string
+          criado_em?: string
+          slug?: string | null
+          issue_id?: string | null
+          acao?: string
+          detalhe?: string | null
         }
         Relationships: []
       }
@@ -947,6 +1004,26 @@ export type Database = {
       aplicar_experiencia_hospede: {
         Args: { p_token: string; p_afeta?: boolean }
         Returns: undefined
+      }
+      aplicar_alerta_sentry: {
+        Args: {
+          p_slug: string
+          p_issue_id: string
+          p_nivel: string
+          p_ambiente: string
+          p_descricao: string
+          p_rota: string
+          p_quadro: string
+          p_ocorrencias: number
+          p_usuarios: number
+          p_primeira?: string | null
+          p_ultima?: string | null
+          p_sentry_url: string
+          p_posthog_url: string
+          p_prioridade: Database["public"]["Enums"]["demanda_prioridade"]
+          p_afeta: boolean
+        }
+        Returns: string
       }
       confirmar_finalizacao: {
         Args: { p_token: string }

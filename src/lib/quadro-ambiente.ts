@@ -6,21 +6,36 @@ import { DEMANDA_SELECT, type DemandaKanban } from "@/lib/demanda-select";
 type Cliente = SupabaseClient<Database>;
 
 const SELECT_SISTEMA = `${DEMANDA_SELECT}, sistema_id, sistema:sistemas(nome)`;
+const CAMPOS_ALERTA = `
+  sentry_issue_id, sentry_ocorrencias, sentry_usuarios,
+  sentry_primeira_em, sentry_ultima_em, sentry_rota,
+  sentry_quadro, sentry_url, sentry_posthog_url
+`;
 
 function faltaSistema(mensagem: string) {
   return mensagem.includes("sistemas") || mensagem.includes("sistema_id");
+}
+
+function faltaAlerta(mensagem: string) {
+  return mensagem.includes("sentry_");
 }
 
 export async function listarQuadro(
   supabase: Cliente,
   ambiente: AmbienteEquipe,
 ): Promise<DemandaKanban[]> {
-  const filtrado = await supabase
-    .from("demandas")
-    .select(`${SELECT_SISTEMA}, ambiente`)
-    .eq("ambiente", ambiente)
-    .order("peso", { ascending: false })
-    .order("criado_em", { ascending: true });
+  const ordenar = (select: string) =>
+    supabase
+      .from("demandas")
+      .select(select)
+      .eq("ambiente", ambiente)
+      .order("peso", { ascending: false })
+      .order("criado_em", { ascending: true });
+
+  let filtrado = await ordenar(`${SELECT_SISTEMA}, ambiente, ${CAMPOS_ALERTA}`);
+  if (filtrado.error && faltaAlerta(filtrado.error.message)) {
+    filtrado = await ordenar(`${SELECT_SISTEMA}, ambiente`);
+  }
 
   if (!filtrado.error) {
     return (filtrado.data ?? []) as unknown as DemandaKanban[];

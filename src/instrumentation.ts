@@ -16,6 +16,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
   contexto,
 ) => {
   if (process.env.NODE_ENV === "development") return;
+  if (request.path.includes("/api/webhooks/sentry")) return;
   const Sentry = await import("@sentry/nextjs");
   Sentry.captureRequestError(erro, request, contexto);
 };

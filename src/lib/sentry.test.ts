@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { opcoesSentry, sentryDsn } from "@/lib/sentry";
+import { opcoesSentry, quadroDaRequisicao, sentryDsn } from "@/lib/sentry";
 
 describe("Sentry", () => {
   const env = process.env;
@@ -39,6 +39,29 @@ describe("Sentry", () => {
     expect(limpo?.request?.cookies).toBeUndefined();
     expect(limpo?.request?.headers).toBeUndefined();
     expect(limpo?.user).toEqual({ id: "u1" });
+    expect(limpo?.tags).toMatchObject({ sistema: "chamados" });
+  });
+
+  it("marca o quadro do cookie e descarta o webhook", () => {
+    process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";
+    expect(quadroDaRequisicao("vivaz-ambiente=ti; outra=1")).toBe("ti");
+    const comQuadro = opcoesSentry().beforeSend(
+      {
+        request: { cookies: { "vivaz-ambiente": "manutencao" }, url: "https://app/lider" },
+      } as never,
+      {} as never,
+    );
+    expect(comQuadro?.tags).toMatchObject({
+      sistema: "chamados",
+      quadro: "manutencao",
+    });
+    expect(comQuadro?.request?.cookies).toBeUndefined();
+    expect(
+      opcoesSentry().beforeSend(
+        { request: { url: "https://app/api/webhooks/sentry" } } as never,
+        {} as never,
+      ),
+    ).toBeNull();
   });
 
   it("usa 20% de traces em produção", () => {

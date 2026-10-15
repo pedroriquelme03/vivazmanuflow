@@ -43,6 +43,15 @@ export type DemandaKanban = {
   sistema_id?: string | null;
   /** Presente quando a coluna de quadro já existe no banco. */
   ambiente?: "manutencao" | "ti" | null;
+  sentry_issue_id?: string | null;
+  sentry_ocorrencias?: number | null;
+  sentry_usuarios?: number | null;
+  sentry_primeira_em?: string | null;
+  sentry_ultima_em?: string | null;
+  sentry_rota?: string | null;
+  sentry_quadro?: string | null;
+  sentry_url?: string | null;
+  sentry_posthog_url?: string | null;
   solicitante: Rel;
   local: Rel;
   propriedade: Rel;

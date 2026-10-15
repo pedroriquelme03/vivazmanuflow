@@ -2,8 +2,27 @@ import { describe, expect, it } from "vitest";
 import {
   horasDoDia,
   picoHorario,
+  volumeErrosSentry,
   volumeLocaisDigitados,
 } from "./metricas-ti";
+
+describe("volumeErrosSentry", () => {
+  it("separa as ocorrências por sistema", () => {
+    expect(
+      volumeErrosSentry([
+        { sistema: "Portal RH", chamados: 2, ocorrencias: 14 },
+        { sistema: "Chamados TI", chamados: 1, ocorrencias: 3 },
+      ]),
+    ).toEqual([
+      { rotulo: "Portal RH · 2 chamados", valor: 14 },
+      { rotulo: "Chamados TI · 1 chamado", valor: 3 },
+    ]);
+  });
+
+  it("lista vazia se o SQL ainda não mandou o campo", () => {
+    expect(volumeErrosSentry(undefined)).toEqual([]);
+  });
+});
 
 describe("volumeLocaisDigitados", () => {
   it("usa o texto que a pessoa digitou", () => {

@@ -642,6 +642,51 @@ export function DetalheDemandaModal({
             </p>
           )}
 
+          {!editandoConteudo && demanda.sentry_issue_id && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Alerta do Sentry
+              </p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <Info
+                  rotulo="Ocorrências"
+                  valor={String(demanda.sentry_ocorrencias ?? "—")}
+                />
+                <Info
+                  rotulo="Usuários"
+                  valor={String(demanda.sentry_usuarios ?? "—")}
+                />
+                <Info
+                  rotulo="Primeira vez"
+                  valor={formatarData(demanda.sentry_primeira_em)}
+                />
+                <Info
+                  rotulo="Última vez"
+                  valor={formatarData(demanda.sentry_ultima_em)}
+                />
+                <Info rotulo="Rota" valor={demanda.sentry_rota} />
+                <Info
+                  rotulo="Tela"
+                  valor={
+                    demanda.sentry_quadro === "ti"
+                      ? "TI"
+                      : demanda.sentry_quadro === "manutencao"
+                        ? "Manutenção"
+                        : null
+                  }
+                />
+                <Info
+                  rotulo="Sentry"
+                  valor={linkHttps(demanda.sentry_url, "Abrir issue")}
+                />
+                <Info
+                  rotulo="PostHog"
+                  valor={linkHttps(demanda.sentry_posthog_url, "Abrir replay")}
+                />
+              </dl>
+            </div>
+          )}
+
           {ambiente === "ti" && (
             <ChatChamado
               demandaId={demanda.id}
@@ -1030,6 +1075,20 @@ export function DetalheDemandaModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function linkHttps(url: string | null | undefined, rotulo: string) {
+  if (!url || !url.startsWith("https://")) return "—";
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="font-medium text-brand-700 hover:underline"
+    >
+      {rotulo}
+    </a>
   );
 }
 

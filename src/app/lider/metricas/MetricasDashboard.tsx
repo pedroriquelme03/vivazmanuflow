@@ -8,6 +8,7 @@ import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
 import {
   horasDoDia,
   picoHorario,
+  volumeErrosSentry,
   volumeLocaisDigitados,
 } from "@/lib/metricas-ti";
 
@@ -26,6 +27,9 @@ type Metricas = {
   por_local: { local: string; total: number }[];
   por_sublocal?: { local: string; total: number }[];
   por_sistema?: { sistema: string; total: number }[];
+  erros_sentry?: number;
+  ocorrencias_sentry?: number;
+  por_erro_sentry?: { sistema: string; chamados: number; ocorrencias: number }[];
   ranking: { nome: string; total: number; tempo_medio_min: number | null; pct_prazo: number | null }[];
   por_hora: { hora: number; total: number }[];
   por_dia_semana: { dow: number; total: number }[];
@@ -109,6 +113,9 @@ const METRICAS_ZERADAS: Metricas = {
   por_local: [],
   por_sublocal: [],
   por_sistema: [],
+  erros_sentry: 0,
+  ocorrencias_sentry: 0,
+  por_erro_sentry: [],
   ranking: [],
   por_hora: [],
   por_dia_semana: [],
@@ -603,8 +610,12 @@ export function MetricasDashboard({
                 <BarList itens={volumeLocaisDigitados(dados.por_sublocal)} />
                 {ambiente === "ti" && dados.por_sistema != null && (
                   <div className="mt-5 border-t border-slate-100 pt-4">
-                    <p className="mb-3 text-xs font-semibold text-slate-600">
+                    <p className="mb-1 text-xs font-semibold text-slate-600">
                       Por sistema
+                    </p>
+                    <p className="mb-3 text-xs text-slate-400">
+                      Chamados abertos por uma pessoa. Erro do Sentry fica no
+                      painel seguinte.
                     </p>
                     <BarList
                       itens={dados.por_sistema.map((s) => ({
@@ -617,6 +628,34 @@ export function MetricasDashboard({
               </>
             )}
           </Painel>
+
+          {ambiente === "ti" && (
+            <Painel titulo="Erros do Sentry">
+              {dados.por_erro_sentry == null ? (
+                <p className="text-sm text-amber-800">
+                  Rode o SQL em{" "}
+                  <code className="text-xs">
+                    supabase/migrations/20261014170000_metricas_erros_sentry.sql
+                  </code>{" "}
+                  no Supabase para separar os erros automáticos por sistema.
+                </p>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-slate-400">
+                    {dados.ocorrencias_sentry ?? 0}{" "}
+                    {(dados.ocorrencias_sentry ?? 0) === 1
+                      ? "ocorrência"
+                      : "ocorrências"}{" "}
+                    em {dados.erros_sentry ?? 0}{" "}
+                    {(dados.erros_sentry ?? 0) === 1 ? "chamado" : "chamados"}{" "}
+                    abertos no período. A barra é a quantidade de erros de cada
+                    sistema.
+                  </p>
+                  <BarList itens={volumeErrosSentry(dados.por_erro_sentry)} />
+                </>
+              )}
+            </Painel>
+          )}
 
           <Painel titulo="Ranking de colaboradores">
             {dados.ranking.length === 0 ? (

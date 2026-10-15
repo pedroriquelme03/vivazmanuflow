@@ -18,18 +18,47 @@ export default async function SistemasPage() {
   const ambiente = await resolverAmbiente(perfil.ambientes, perfil.role);
   if (ambiente !== "ti") redirect("/lider");
 
-  const { data, error } = await supabase
+  const comSlug = await supabase
     .from("sistemas")
-    .select("id, nome, ativo")
+    .select("id, nome, slug, ativo")
     .order("nome");
 
-  const aviso = error
-    ? "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase."
-    : null;
+  let aviso: string | null = null;
+  let slugDisponivel = true;
+  let sistemas: { id: string; nome: string; slug: string | null; ativo: boolean }[] =
+    comSlug.data ?? [];
+
+  if (comSlug.error) {
+    const faltaSlug = comSlug.error.message.includes("slug");
+    if (faltaSlug) {
+      const base = await supabase
+        .from("sistemas")
+        .select("id, nome, ativo")
+        .order("nome");
+      aviso = base.error
+        ? "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase."
+        : "Rode o SQL em supabase/migrations/20261014130000_alerta_sentry.sql no Supabase.";
+      slugDisponivel = false;
+      sistemas = (base.data ?? []).map((sistema) => ({
+        ...sistema,
+        slug: null,
+      }));
+    } else {
+      aviso =
+        "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase.";
+      slugDisponivel = false;
+      sistemas = [];
+    }
+  }
 
   return (
     <PainelComAmbiente perfil={perfil}>
-      <SistemasApp sistemas={data ?? []} aviso={aviso} />
+      <SistemasApp
+        sistemas={sistemas}
+        aviso={aviso}
+        slugDisponivel={slugDisponivel}
+        podeTestar={perfil.role === "admin"}
+      />
     </PainelComAmbiente>
   );
 }

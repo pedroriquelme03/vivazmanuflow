@@ -1,6 +1,23 @@
 export type VolumeNome = { rotulo: string; valor: number };
 export type HoraVolume = { hora: number; total: number };
 
+export function volumeErrosSentry(
+  itens:
+    | { sistema: string; chamados: number; ocorrencias: number }[]
+    | null
+    | undefined,
+): VolumeNome[] {
+  return (itens ?? [])
+    .filter((item) => item.chamados > 0 || item.ocorrencias > 0)
+    .map((item) => {
+      const chamados = `${item.chamados} ${item.chamados === 1 ? "chamado" : "chamados"}`;
+      return {
+        rotulo: `${item.sistema?.trim() || "Sistema sem cadastro"} · ${chamados}`,
+        valor: item.ocorrencias,
+      };
+    });
+}
+
 export function volumeLocaisDigitados(
   porSublocal: { local: string; total: number }[] | null | undefined,
 ): VolumeNome[] {

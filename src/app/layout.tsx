@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NavigationLoader } from "@/components/NavigationLoader";
+import { Observabilidade } from "@/components/Observabilidade";
 import { RegistrarPwa } from "@/components/RegistrarPwa";
 import "./globals.css";
 
@@ -43,6 +44,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <RegistrarPwa />
+        <Observabilidade />
         <Suspense fallback={null}>
           <NavigationLoader />
         </Suspense>

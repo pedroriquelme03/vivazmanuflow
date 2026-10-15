@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { slugValido, sugerirSlug } from "@/lib/slug-sistema";
+import { TesteObservabilidade } from "./TesteObservabilidade";
 
 type Sistema = {
   id: string;
   nome: string;
+  slug: string | null;
   ativo: boolean;
 };
 
@@ -16,23 +19,36 @@ const inputCls =
 export function SistemasApp({
   sistemas,
   aviso,
+  slugDisponivel,
+  podeTestar,
 }: {
   sistemas: Sistema[];
   aviso: string | null;
+  slugDisponivel: boolean;
+  podeTestar: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [nome, setNome] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugManual, setSlugManual] = useState(false);
   const [erro, setErro] = useState<string | null>(aviso);
   const [salvando, setSalvando] = useState(false);
 
   async function adicionar() {
     setErro(null);
     if (!nome.trim()) return setErro("Informe o nome do sistema.");
+    const slugFinal = (slugManual ? slug : sugerirSlug(nome)).trim();
+    if (slugDisponivel && !slugValido(slugFinal)) {
+      return setErro(
+        "O slug usa letras minúsculas, números e hífen. Ex.: chamados, portal-rh.",
+      );
+    }
     setSalvando(true);
     const { error } = await supabase.from("sistemas").insert({
       nome: nome.trim(),
       ativo: true,
+      ...(slugDisponivel ? { slug: slugFinal } : {}),
     });
     setSalvando(false);
     if (error) {
@@ -42,15 +58,23 @@ export function SistemasApp({
         error.message.includes("sistemas")
       ) {
         return setErro(
-          "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase.",
+          error.message.includes("slug")
+            ? "Rode o SQL em supabase/migrations/20261014130000_alerta_sentry.sql no Supabase."
+            : "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase.",
         );
       }
       if (error.code === "23505") {
-        return setErro("Já existe um sistema com esse nome.");
+        return setErro(
+          error.message.includes("slug")
+            ? "Já existe um sistema com esse slug."
+            : "Já existe um sistema com esse nome.",
+        );
       }
       return setErro(error.message);
     }
     setNome("");
+    setSlug("");
+    setSlugManual(false);
     router.refresh();
   }
 
@@ -79,9 +103,25 @@ export function SistemasApp({
             className={inputCls}
             placeholder="Nome (ex.: PMS, Wi-Fi, Channel)"
             value={nome}
-            onChange={(e) => setNome(e.target.value)}
+            onChange={(e) => {
+              setNome(e.target.value);
+              if (!slugManual) setSlug(sugerirSlug(e.target.value));
+            }}
             maxLength={80}
           />
+          {slugDisponivel && (
+            <input
+              className={inputCls}
+              placeholder="Slug (ex.: portal-rh)"
+              value={slug}
+              onChange={(e) => {
+                setSlugManual(true);
+                setSlug(e.target.value.toLowerCase());
+              }}
+              maxLength={40}
+              spellCheck={false}
+            />
+          )}
           <button
             type="button"
             onClick={adicionar}
@@ -91,6 +131,11 @@ export function SistemasApp({
             {salvando ? "Salvando…" : "Cadastrar sistema"}
           </button>
         </div>
+        {slugDisponivel && (
+          <p className="mt-2 text-xs text-slate-500">
+            O slug é a chave que o Sentry envia. Este sistema usa chamados.
+          </p>
+        )}
         {erro && (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             {erro}
@@ -105,30 +150,105 @@ export function SistemasApp({
           </p>
         )}
         {sistemas.map((sistema) => (
-          <div
+          <LinhaSistema
             key={sistema.id}
-            className={`flex flex-col gap-2 rounded-xl border bg-white px-4 py-3 sm:flex-row sm:items-center ${
-              sistema.ativo ? "border-slate-200" : "border-slate-100 opacity-60"
-            }`}
-          >
-            <p className="min-w-0 flex-1 break-words font-semibold text-slate-900">
-              {sistema.nome}
-              {!sistema.ativo && (
-                <span className="ml-2 text-xs font-medium text-slate-400">
-                  inativo
-                </span>
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={() => toggle(sistema)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              {sistema.ativo ? "Desativar" : "Ativar"}
-            </button>
-          </div>
+            sistema={sistema}
+            slugDisponivel={slugDisponivel}
+            onErro={setErro}
+            onToggle={() => toggle(sistema)}
+          />
         ))}
       </div>
+
+      {podeTestar && <TesteObservabilidade />}
+    </div>
+  );
+}
+
+function LinhaSistema({
+  sistema,
+  slugDisponivel,
+  onErro,
+  onToggle,
+}: {
+  sistema: Sistema;
+  slugDisponivel: boolean;
+  onErro: (mensagem: string | null) => void;
+  onToggle: () => void;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [slug, setSlug] = useState(sistema.slug ?? "");
+  const [salvando, setSalvando] = useState(false);
+  const mudou = slug.trim() !== (sistema.slug ?? "");
+
+  async function salvarSlug() {
+    onErro(null);
+    if (!slugValido(slug.trim())) {
+      return onErro(
+        "O slug usa letras minúsculas, números e hífen. Ex.: chamados, portal-rh.",
+      );
+    }
+    setSalvando(true);
+    const { error } = await supabase
+      .from("sistemas")
+      .update({ slug: slug.trim() })
+      .eq("id", sistema.id);
+    setSalvando(false);
+    if (error) {
+      if (error.code === "23505") {
+        return onErro("Já existe um sistema com esse slug.");
+      }
+      return onErro(error.message);
+    }
+    router.refresh();
+  }
+
+  return (
+    <div
+      className={`flex flex-col gap-2 rounded-xl border bg-white px-4 py-3 sm:flex-row sm:items-center ${
+        sistema.ativo ? "border-slate-200" : "border-slate-100 opacity-60"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="break-words font-semibold text-slate-900">
+          {sistema.nome}
+          {!sistema.ativo && (
+            <span className="ml-2 text-xs font-medium text-slate-400">
+              inativo
+            </span>
+          )}
+        </p>
+        {slugDisponivel && (
+          <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              className={inputCls}
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase())}
+              maxLength={40}
+              spellCheck={false}
+              aria-label={`Slug de ${sistema.nome}`}
+            />
+            {mudou && (
+              <button
+                type="button"
+                onClick={() => void salvarSlug()}
+                disabled={salvando}
+                className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                {salvando ? "Salvando…" : "Salvar slug"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+      >
+        {sistema.ativo ? "Desativar" : "Ativar"}
+      </button>
     </div>
   );
 }
