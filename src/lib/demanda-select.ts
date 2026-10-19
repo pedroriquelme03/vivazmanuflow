@@ -10,7 +10,7 @@ export const DEMANDA_SELECT = `
   solicitante:solicitantes(nome),
   local:locais(nome),
   propriedade:propriedades(nome),
-  colaborador:usuarios(nome),
+  colaborador:usuarios!demandas_colaborador_id_fkey(nome),
   evento:eventos(nome),
   projeto:projetos(nome),
   anexos:demanda_anexos(url, tipo, enviado_por, criado_em)
