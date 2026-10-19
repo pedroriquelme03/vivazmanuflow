@@ -934,6 +934,7 @@ export type Database = {
           atualizado_em: string | null
           email: string | null
           foto_url: string | null
+          governanca_papel: string | null
           id: string
           nome: string
           propriedade_id: string | null
@@ -946,6 +947,7 @@ export type Database = {
           atualizado_em?: string | null
           email?: string | null
           foto_url?: string | null
+          governanca_papel?: string | null
           id: string
           nome: string
           propriedade_id?: string | null
@@ -958,6 +960,7 @@ export type Database = {
           atualizado_em?: string | null
           email?: string | null
           foto_url?: string | null
+          governanca_papel?: string | null
           id?: string
           nome?: string
           propriedade_id?: string | null
@@ -1012,6 +1015,305 @@ export type Database = {
           usuario_id?: string | null
         }
         Relationships: []
+      }
+      gov_acomodacoes: {
+        Row: {
+          id: string
+          numero: string
+          tipo: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          numero: string
+          tipo: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          numero?: string
+          tipo?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      gov_camareiras: {
+        Row: {
+          id: string
+          nome: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      gov_processos: {
+        Row: {
+          id: string
+          nome: string
+          descricao: string | null
+          tipo: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          descricao?: string | null
+          tipo?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          descricao?: string | null
+          tipo?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      gov_secoes: {
+        Row: {
+          id: string
+          processo_id: string
+          nome: string
+          ordem: number
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          processo_id: string
+          nome: string
+          ordem?: number
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          processo_id?: string
+          nome?: string
+          ordem?: number
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_secoes_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "gov_processos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_perguntas: {
+        Row: {
+          id: string
+          secao_id: string
+          texto: string
+          ordem: number
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          secao_id: string
+          texto: string
+          ordem?: number
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          secao_id?: string
+          texto?: string
+          ordem?: number
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_perguntas_secao_id_fkey"
+            columns: ["secao_id"]
+            isOneToOne: false
+            referencedRelation: "gov_secoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_inspecoes: {
+        Row: {
+          id: string
+          processo_id: string
+          acomodacao_id: string
+          tipo: string
+          camareira_id: string | null
+          inspetor_id: string
+          status: string
+          criado_em: string
+          finalizada_em: string | null
+        }
+        Insert: {
+          id?: string
+          processo_id: string
+          acomodacao_id: string
+          tipo: string
+          camareira_id?: string | null
+          inspetor_id: string
+          status?: string
+          criado_em?: string
+          finalizada_em?: string | null
+        }
+        Update: {
+          id?: string
+          processo_id?: string
+          acomodacao_id?: string
+          tipo?: string
+          camareira_id?: string | null
+          inspetor_id?: string
+          status?: string
+          criado_em?: string
+          finalizada_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_inspecoes_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "gov_processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_inspecoes_acomodacao_id_fkey"
+            columns: ["acomodacao_id"]
+            isOneToOne: false
+            referencedRelation: "gov_acomodacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_inspecoes_camareira_id_fkey"
+            columns: ["camareira_id"]
+            isOneToOne: false
+            referencedRelation: "gov_camareiras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_inspecoes_inspetor_id_fkey"
+            columns: ["inspetor_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_respostas: {
+        Row: {
+          id: string
+          inspecao_id: string
+          pergunta_id: string | null
+          pergunta_texto: string
+          secao_nome: string
+          secao_ordem: number
+          pergunta_ordem: number
+          resposta: string | null
+          comentario: string | null
+          anexo_url: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          inspecao_id: string
+          pergunta_id?: string | null
+          pergunta_texto: string
+          secao_nome: string
+          secao_ordem?: number
+          pergunta_ordem?: number
+          resposta?: string | null
+          comentario?: string | null
+          anexo_url?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          inspecao_id?: string
+          pergunta_id?: string | null
+          pergunta_texto?: string
+          secao_nome?: string
+          secao_ordem?: number
+          pergunta_ordem?: number
+          resposta?: string | null
+          comentario?: string | null
+          anexo_url?: string | null
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_respostas_inspecao_id_fkey"
+            columns: ["inspecao_id"]
+            isOneToOne: false
+            referencedRelation: "gov_inspecoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_respostas_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "gov_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_planos_acao: {
+        Row: {
+          id: string
+          resposta_id: string
+          prioridade: string
+          o_que_fazer: string
+          quem_vai_fazer: string | null
+          quem_pediu: string | null
+          observacao: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          resposta_id: string
+          prioridade?: string
+          o_que_fazer: string
+          quem_vai_fazer?: string | null
+          quem_pediu?: string | null
+          observacao?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          resposta_id?: string
+          prioridade?: string
+          o_que_fazer?: string
+          quem_vai_fazer?: string | null
+          quem_pediu?: string | null
+          observacao?: string | null
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_planos_acao_resposta_id_fkey"
+            columns: ["resposta_id"]
+            isOneToOne: false
+            referencedRelation: "gov_respostas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1203,6 +1505,10 @@ export type Database = {
       }
       admin_concluir_demanda: {
         Args: { p_id: string; p_observacao: string }
+        Returns: undefined
+      }
+      admin_definir_governanca: {
+        Args: { p_user_id: string; p_papel: string | null }
         Returns: undefined
       }
       admin_definir_ambientes: {

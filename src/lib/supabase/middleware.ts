@@ -3,7 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 /** Rotas que exigem login (área do staff). */
-const PROTECTED_PREFIXES = ["/lider", "/colaborador", "/admin", "/solicitante"];
+const PROTECTED_PREFIXES = [
+  "/lider",
+  "/colaborador",
+  "/admin",
+  "/solicitante",
+  "/governanca",
+];
 
 /**
  * Mantém a sessão do Supabase atualizada nos cookies e protege as áreas

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
@@ -735,6 +736,15 @@ function PerfilColab({ perfil }: { perfil: Perfil }) {
           </div>
         </dl>
       </div>
+
+      {perfil.governanca_papel && (
+        <Link
+          href="/governanca"
+          className="mt-4 block w-full rounded-xl bg-brand-600 px-4 py-3.5 text-center text-base font-semibold text-white transition hover:bg-brand-700"
+        >
+          Checklist de governança
+        </Link>
+      )}
 
       <form action={logout} className="mt-4">
         <button

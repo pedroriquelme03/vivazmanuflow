@@ -9,6 +9,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { AvisoPush } from "@/components/AvisoPush";
 import { TrocaAmbiente } from "@/components/TrocaAmbiente";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
+import { papelGovernanca } from "@/lib/governanca";
 
 const ROLE_BADGE: Record<Perfil["role"], string> = {
   admin: "ADMIN",
@@ -25,6 +26,7 @@ type NavItem = {
   soAdmin?: boolean;
   soManutencao?: boolean;
   soTi?: boolean;
+  soGovernanca?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -129,6 +131,18 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/governanca",
+    rotulo: "Governança",
+    soGovernanca: true,
+    match: (p) => p.startsWith("/governanca"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <rect x="5" y="4" width="14" height="17" rx="2" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6" />
+      </svg>
+    ),
+  },
+  {
     href: "/lider/metricas",
     rotulo: "Métricas",
     match: (p) => p.startsWith("/lider/metricas"),
@@ -152,7 +166,7 @@ export function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const ti = ambiente === "ti";
-  const itens = itensDoMenu(perfil.role === "admin", ti);
+  const itens = itensDoMenu(perfil, ti);
   const destaque = ti ? "text-white" : "text-brand-500";
   const ponto = ti ? "bg-white" : "bg-brand-500";
 
@@ -299,12 +313,15 @@ export function PainelShell({
   );
 }
 
-function itensDoMenu(ehAdmin: boolean, ti: boolean) {
+function itensDoMenu(perfil: Perfil, ti: boolean) {
+  const ehAdmin = perfil.role === "admin";
+  const governanca = papelGovernanca(perfil.role, perfil.governanca_papel) !== null;
   return NAV.filter(
     (item) =>
       (!item.soAdmin || ehAdmin) &&
       (!item.soManutencao || !ti) &&
-      (!item.soTi || ti),
+      (!item.soTi || ti) &&
+      (!item.soGovernanca || governanca),
   );
 }
 
@@ -319,7 +336,7 @@ function MobileBar({
 }) {
   const pathname = usePathname();
   const ti = ambiente === "ti";
-  const itens = itensDoMenu(perfil.role === "admin", ti);
+  const itens = itensDoMenu(perfil, ti);
 
   return (
     <div
