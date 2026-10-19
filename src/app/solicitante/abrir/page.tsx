@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { listaAmbientes } from "@/lib/ambiente-equipe";
 import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { BrandMark } from "@/components/BrandMark";
@@ -18,7 +19,12 @@ export default async function SolicitanteAbrirPage({
   if (perfil.role !== "solicitante") redirect(rotaInicial(perfil.role));
 
   const { tipo } = await searchParams;
-  const ambiente = tipo === "manutencao" ? "manutencao" : "ti";
+  const permitidos = listaAmbientes(perfil.ambientes);
+  const pedido = tipo === "manutencao" || tipo === "ti" ? tipo : null;
+  if (!pedido || !permitidos.includes(pedido)) {
+    redirect(`/solicitante/abrir?tipo=${permitidos[0]}`);
+  }
+  const ambiente = pedido;
 
   const supabase = await createClient();
   const [{ data: propriedades }, { data: solicitantes }, sistemasRes] = await Promise.all([

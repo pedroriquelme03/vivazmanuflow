@@ -25,6 +25,8 @@ export type AlertaSentry = {
   ambiente: string;
   mensagem: string;
   rota: string | null;
+  navegador: string | null;
+  versao: string | null;
   quadro: "ti" | "manutencao" | null;
   ocorrencias: number;
   usuarios: number;
@@ -76,7 +78,7 @@ export function urlPermitida(valor: string | null, max = 300) {
   return semConsulta.slice(0, max) || null;
 }
 
-/** Só produção abre chamado. Alta usa prioridade alta e afeta a experiência. */
+/** Só produção abre chamado. Todo erro ou fatal entra como Alta. */
 export function prioridadeAlerta(entrada: {
   ambiente: string;
   nivel: string;
@@ -85,14 +87,8 @@ export function prioridadeAlerta(entrada: {
 }): PrioridadeAlerta | null {
   if (entrada.ambiente.trim().toLowerCase() !== "production") return null;
   const nivel = entrada.nivel.trim().toLowerCase();
-  if (nivel === "fatal") {
-    return { prioridade: "alta", afetaExperiencia: true };
-  }
-  if (nivel !== "error") return null;
-  const alta = entrada.usuarios >= 5 || entrada.ocorrencias >= 10;
-  return alta
-    ? { prioridade: "alta", afetaExperiencia: true }
-    : { prioridade: "media", afetaExperiencia: false };
+  if (nivel !== "fatal" && nivel !== "error") return null;
+  return { prioridade: "alta", afetaExperiencia: true };
 }
 
 export function decisaoAlerta(
@@ -121,15 +117,19 @@ export function montarDescricaoAlerta(alerta: AlertaSentry) {
         ? "Tela de Manutenção"
         : null;
   const linhas = [
-    alerta.mensagem,
+    `Erro: ${alerta.mensagem}`,
+    quadro ? `Onde: ${quadro}` : null,
     alerta.rota ? `Rota: ${alerta.rota}` : null,
-    quadro,
+    alerta.navegador ? `Navegador: ${alerta.navegador}` : null,
+    alerta.versao ? `Versão: ${alerta.versao}` : null,
     alerta.ambiente ? `Ambiente: ${alerta.ambiente}` : null,
     alerta.issueId ? `Issue: ${alerta.issueId}` : null,
     alerta.sentryUrl ? `Sentry: ${alerta.sentryUrl}` : null,
-    !alerta.posthogUrl && alerta.posthogSession
-      ? `Sessão PostHog: ${alerta.posthogSession}`
-      : null,
+    alerta.posthogUrl
+      ? `Replay: ${alerta.posthogUrl}`
+      : alerta.posthogSession
+        ? `Sessão PostHog: ${alerta.posthogSession}`
+        : null,
   ].filter((linha): linha is string => Boolean(linha));
   return sanitizarTexto(linhas.join("\n"), 2000);
 }
@@ -147,12 +147,16 @@ export function extrairAlertaSentry(corpo: unknown): AlertaSentry | null {
     ...tagsDe(event?.tags),
   };
   const metadata = objeto(event?.metadata) ?? objeto(issue?.metadata);
+  const excecao = primeiraExcecao(event) ?? primeiraExcecao(issue);
   const request = objeto(event?.request);
   const mensagemBruta =
     texto(event?.title) ??
-    texto(event?.message) ??
     texto(issue?.title) ??
-    juntar(texto(metadata?.type), texto(metadata?.value)) ??
+    juntar(
+      texto(metadata?.type) ?? texto(excecao?.type),
+      texto(metadata?.value) ?? texto(excecao?.value),
+    ) ??
+    texto(event?.message) ??
     "Erro identificado automaticamente";
   const rotaBruta =
     tags.url ??
@@ -186,6 +190,8 @@ export function extrairAlertaSentry(corpo: unknown): AlertaSentry | null {
     ).toLowerCase(),
     mensagem: sanitizarTexto(mensagemBruta, 500),
     rota: rotaLimpa(rotaBruta),
+    navegador: textoCurto(tags.browser),
+    versao: textoCurto(tags.release ?? texto(event?.release) ?? texto(issue?.release)),
     quadro,
     ocorrencias: inteiro(issue?.count ?? event?.count ?? tags.times_seen, 1),
     usuarios: inteiro(issue?.userCount ?? issue?.user_count, 0),
@@ -202,6 +208,19 @@ export function extrairAlertaSentry(corpo: unknown): AlertaSentry | null {
         ? posthogSession
         : null,
   };
+}
+
+function primeiraExcecao(origem: Record<string, unknown> | null) {
+  const excecao = objeto(origem?.exception);
+  const valores = excecao?.values;
+  if (!Array.isArray(valores) || valores.length === 0) return null;
+  return objeto(valores[0]);
+}
+
+function textoCurto(valor: string | null | undefined) {
+  if (!valor) return null;
+  const limpo = sanitizarTexto(valor, 80);
+  return limpo || null;
 }
 
 function rotaLimpa(valor: string | null) {

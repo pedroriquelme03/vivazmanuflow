@@ -479,6 +479,41 @@ export type Database = {
         }
         Relationships: []
       }
+      push_inscricoes: {
+        Row: {
+          id: string
+          usuario_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_inscricoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       preventiva_locais: {
         Row: {
           id: string
@@ -1003,6 +1038,10 @@ export type Database = {
       }
       aplicar_experiencia_hospede: {
         Args: { p_token: string; p_afeta?: boolean }
+        Returns: undefined
+      }
+      salvar_push_inscricao: {
+        Args: { p_endpoint: string; p_p256dh: string; p_auth: string }
         Returns: undefined
       }
       aplicar_alerta_sentry: {

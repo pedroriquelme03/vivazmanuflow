@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
-import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
+import { AvisoPush } from "@/components/AvisoPush";
+import { listaAmbientes, type AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   STATUS_BADGE,
   STATUS_LABEL,
@@ -65,7 +66,10 @@ export function SolicitantePainel({
   abaInicial?: string;
 }) {
   const aba = lerAba(abaInicial);
-  const [filtro, setFiltro] = useState<AmbienteEquipe>("ti");
+  const permitidos = listaAmbientes(perfil.ambientes);
+  const [filtro, setFiltro] = useState<AmbienteEquipe>(
+    permitidos.includes("ti") ? "ti" : "manutencao",
+  );
   const [historico, setHistorico] = useState(false);
   const primeiroNome = perfil.nome.split(" ")[0];
   const abertos = useMemo(
@@ -82,12 +86,16 @@ export function SolicitantePainel({
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <AvisoPush />
       <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-28">
-        {aba === "abrir" && <AbaAbrir nome={primeiroNome} />}
+        {aba === "abrir" && (
+          <AbaAbrir nome={primeiroNome} ambientes={permitidos} />
+        )}
         {aba === "chamados" && (
           <AbaChamados
             filtro={filtro}
             onFiltro={setFiltro}
+            ambientes={permitidos}
             historico={historico}
             onHistorico={setHistorico}
             lista={lista}
@@ -100,26 +108,42 @@ export function SolicitantePainel({
   );
 }
 
-function AbaAbrir({ nome }: { nome: string }) {
+function AbaAbrir({
+  nome,
+  ambientes,
+}: {
+  nome: string;
+  ambientes: AmbienteEquipe[];
+}) {
+  const temTi = ambientes.includes("ti");
+  const temManutencao = ambientes.includes("manutencao");
+  const texto =
+    temTi && temManutencao
+      ? "Abra um chamado de TI ou de Manutenção."
+      : temTi
+        ? "Abra um chamado de TI."
+        : "Abra um chamado de Manutenção.";
   return (
     <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col items-center justify-center text-center">
       <h1 className="text-xl font-bold">Olá, {nome}</h1>
-      <p className="mt-0.5 text-sm text-slate-500">
-        Abra um chamado de TI ou de Manutenção.
-      </p>
+      <p className="mt-0.5 text-sm text-slate-500">{texto}</p>
       <div className="mt-6 grid w-full max-w-xs gap-3">
-        <Link
-          href="/solicitante/abrir?tipo=ti"
-          className="block rounded-2xl bg-[#1E293B] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#0f172a]"
-        >
-          Abrir chamado de TI
-        </Link>
-        <Link
-          href="/solicitante/abrir?tipo=manutencao"
-          className="block rounded-2xl bg-[#0891b2] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-[#0e7490]"
-        >
-          Abrir chamado de Manutenção
-        </Link>
+        {temTi && (
+          <Link
+            href="/solicitante/abrir?tipo=ti"
+            className="block rounded-2xl bg-[#1E293B] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#0f172a]"
+          >
+            Abrir chamado de TI
+          </Link>
+        )}
+        {temManutencao && (
+          <Link
+            href="/solicitante/abrir?tipo=manutencao"
+            className="block rounded-2xl bg-[#0891b2] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-[#0e7490]"
+          >
+            Abrir chamado de Manutenção
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -131,21 +155,27 @@ function AbaChamados({
   historico,
   onHistorico,
   lista,
+  ambientes,
 }: {
   filtro: AmbienteEquipe;
   onFiltro: (valor: AmbienteEquipe) => void;
   historico: boolean;
   onHistorico: (valor: boolean) => void;
   lista: ChamadoSolicitante[];
+  ambientes: AmbienteEquipe[];
 }) {
   const nomeAmbiente = filtro === "ti" ? "TI" : "Manutenção";
+  const dois = ambientes.includes("ti") && ambientes.includes("manutencao");
   return (
     <>
       <h1 className="text-xl font-bold">Meus chamados</h1>
       <p className="mt-0.5 text-sm text-slate-500">
-        TI e Manutenção ficam em listas separadas.
+        {dois
+          ? "TI e Manutenção ficam em listas separadas."
+          : `Seus chamados de ${nomeAmbiente}.`}
       </p>
 
+      {dois && (
       <div className="mt-4 grid grid-cols-2 rounded-full bg-slate-100 p-1 text-sm font-semibold">
         <button
           type="button"
@@ -170,6 +200,7 @@ function AbaChamados({
           Manutenção
         </button>
       </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 rounded-full bg-slate-100 p-1 text-sm font-semibold">
         <button

@@ -33,6 +33,7 @@ import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 import { ambientesDoPapel } from "@/lib/ambiente-equipe";
+import { AvisoPush } from "@/components/AvisoPush";
 import { TrocaAmbiente } from "@/components/TrocaAmbiente";
 import {
   aplicarPegarNoPainel,
@@ -199,6 +200,7 @@ export function ColaboradorPainel({
           <TrocaAmbiente valor={ambiente} />
         </div>
       )}
+      <AvisoPush />
       <main className="mx-auto w-full max-w-md flex-1 px-4 pb-28 pt-6">
         {aba === "demandas" && (
           <ListaDemandas

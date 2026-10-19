@@ -637,7 +637,7 @@ export function DetalheDemandaModal({
           )}
 
           {!editandoConteudo && demanda.descricao && (
-            <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
+            <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-700">
               {demanda.descricao}
             </p>
           )}
@@ -647,14 +647,18 @@ export function DetalheDemandaModal({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Alerta do Sentry
               </p>
-              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+              <dl className="mt-2 grid grid-cols-1 gap-x-3 gap-y-2 text-sm sm:grid-cols-2">
                 <Info
                   rotulo="Ocorrências"
                   valor={String(demanda.sentry_ocorrencias ?? "—")}
                 />
                 <Info
                   rotulo="Usuários"
-                  valor={String(demanda.sentry_usuarios ?? "—")}
+                  valor={
+                    demanda.sentry_usuarios
+                      ? String(demanda.sentry_usuarios)
+                      : "—"
+                  }
                 />
                 <Info
                   rotulo="Primeira vez"
@@ -664,7 +668,9 @@ export function DetalheDemandaModal({
                   rotulo="Última vez"
                   valor={formatarData(demanda.sentry_ultima_em)}
                 />
-                <Info rotulo="Rota" valor={demanda.sentry_rota} />
+                <div className="min-w-0 sm:col-span-2">
+                  <Info rotulo="Rota" valor={demanda.sentry_rota} />
+                </div>
                 <Info
                   rotulo="Tela"
                   valor={
@@ -1104,7 +1110,7 @@ function Info({
       <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
         {rotulo}
       </dt>
-      <dd className="text-slate-800">{valor || "—"}</dd>
+      <dd className="min-w-0 break-words text-slate-800">{valor || "—"}</dd>
     </div>
   );
 }

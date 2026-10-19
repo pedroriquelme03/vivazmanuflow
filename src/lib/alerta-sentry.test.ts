@@ -33,29 +33,13 @@ describe("prioridade do alerta", () => {
     ).toEqual({ prioridade: "alta", afetaExperiencia: true });
   });
 
-  it("error em produção fica Normal até 5 usuários ou 10 ocorrências", () => {
-    expect(
-      prioridadeAlerta({
-        ambiente: "production",
-        nivel: "error",
-        usuarios: 4,
-        ocorrencias: 9,
-      }),
-    ).toEqual({ prioridade: "media", afetaExperiencia: false });
-    expect(
-      prioridadeAlerta({
-        ambiente: "production",
-        nivel: "error",
-        usuarios: 5,
-        ocorrencias: 1,
-      }),
-    ).toEqual({ prioridade: "alta", afetaExperiencia: true });
+  it("todo error em produção entra como Alta", () => {
     expect(
       prioridadeAlerta({
         ambiente: "production",
         nivel: "error",
         usuarios: 1,
-        ocorrencias: 10,
+        ocorrencias: 1,
       }),
     ).toEqual({ prioridade: "alta", afetaExperiencia: true });
   });
@@ -199,7 +183,8 @@ describe("extração do payload", () => {
   it("monta a descrição sem o token da rota", () => {
     expect(alerta).not.toBeNull();
     const texto = montarDescricaoAlerta(alerta!);
-    expect(texto).toContain("Tela de TI");
+    expect(texto).toContain("Erro: TypeError: falhou");
+    expect(texto).toContain("Onde: Tela de TI");
     expect(texto).toContain("Issue: 99");
     expect(texto).not.toContain("segredo");
   });

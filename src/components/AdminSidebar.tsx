@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import { BrandMark } from "@/components/BrandMark";
+import { AvisoPush } from "@/components/AvisoPush";
 import { TrocaAmbiente } from "@/components/TrocaAmbiente";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 
@@ -289,6 +290,7 @@ export function PainelShell({
           ambiente={ambiente}
           mostraTroca={mostraTroca}
         />
+        <AvisoPush />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </div>

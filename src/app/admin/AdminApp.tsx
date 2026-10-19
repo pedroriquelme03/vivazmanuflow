@@ -391,10 +391,7 @@ function ModalEditarEquipe({
       propriedadeId: propId,
       userId: usuario.id,
       role,
-      ambientes:
-        role === "solicitante"
-          ? (["manutencao", "ti"] as const)
-          : ambientesMarcados(manutencao, ti),
+      ambientes: ambientesMarcados(manutencao, ti),
     };
     const falha = validarEdicaoEquipe(dados);
     if (falha) return setErro(falha);
@@ -513,17 +510,16 @@ function ModalEditarEquipe({
             </select>
           </CampoModal>
           <CampoModal rotulo="Ambientes">
-            {role === "solicitante" ? (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                Solicitante abre chamado de TI e de Manutenção.
+            <EscolhaAmbientes
+              manutencao={manutencao}
+              ti={ti}
+              onManutencao={setManutencao}
+              onTi={setTi}
+            />
+            {role === "solicitante" && (
+              <p className="mt-1 text-xs text-slate-500">
+                Desmarque um quadro para a pessoa abrir chamado só no outro.
               </p>
-            ) : (
-              <EscolhaAmbientes
-                manutencao={manutencao}
-                ti={ti}
-                onManutencao={setManutencao}
-                onTi={setTi}
-              />
             )}
           </CampoModal>
           <CampoModal rotulo="Local">

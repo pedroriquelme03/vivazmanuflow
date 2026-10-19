@@ -776,7 +776,7 @@ function Card({
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold leading-tight text-slate-800">
+        <p className="min-w-0 break-words text-sm font-semibold leading-snug text-slate-800">
           {demanda.titulo}
         </p>
         <div className="flex shrink-0 flex-col items-end gap-1">
