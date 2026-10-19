@@ -453,7 +453,10 @@ function CardTv({
       ? null
       : calcularUrgencia(demanda.prazo_confirmado, demanda.atribuido_em, agora);
 
-  const pesoMax = demanda.afeta_experiencia || (demanda.peso ?? 0) >= 10;
+  const encerrada =
+    demanda.status === "concluida" || demanda.status === "cancelada";
+  const pesoMax =
+    !encerrada && (demanda.afeta_experiencia || (demanda.peso ?? 0) >= 10);
   const fotoNaoPerturbe = urlFotoNaoPerturbe(
     demanda.motivo_nao_conclusao,
     demanda.anexos,
