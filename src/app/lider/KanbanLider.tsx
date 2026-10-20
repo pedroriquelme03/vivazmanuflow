@@ -19,6 +19,7 @@ import {
 } from "@/lib/demanda-ui";
 import type { Enums } from "@/lib/database.types";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { GrupoFiltros } from "@/components/GrupoFiltros";
 import { AtribuirModal } from "./AtribuirModal";
 import { DetalheDemandaModal } from "./DetalheDemandaModal";
 import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
@@ -90,8 +91,10 @@ function ColunaQuadro({
 }) {
   return (
     <section
-      className={`flex h-full flex-col overflow-hidden rounded-xl p-2 ${
-        cheia ? "w-full min-w-0" : "min-w-[17.5rem] flex-1 shrink-0"
+      className={`flex flex-col rounded-xl p-2 ${
+        cheia
+          ? "w-full min-w-0"
+          : "h-full min-w-[17.5rem] flex-1 shrink-0 overflow-hidden"
       } ${className}`}
     >
       <header className="shrink-0 px-2 py-1.5">
@@ -105,7 +108,11 @@ function ColunaQuadro({
           <p className="mt-0.5 text-[11px] text-slate-400">{subtitulo}</p>
         )}
       </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
+      <div
+        className={`flex flex-col gap-2 ${
+          cheia ? "" : "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        }`}
+      >
         {itens.map((d) => (
           <Card
             key={d.id}
@@ -314,9 +321,9 @@ export function KanbanLider({
   }
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 py-3 md:p-4">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 py-3 md:overflow-hidden md:p-4">
       <div className="mb-3 flex shrink-0 flex-col gap-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-lg font-bold">
               {ambiente === "ti" ? "Chamados" : "Demandas"}
@@ -360,31 +367,7 @@ export function KanbanLider({
               </span>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 sm:items-center">
-            <button
-              type="button"
-              onClick={() => setVerArquivado(true)}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto sm:px-3 sm:text-sm"
-            >
-              Arquivado
-              {arquivadas.length > 0 && (
-                <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">
-                  {arquivadas.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setNovaModoProjeto("oculto");
-                setNovaProjetoPadrao("");
-                setCriando("concluido");
-              }}
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 sm:w-auto sm:px-3 sm:text-sm"
-            >
-              <span className="sm:hidden">Concluído</span>
-              <span className="hidden sm:inline">Registrar concluído</span>
-            </button>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <button
               type="button"
               onClick={() => {
@@ -394,99 +377,120 @@ export function KanbanLider({
                 );
                 setCriando("fila");
               }}
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-2 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 sm:w-auto sm:px-3.5 sm:text-sm"
+              className="order-first inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-base font-semibold text-white shadow-md shadow-brand-600/25 transition hover:bg-brand-700 md:order-last md:w-auto md:rounded-lg md:px-3.5 md:py-2 md:text-sm md:shadow-none"
             >
-              <span className="text-base leading-none">＋</span>
-              <span className="sm:hidden">Nova</span>
-              <span className="hidden sm:inline">
-                {ambiente === "ti" ? "Novo chamado" : "Nova demanda"}
-              </span>
+              <span className="text-lg leading-none md:text-base">＋</span>
+              {ambiente === "ti" ? "Novo chamado" : "Nova demanda"}
             </button>
+            <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
+              <button
+                type="button"
+                onClick={() => setVerArquivado(true)}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 md:w-auto md:px-3 md:text-sm"
+              >
+                Arquivado
+                {arquivadas.length > 0 && (
+                  <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">
+                    {arquivadas.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNovaModoProjeto("oculto");
+                  setNovaProjetoPadrao("");
+                  setCriando("concluido");
+                }}
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 md:w-auto md:px-3 md:text-sm"
+              >
+                <span className="md:hidden">Concluído</span>
+                <span className="hidden md:inline">Registrar concluído</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <GrupoFiltros ativo={temFiltro}>
           <input
             type="search"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar título, solicitante, sublocal…"
-            className={`w-full min-w-0 sm:min-w-[12rem] sm:flex-1 ${filtroCls}`}
+            className={`w-full min-w-0 ${filtroCls}`}
           />
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-1 sm:flex-wrap sm:items-center">
+          <select
+            value={colaboradorFiltro}
+            onChange={(e) => setColaboradorFiltro(e.target.value)}
+            className={`min-w-0 w-full ${filtroCls}`}
+          >
+            <option value="">Colaborador</option>
+            {colaboradoresFiltro.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+          <select
+            value={prioridadeFiltro}
+            onChange={(e) =>
+              setPrioridadeFiltro(e.target.value as "" | Prioridade)
+            }
+            className={`min-w-0 w-full ${filtroCls}`}
+          >
+            <option value="">Prioridade</option>
+            {(["alta", "media", "baixa"] as const).map((p) => (
+              <option key={p} value={p}>
+                {PRIORIDADE_LABEL[p]}
+              </option>
+            ))}
+          </select>
+          {ambiente === "ti" && (
             <select
-              value={colaboradorFiltro}
-              onChange={(e) => setColaboradorFiltro(e.target.value)}
-              className={`min-w-0 w-full sm:w-auto sm:max-w-[14rem] ${filtroCls}`}
+              value={sistemaFiltro}
+              onChange={(e) => setSistemaFiltro(e.target.value)}
+              className={`min-w-0 w-full ${filtroCls}`}
             >
-              <option value="">Colaborador</option>
-              {colaboradoresFiltro.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
+              <option value="">Todos os sistemas</option>
+              {sistemas.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
                 </option>
               ))}
             </select>
+          )}
+          {ehGestor && visao === "projetos" && (
             <select
-              value={prioridadeFiltro}
-              onChange={(e) =>
-                setPrioridadeFiltro(e.target.value as "" | Prioridade)
-              }
-              className={`min-w-0 w-full sm:w-auto ${filtroCls}`}
+              value={projetoFiltro}
+              onChange={(e) => {
+                setProjetoFiltro(e.target.value);
+                setColaboradorFiltro("");
+              }}
+              className={`min-w-0 w-full ${filtroCls}`}
             >
-              <option value="">Prioridade</option>
-              {(["alta", "media", "baixa"] as const).map((p) => (
-                <option key={p} value={p}>
-                  {PRIORIDADE_LABEL[p]}
+              <option value="">Todos os projetos</option>
+              {projetosNoQuadro.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
                 </option>
               ))}
             </select>
-            {ambiente === "ti" && (
-              <select
-                value={sistemaFiltro}
-                onChange={(e) => setSistemaFiltro(e.target.value)}
-                className={`min-w-0 w-full sm:w-auto ${filtroCls}`}
-              >
-                <option value="">Todos os sistemas</option>
-                {sistemas.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nome}
-                  </option>
-                ))}
-              </select>
-            )}
-            {ehGestor && visao === "projetos" && (
-              <select
-                value={projetoFiltro}
-                onChange={(e) => {
-                  setProjetoFiltro(e.target.value);
-                  setColaboradorFiltro("");
-                }}
-                className={`min-w-0 w-full sm:w-auto ${filtroCls}`}
-              >
-                <option value="">Todos os projetos</option>
-                {projetosNoQuadro.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            )}
-            {temFiltro && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBusca("");
-                  setColaboradorFiltro("");
-                  setPrioridadeFiltro("");
-                  setSistemaFiltro("");
-                }}
-                className="col-span-2 py-1 text-center text-xs font-semibold text-slate-500 hover:text-slate-800 sm:col-span-1 sm:text-left"
-              >
-                Limpar
-              </button>
-            )}
-          </div>
-        </div>
+          )}
+          {temFiltro && (
+            <button
+              type="button"
+              onClick={() => {
+                setBusca("");
+                setColaboradorFiltro("");
+                setPrioridadeFiltro("");
+                setSistemaFiltro("");
+              }}
+              className="py-1 text-center text-xs font-semibold text-slate-500 hover:text-slate-800"
+            >
+              Limpar
+            </button>
+          )}
+        </GrupoFiltros>
       </div>
 
       {sucesso && (
@@ -503,7 +507,7 @@ export function KanbanLider({
         </div>
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+      <div className="flex flex-col gap-2 md:min-h-0 md:min-w-0 md:flex-1">
         <div className="flex shrink-0 gap-1 overflow-x-auto pb-0.5 md:hidden">
           {COLUNAS.map((col) => {
             const qtd = porStatus(col.status).length;
@@ -529,7 +533,7 @@ export function KanbanLider({
         </div>
 
         <div
-          className="min-h-0 flex-1 md:hidden"
+          className="md:hidden"
           onTouchStart={(e) => {
             toqueIni.current = {
               x: e.touches[0].clientX,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { GrupoFiltros } from "@/components/GrupoFiltros";
 
 export type PageSize = 10 | 50 | 100 | "todos";
 export type StatusFiltro = "todos" | "ativos" | "inativos";
@@ -90,6 +91,7 @@ export function ListaCadastroControles({
   placeholder = "Pesquisar…",
   filtrosExtras,
   mostrarStatus = true,
+  marcado = false,
 }: {
   busca: string;
   setBusca: (v: string) => void;
@@ -104,6 +106,7 @@ export function ListaCadastroControles({
   placeholder?: string;
   filtrosExtras?: ReactNode;
   mostrarStatus?: boolean;
+  marcado?: boolean;
 }) {
   const inicio =
     total === 0
@@ -120,39 +123,43 @@ export function ListaCadastroControles({
 
   return (
     <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          className={`${inputCls} col-span-2`}
-          placeholder={placeholder}
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-        />
-        {mostrarStatus && (
+      <GrupoFiltros
+        ativo={Boolean(busca.trim()) || status !== "todos" || marcado}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            className={`${inputCls} col-span-2`}
+            placeholder={placeholder}
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+          {mostrarStatus && (
+            <select
+              className={selectCls}
+              value={status}
+              onChange={(e) => setStatus(e.target.value as StatusFiltro)}
+            >
+              <option value="todos">Todos os status</option>
+              <option value="ativos">Somente ativos</option>
+              <option value="inativos">Somente inativos</option>
+            </select>
+          )}
+          {filtrosExtras}
           <select
             className={selectCls}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFiltro)}
+            value={String(pageSize)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPageSize(v === "todos" ? "todos" : (Number(v) as 10 | 50 | 100));
+            }}
           >
-            <option value="todos">Todos os status</option>
-            <option value="ativos">Somente ativos</option>
-            <option value="inativos">Somente inativos</option>
+            <option value="10">10 por página</option>
+            <option value="50">50 por página</option>
+            <option value="100">100 por página</option>
+            <option value="todos">Todos</option>
           </select>
-        )}
-        {filtrosExtras}
-        <select
-          className={selectCls}
-          value={String(pageSize)}
-          onChange={(e) => {
-            const v = e.target.value;
-            setPageSize(v === "todos" ? "todos" : (Number(v) as 10 | 50 | 100));
-          }}
-        >
-          <option value="10">10 por página</option>
-          <option value="50">50 por página</option>
-          <option value="100">100 por página</option>
-          <option value="todos">Todos</option>
-        </select>
-      </div>
+        </div>
+      </GrupoFiltros>
 
       <div className="flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
         <span>

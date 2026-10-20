@@ -4,6 +4,7 @@ import {
   mapaEmails,
   payloadAtualizarUsuario,
   payloadDefinirAmbientes,
+  payloadDefinirAvisos,
   rotuloAmbientes,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
@@ -64,6 +65,17 @@ describe("validarEdicaoEquipe", () => {
       "Marque Manutenção, TI ou os dois.",
     );
   });
+
+  it("exige um aviso quando a pessoa vê os dois painéis", () => {
+    expect(
+      validarEdicaoEquipe({
+        ...base,
+        role: "admin",
+        ambientes: ["manutencao", "ti"],
+        avisos: [],
+      }),
+    ).toBe("Marque o aviso de Manutenção, de TI ou dos dois.");
+  });
 });
 
 describe("payloadAtualizarUsuario", () => {
@@ -115,6 +127,16 @@ describe("ambientes", () => {
     expect(
       payloadDefinirAmbientes({ ...base, ambientes: ["ti"] as const }),
     ).toEqual({ p_user_id: "u1", p_ambientes: ["ti"] });
+  });
+
+  it("grava só o aviso dos painéis que a pessoa vê", () => {
+    expect(
+      payloadDefinirAvisos({
+        userId: "u1",
+        ambientes: ["manutencao", "ti"],
+        avisos: ["ti"],
+      }),
+    ).toEqual({ p_user_id: "u1", p_avisos: ["ti"] });
   });
 });
 

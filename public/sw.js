@@ -9,6 +9,8 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Navegação fica com o navegador para o cookie de sessão ir no app instalado.
+  if (event.request.mode === "navigate") return;
   event.respondWith(fetch(event.request));
 });
 

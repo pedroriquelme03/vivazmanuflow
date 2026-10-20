@@ -7,6 +7,7 @@ export function recursoAmbienteAusente(mensagem: string) {
   const texto = mensagem.toLowerCase();
   return (
     texto.includes("admin_definir_ambientes") ||
+    texto.includes("admin_definir_avisos") ||
     texto.includes("marcar_ambiente_demanda") ||
     texto.includes("could not find the function") ||
     texto.includes("schema cache") ||

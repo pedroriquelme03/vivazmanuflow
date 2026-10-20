@@ -1,13 +1,50 @@
-import { pessoaDoAmbiente, type AmbienteEquipe } from "@/lib/ambiente-equipe";
+import { listaAmbientes, type AmbienteEquipe } from "@/lib/ambiente-equipe";
 
 export type PessoaAviso = {
   id?: string;
   role: string;
   ambientes: readonly string[] | null;
+  avisos?: readonly string[] | null;
   ativo: boolean;
 };
 
-/** Manutenção avisa quem tem esse quadro. TI avisa a equipe de TI e todo admin. */
+function listaEscolhida(
+  valor: readonly string[] | null | undefined,
+): AmbienteEquipe[] {
+  const lista = (valor ?? []).filter(
+    (item): item is AmbienteEquipe => item === "manutencao" || item === "ti",
+  );
+  return Array.from(new Set(lista));
+}
+
+/**
+ * Quem está em um quadro só recebe aviso desse quadro.
+ * Quem está nos dois usa a escolha gravada.
+ * Admin e líder nos dois, sem escolha ainda, recebem só Manutenção.
+ */
+export function avisosEfetivos(pessoa: {
+  role: string;
+  ambientes: readonly string[] | null;
+  avisos?: readonly string[] | null;
+}): AmbienteEquipe[] {
+  const visiveis = listaAmbientes(pessoa.ambientes);
+  if (visiveis.length < 2) return visiveis;
+  const escolhidos = listaEscolhida(pessoa.avisos).filter((item) =>
+    visiveis.includes(item),
+  );
+  if (escolhidos.length > 0) return escolhidos;
+  if (pessoa.role === "admin" || pessoa.role === "lider") return ["manutencao"];
+  return visiveis;
+}
+
+export function mesmosAvisos(
+  a: readonly string[],
+  b: readonly string[],
+) {
+  return [...a].sort().join(",") === [...b].sort().join(",");
+}
+
+/** O aviso segue a equipe escolhida, dentro dos painéis que a pessoa vê. */
 export function recebeAvisoChamado(pessoa: PessoaAviso, quadro: AmbienteEquipe) {
   if (!pessoa.ativo) return false;
   if (
@@ -17,11 +54,7 @@ export function recebeAvisoChamado(pessoa: PessoaAviso, quadro: AmbienteEquipe) 
   ) {
     return false;
   }
-  if (quadro === "ti" && pessoa.role === "admin") return true;
-  if (quadro === "manutencao" && pessoa.role === "admin") {
-    return (pessoa.ambientes ?? []).includes("manutencao");
-  }
-  return pessoaDoAmbiente(pessoa.ambientes, quadro);
+  return avisosEfetivos(pessoa).includes(quadro);
 }
 
 /** Quem abre o chamado não recebe o aviso dele mesmo. */

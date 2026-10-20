@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  avisosEfetivos,
   chamadoDoWebhook,
   destinoDoAviso,
   eventoDoWebhook,
@@ -31,7 +32,7 @@ describe("recebeAvisoChamado", () => {
     ).toBe(false);
   });
 
-  it("manda TI para a equipe de TI e para todo admin", () => {
+  it("manda TI só para quem tem esse quadro", () => {
     expect(
       recebeAvisoChamado(
         { role: "colaborador", ambientes: ["ti"], ativo: true },
@@ -43,6 +44,33 @@ describe("recebeAvisoChamado", () => {
         { role: "admin", ambientes: ["manutencao"], ativo: true },
         "ti",
       ),
+    ).toBe(false);
+    expect(
+      recebeAvisoChamado(
+        { role: "admin", ambientes: ["ti", "manutencao"], ativo: true },
+        "ti",
+      ),
+    ).toBe(false);
+    expect(
+      recebeAvisoChamado(
+        {
+          role: "admin",
+          ambientes: ["ti", "manutencao"],
+          avisos: ["ti"],
+          ativo: true,
+        },
+        "ti",
+      ),
+    ).toBe(true);
+    expect(
+      recebeAvisoChamado(
+        {
+          role: "colaborador",
+          ambientes: ["ti", "manutencao"],
+          ativo: true,
+        },
+        "ti",
+      ),
     ).toBe(true);
     expect(
       recebeAvisoChamado(
@@ -50,6 +78,23 @@ describe("recebeAvisoChamado", () => {
         "ti",
       ),
     ).toBe(false);
+  });
+
+  it("admin e líder nos dois começam só na manutenção", () => {
+    expect(
+      avisosEfetivos({
+        role: "lider",
+        ambientes: ["manutencao", "ti"],
+        avisos: null,
+      }),
+    ).toEqual(["manutencao"]);
+    expect(
+      avisosEfetivos({
+        role: "admin",
+        ambientes: ["ti"],
+        avisos: ["manutencao"],
+      }),
+    ).toEqual(["ti"]);
   });
 
   it("não avisa quem abriu o chamado", () => {

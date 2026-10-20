@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/database.types";
 
+export { rotaInicial } from "@/lib/rotas";
+
 export type Perfil = Omit<Tables<"usuarios">, "email"> & {
   email: string | null;
   propriedade_nome: string | null;
@@ -35,9 +37,3 @@ export async function getPerfil(): Promise<Perfil | null> {
   };
 }
 
-/** Caminho inicial de cada papel. */
-export function rotaInicial(role: Tables<"usuarios">["role"]) {
-  if (role === "colaborador") return "/colaborador";
-  if (role === "solicitante") return "/solicitante";
-  return "/lider";
-}

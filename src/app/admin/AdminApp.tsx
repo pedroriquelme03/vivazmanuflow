@@ -9,14 +9,17 @@ import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
 import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
 import { emailJaCadastrado } from "@/lib/requisicao-acesso";
 import { abrirRascunhoEmail, rascunhoAcessoOutlook } from "@/lib/email-acesso";
+import { avisosEfetivos, mesmosAvisos } from "@/lib/aviso-push";
 import {
   ambientesMarcados,
   payloadAtualizarUsuario,
   payloadDefinirAmbientes,
+  payloadDefinirAvisos,
   rotuloAmbientes,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
   validarExclusaoConta,
+  type DadosEdicaoEquipe,
 } from "@/lib/equipe-edicao";
 import {
   idPrimeiraPropriedadeAtiva,
@@ -33,6 +36,40 @@ type Local = Tables<"locais">;
 type Solic = Tables<"solicitantes">;
 type Usuario = Tables<"usuarios">;
 type SolicAcesso = Tables<"requisicoes_acesso">;
+
+async function salvarEscolhaAvisos(
+  supabase: ReturnType<typeof createClient>,
+  dados: Pick<DadosEdicaoEquipe, "userId" | "role" | "ambientes" | "avisos">,
+) {
+  if (dados.role === "solicitante" || dados.ambientes.length < 2) return null;
+  const gravar = payloadDefinirAvisos({
+    userId: dados.userId,
+    ambientes: dados.ambientes,
+    avisos: dados.avisos,
+  });
+  if (gravar.p_avisos.length === 0) {
+    return "Marque o aviso de Manutenção, de TI ou dos dois.";
+  }
+  const { error } = await supabase.rpc("admin_definir_avisos", gravar);
+  if (!error) return null;
+  if (recursoAmbienteAusente(error.message)) {
+    const padrao = avisosEfetivos({
+      role: dados.role,
+      ambientes: dados.ambientes,
+      avisos: null,
+    });
+    if (mesmosAvisos(padrao, gravar.p_avisos)) return null;
+    return "Rode o SQL admin_definir_avisos no Supabase para gravar de qual equipe chega o aviso.";
+  }
+  return error.message;
+}
+
+function avisosAoMarcarOsDois(role: string) {
+  if (role === "admin" || role === "lider") {
+    return { manutencao: true, ti: false };
+  }
+  return { manutencao: true, ti: true };
+}
 
 const ABAS = [
   "Locais principais",
@@ -372,10 +409,31 @@ function ModalEditarEquipe({
   );
   const [ti, setTi] = useState(ambientesAtuais.includes("ti"));
   const [role, setRole] = useState(usuario.role);
+  const efetivosNoInicio = avisosEfetivos({
+    role: usuario.role,
+    ambientes: usuario.ambientes,
+    avisos: usuario.avisos,
+  });
+  const [avisoManutencao, setAvisoManutencao] = useState(
+    efetivosNoInicio.includes("manutencao"),
+  );
+  const [avisoTi, setAvisoTi] = useState(efetivosNoInicio.includes("ti"));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState(false);
   const [confirmacao, setConfirmacao] = useState("");
+  function marcarPainel(qual: "manutencao" | "ti", valor: boolean) {
+    const proximoManutencao = qual === "manutencao" ? valor : manutencao;
+    const proximoTi = qual === "ti" ? valor : ti;
+    const entrouNosDois = !(manutencao && ti) && proximoManutencao && proximoTi;
+    if (qual === "manutencao") setManutencao(valor);
+    else setTi(valor);
+    if (!entrouNosDois) return;
+    const padrao = avisosAoMarcarOsDois(role);
+    setAvisoManutencao(padrao.manutencao);
+    setAvisoTi(padrao.ti);
+  }
+
   const ultima = rotuloUltimaAlteracao(usuario.atualizado_em);
   const ultimaExibida =
     ultima === "Ainda não houve alteração" ? ultima : formatarData(usuario.atualizado_em);
@@ -392,6 +450,7 @@ function ModalEditarEquipe({
       userId: usuario.id,
       role,
       ambientes: ambientesMarcados(manutencao, ti),
+      avisos: ambientesMarcados(avisoManutencao, avisoTi),
     };
     const falha = validarEdicaoEquipe(dados);
     if (falha) return setErro(falha);
@@ -416,10 +475,13 @@ function ModalEditarEquipe({
       "admin_definir_ambientes",
       payloadDefinirAmbientes(dados),
     );
-    setSalvando(false);
     if (erroAmbiente && !recursoAmbienteAusente(erroAmbiente.message)) {
+      setSalvando(false);
       return setErro(erroAmbiente.message);
     }
+    const falhaAvisos = await salvarEscolhaAvisos(supabase, dados);
+    setSalvando(false);
+    if (falhaAvisos) return setErro(falhaAvisos);
     onSalvo(
       erroAmbiente
         ? "Dados salvos. A marcação de Manutenção/TI ainda não está no banco, então ela não ficou gravada."
@@ -509,19 +571,36 @@ function ModalEditarEquipe({
               <option value="admin">Administrador</option>
             </select>
           </CampoModal>
-          <CampoModal rotulo="Ambientes">
+          <div className="grid gap-1">
+            <span className="text-xs font-medium text-slate-500">Ambientes</span>
             <EscolhaAmbientes
               manutencao={manutencao}
               ti={ti}
-              onManutencao={setManutencao}
-              onTi={setTi}
+              onManutencao={(valor) => marcarPainel("manutencao", valor)}
+              onTi={(valor) => marcarPainel("ti", valor)}
+              rotulo=""
+              ajuda={
+                role === "solicitante"
+                  ? "Desmarque um quadro para a pessoa abrir chamado só no outro."
+                  : "Marcado abre o painel. Desmarcado deixa de ver."
+              }
             />
-            {role === "solicitante" && (
-              <p className="mt-1 text-xs text-slate-500">
-                Desmarque um quadro para a pessoa abrir chamado só no outro.
-              </p>
-            )}
-          </CampoModal>
+          </div>
+          {role !== "solicitante" && manutencao && ti && (
+            <div className="grid gap-1">
+              <span className="text-xs font-medium text-slate-500">
+                Notificações
+              </span>
+              <EscolhaAmbientes
+                manutencao={avisoManutencao}
+                ti={avisoTi}
+                onManutencao={setAvisoManutencao}
+                onTi={setAvisoTi}
+                rotulo=""
+                ajuda="O aviso de chamado novo chega só do que estiver marcado aqui. Os dois painéis continuam visíveis."
+              />
+            </div>
+          )}
           <CampoModal rotulo="Local">
             <select
               className={inputCls}
@@ -759,6 +838,7 @@ function Setores({ itens, propriedades }: { itens: Setor[]; propriedades: Prop[]
       <ListaCadastroControles
         {...lista}
         placeholder="Pesquisar setor…"
+        marcado={Boolean(filtroProp)}
         filtrosExtras={
           <select
             className={inputCls}
@@ -943,6 +1023,7 @@ function Locais({
       <ListaCadastroControles
         {...lista}
         placeholder="Pesquisar sublocal…"
+        marcado={Boolean(filtroProp || filtroSetor)}
         filtrosExtras={
           <>
             <select
@@ -1073,6 +1154,7 @@ function Solicitantes({
       <ListaCadastroControles
         {...lista}
         placeholder="Pesquisar solicitante…"
+        marcado={Boolean(filtroProp || filtroSetor)}
         filtrosExtras={
           <>
             <select
@@ -1294,6 +1376,7 @@ function Predefinidas({
       <ListaCadastroControles
         {...lista}
         placeholder="Pesquisar demanda pré-definida…"
+        marcado={Boolean(filtroProp || filtroColab || filtroPrio)}
         filtrosExtras={
           <>
             <select
@@ -1630,6 +1713,8 @@ function Equipe({
   );
   const [manutencao, setManutencao] = useState(true);
   const [ti, setTi] = useState(Boolean(preencher));
+  const [avisoManutencao, setAvisoManutencao] = useState(true);
+  const [avisoTi, setAvisoTi] = useState(false);
   const [propId, setPropId] = useState("");
   const [filtroRole, setFiltroRole] = useState("");
   const [filtroProp, setFiltroProp] = useState("");
@@ -1639,6 +1724,18 @@ function Equipe({
   const nomeProp = (id: string | null) =>
     id ? propriedades.find((p) => p.id === id)?.nome ?? "?" : "Todas";
   const locaisEscolha = propriedadesAtivas(propriedades);
+
+  function marcarPainel(qual: "manutencao" | "ti", valor: boolean) {
+    const proximoManutencao = qual === "manutencao" ? valor : manutencao;
+    const proximoTi = qual === "ti" ? valor : ti;
+    const entrouNosDois = !(manutencao && ti) && proximoManutencao && proximoTi;
+    if (qual === "manutencao") setManutencao(valor);
+    else setTi(valor);
+    if (!entrouNosDois) return;
+    const padrao = avisosAoMarcarOsDois(role);
+    setAvisoManutencao(padrao.manutencao);
+    setAvisoTi(padrao.ti);
+  }
 
   useEffect(() => {
     if (!preencher) return;
@@ -1702,6 +1799,17 @@ function Equipe({
         return;
       }
       ambienteAindaNaoGrava = Boolean(erroAmbiente);
+      const falhaAvisos = await salvarEscolhaAvisos(supabase, {
+        userId: novoId,
+        role,
+        ambientes,
+        avisos: ambientesMarcados(avisoManutencao, avisoTi),
+      });
+      if (falhaAvisos) {
+        setErro(falhaAvisos);
+        refresh();
+        return;
+      }
     }
     if (role === "admin" || role === "lider" || role === "solicitante") {
       await garantirSolicitantesGestor(supabase, {
@@ -1733,6 +1841,8 @@ function Equipe({
     setRole("colaborador");
     setTi(false);
     setManutencao(true);
+    setAvisoManutencao(true);
+    setAvisoTi(false);
     onPreencherConsumido?.();
     refresh();
   }
@@ -1780,15 +1890,29 @@ function Equipe({
         </select>
         {role === "solicitante" ? (
           <p className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500">
-            Solicitante abre chamado de TI e de Manutenção.
+            Solicitante abre chamado de TI e de Manutenção e recebe atualização dos chamados que abriu.
           </p>
         ) : (
-          <EscolhaAmbientes
-            manutencao={manutencao}
-            ti={ti}
-            onManutencao={setManutencao}
-            onTi={setTi}
-          />
+          <div className="grid gap-2 sm:col-span-2">
+            <EscolhaAmbientes
+              manutencao={manutencao}
+              ti={ti}
+              onManutencao={(valor) => marcarPainel("manutencao", valor)}
+              onTi={(valor) => marcarPainel("ti", valor)}
+              rotulo="Ambientes"
+              ajuda="Marcado abre o painel. Desmarcado deixa de ver."
+            />
+            {manutencao && ti && (
+              <EscolhaAmbientes
+                manutencao={avisoManutencao}
+                ti={avisoTi}
+                onManutencao={setAvisoManutencao}
+                onTi={setAvisoTi}
+                rotulo="Notificações"
+                ajuda="O aviso de chamado novo chega só do que estiver marcado aqui."
+              />
+            )}
+          </div>
         )}
         <select className={inputCls} value={propId} onChange={(e) => setPropId(e.target.value)}>
           <option value="">Todos os locais principais</option>
@@ -1819,6 +1943,7 @@ function Equipe({
       <ListaCadastroControles
         {...lista}
         placeholder="Pesquisar por nome ou e-mail…"
+        marcado={Boolean(filtroRole || filtroProp)}
         filtrosExtras={
           <>
             <select
@@ -1858,6 +1983,11 @@ function Equipe({
               u.email || emails[u.id] || "Sem e-mail",
               ROLE_LABEL[u.role],
               rotuloAmbientes(u.ambientes),
+              u.role !== "solicitante" &&
+              (u.ambientes ?? []).includes("manutencao") &&
+              (u.ambientes ?? []).includes("ti")
+                ? `Avisos: ${rotuloAmbientes(avisosEfetivos(u))}`
+                : "",
               nomeProp(u.propriedade_id),
             ]
               .filter(Boolean)
@@ -1889,36 +2019,45 @@ function EscolhaAmbientes({
   onManutencao,
   onTi,
   soManutencao = false,
+  rotulo = "Ambientes",
+  ajuda,
 }: {
   manutencao: boolean;
   ti: boolean;
   onManutencao: (valor: boolean) => void;
   onTi: (valor: boolean) => void;
   soManutencao?: boolean;
+  rotulo?: string;
+  ajuda?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2">
-      <span className="text-xs font-semibold text-slate-500">Ambientes</span>
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          checked={manutencao}
-          onChange={(e) => onManutencao(e.target.checked)}
-        />
-        Manutenção
-      </label>
-      {soManutencao ? (
-        <span className="text-xs text-slate-400">Líder só vê a Manutenção</span>
-      ) : (
+    <div>
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2">
+        {rotulo ? (
+          <span className="text-xs font-semibold text-slate-500">{rotulo}</span>
+        ) : null}
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={ti}
-            onChange={(e) => onTi(e.target.checked)}
+            checked={manutencao}
+            onChange={(e) => onManutencao(e.target.checked)}
           />
-          TI
+          Manutenção
         </label>
-      )}
+        {soManutencao ? (
+          <span className="text-xs text-slate-400">Líder só vê a Manutenção</span>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={ti}
+              onChange={(e) => onTi(e.target.checked)}
+            />
+            TI
+          </label>
+        )}
+      </div>
+      {ajuda && <p className="mt-1 text-xs text-slate-500">{ajuda}</p>}
     </div>
   );
 }

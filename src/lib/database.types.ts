@@ -940,6 +940,7 @@ export type Database = {
           propriedade_id: string | null
           role: Database["public"]["Enums"]["user_role"]
           ambientes: Database["public"]["Enums"]["ambiente_equipe"][]
+          avisos: Database["public"]["Enums"]["ambiente_equipe"][] | null
         }
         Insert: {
           ativo?: boolean
@@ -953,6 +954,7 @@ export type Database = {
           propriedade_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           ambientes?: Database["public"]["Enums"]["ambiente_equipe"][]
+          avisos?: Database["public"]["Enums"]["ambiente_equipe"][] | null
         }
         Update: {
           ativo?: boolean
@@ -966,6 +968,7 @@ export type Database = {
           propriedade_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           ambientes?: Database["public"]["Enums"]["ambiente_equipe"][]
+          avisos?: Database["public"]["Enums"]["ambiente_equipe"][] | null
         }
         Relationships: [
           {
@@ -1552,6 +1555,10 @@ export type Database = {
       }
       admin_definir_ambientes: {
         Args: { p_user_id: string; p_ambientes: string[] }
+        Returns: undefined
+      }
+      admin_definir_avisos: {
+        Args: { p_user_id: string; p_avisos: string[] }
         Returns: undefined
       }
       admin_atualizar_usuario: {

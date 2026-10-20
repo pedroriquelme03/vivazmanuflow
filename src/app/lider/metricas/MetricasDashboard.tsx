@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Database, Enums } from "@/lib/database.types";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
+import { GrupoFiltros } from "@/components/GrupoFiltros";
 import {
   horasDoDia,
   picoHorario,
@@ -340,179 +341,181 @@ export function MetricasDashboard({
 
   return (
     <main className="mx-auto w-full min-h-0 min-w-0 max-w-5xl flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:py-6">
-      <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-base font-bold text-slate-800">Relatórios</h1>
-          <button
-            type="button"
-            onClick={() => setFiltros(filtrosPadrao())}
-            className="text-xs font-medium text-slate-500 hover:text-brand-700"
-          >
-            Limpar filtros
-          </button>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="text-xs font-medium text-slate-600">
-            De
-            <input
-              type="date"
-              className={`${selectCls} mt-1`}
-              value={filtros.inicio}
-              onChange={(e) => setFiltro("inicio", e.target.value)}
-            />
-          </label>
-          <label className="text-xs font-medium text-slate-600">
-            Até
-            <input
-              type="date"
-              className={`${selectCls} mt-1`}
-              value={filtros.fim}
-              onChange={(e) => setFiltro("fim", e.target.value)}
-            />
-          </label>
-        </div>
-        {periodoInvalido && (
-          <p className="mt-2 text-sm text-red-700">
-            {filtros.inicio && filtros.fim
-              ? "A data inicial não pode ser depois da final."
-              : "Informe as duas datas."}
-          </p>
-        )}
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <select
-            className={selectCls}
-            value={filtros.propriedadeId}
-            onChange={(e) => setFiltro("propriedadeId", e.target.value)}
-          >
-            <option value="">Todos os locais principais</option>
-            {propriedades.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
-
-          {ambiente !== "ti" && (
-            <>
-              <select
-                className={selectCls}
-                value={filtros.localId}
-                onChange={(e) => setFiltro("localId", e.target.value)}
-              >
-                <option value="">Todos os sublocais</option>
-                {locaisFiltrados.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.nome}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className={selectCls}
-                value={filtros.setorId}
-                onChange={(e) => setFiltro("setorId", e.target.value)}
-              >
-                <option value="">Todos os setores</option>
-                {setoresFiltrados.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nome}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          <select
-            className={selectCls}
-            value={filtros.colaboradorId}
-            onChange={(e) => setFiltro("colaboradorId", e.target.value)}
-          >
-            <option value="">Todos os colaboradores</option>
-            {colaboradores.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className={selectCls}
-            value={filtros.status}
-            onChange={(e) =>
-              setFiltro("status", e.target.value as Filtros["status"])
-            }
-          >
-            <option value="">Todos os status</option>
-            {COLUNAS_STATUS.map((c) => (
-              <option key={c.valor} value={c.valor}>
-                {c.rotulo}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className={selectCls}
-            value={filtros.prioridade}
-            onChange={(e) =>
-              setFiltro(
-                "prioridade",
-                e.target.value as Filtros["prioridade"],
-              )
-            }
-          >
-            <option value="">Todas as prioridades</option>
-            <option value="alta">Alta</option>
-            <option value="media">Média</option>
-            <option value="baixa">Baixa</option>
-          </select>
-
-          {ambiente !== "ti" && (
-            <>
-              <select
-                className={selectCls}
-                value={filtros.eventoId}
-                onChange={(e) => setFiltro("eventoId", e.target.value)}
-              >
-                <option value="">Todos os eventos</option>
-                {eventos.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className={selectCls}
-                value={filtros.somenteEventos}
-                onChange={(e) =>
-                  setFiltro(
-                    "somenteEventos",
-                    e.target.value as Filtros["somenteEventos"],
-                  )
-                }
-              >
-                <option value="">Rotina + eventos</option>
-                <option value="sim">Somente demandas de evento</option>
-                <option value="nao">Somente manutenção de rotina</option>
-              </select>
-            </>
-          )}
-        </div>
-
-        {filtrosAtivos.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {filtrosAtivos.map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-brand-200"
-              >
-                {t}
-              </span>
-            ))}
+      <div className="mb-5">
+        <h1 className="mb-3 text-base font-bold text-slate-800">Relatórios</h1>
+        <GrupoFiltros ativo={filtrosAtivos.length > 0}>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setFiltros(filtrosPadrao())}
+              className="text-xs font-medium text-slate-500 hover:text-brand-700"
+            >
+              Limpar filtros
+            </button>
           </div>
-        )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs font-medium text-slate-600">
+              De
+              <input
+                type="date"
+                className={`${selectCls} mt-1`}
+                value={filtros.inicio}
+                onChange={(e) => setFiltro("inicio", e.target.value)}
+              />
+            </label>
+            <label className="text-xs font-medium text-slate-600">
+              Até
+              <input
+                type="date"
+                className={`${selectCls} mt-1`}
+                value={filtros.fim}
+                onChange={(e) => setFiltro("fim", e.target.value)}
+              />
+            </label>
+          </div>
+          {periodoInvalido && (
+            <p className="text-sm text-red-700">
+              {filtros.inicio && filtros.fim
+                ? "A data inicial não pode ser depois da final."
+                : "Informe as duas datas."}
+            </p>
+          )}
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <select
+              className={selectCls}
+              value={filtros.propriedadeId}
+              onChange={(e) => setFiltro("propriedadeId", e.target.value)}
+            >
+              <option value="">Todos os locais principais</option>
+              {propriedades.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+
+            {ambiente !== "ti" && (
+              <>
+                <select
+                  className={selectCls}
+                  value={filtros.localId}
+                  onChange={(e) => setFiltro("localId", e.target.value)}
+                >
+                  <option value="">Todos os sublocais</option>
+                  {locaisFiltrados.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nome}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className={selectCls}
+                  value={filtros.setorId}
+                  onChange={(e) => setFiltro("setorId", e.target.value)}
+                >
+                  <option value="">Todos os setores</option>
+                  {setoresFiltrados.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <select
+              className={selectCls}
+              value={filtros.colaboradorId}
+              onChange={(e) => setFiltro("colaboradorId", e.target.value)}
+            >
+              <option value="">Todos os colaboradores</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={selectCls}
+              value={filtros.status}
+              onChange={(e) =>
+                setFiltro("status", e.target.value as Filtros["status"])
+              }
+            >
+              <option value="">Todos os status</option>
+              {COLUNAS_STATUS.map((c) => (
+                <option key={c.valor} value={c.valor}>
+                  {c.rotulo}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={selectCls}
+              value={filtros.prioridade}
+              onChange={(e) =>
+                setFiltro(
+                  "prioridade",
+                  e.target.value as Filtros["prioridade"],
+                )
+              }
+            >
+              <option value="">Todas as prioridades</option>
+              <option value="alta">Alta</option>
+              <option value="media">Média</option>
+              <option value="baixa">Baixa</option>
+            </select>
+
+            {ambiente !== "ti" && (
+              <>
+                <select
+                  className={selectCls}
+                  value={filtros.eventoId}
+                  onChange={(e) => setFiltro("eventoId", e.target.value)}
+                >
+                  <option value="">Todos os eventos</option>
+                  {eventos.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className={selectCls}
+                  value={filtros.somenteEventos}
+                  onChange={(e) =>
+                    setFiltro(
+                      "somenteEventos",
+                      e.target.value as Filtros["somenteEventos"],
+                    )
+                  }
+                >
+                  <option value="">Rotina + eventos</option>
+                  <option value="sim">Somente demandas de evento</option>
+                  <option value="nao">Somente manutenção de rotina</option>
+                </select>
+              </>
+            )}
+          </div>
+
+          {filtrosAtivos.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {filtrosAtivos.map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-brand-200"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </GrupoFiltros>
       </div>
 
       {erro && (

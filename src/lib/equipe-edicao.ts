@@ -12,6 +12,7 @@ export type DadosEdicaoEquipe = {
   userId: string;
   role: "admin" | "lider" | "colaborador" | "solicitante";
   ambientes: readonly AmbienteEquipe[];
+  avisos?: readonly AmbienteEquipe[];
 };
 
 export function rotuloUltimaAlteracao(iso: string | null | undefined) {
@@ -30,6 +31,14 @@ export function validarEdicaoEquipe(d: DadosEdicaoEquipe): string | null {
     }
   }
   if (d.ambientes.length === 0) return "Marque Manutenção, TI ou os dois.";
+  if (
+    d.ambientes.length > 1 &&
+    d.role !== "solicitante" &&
+    d.avisos &&
+    d.avisos.length === 0
+  ) {
+    return "Marque o aviso de Manutenção, de TI ou dos dois.";
+  }
   return null;
 }
 
@@ -69,6 +78,20 @@ export function payloadDefinirAmbientes(d: DadosEdicaoEquipe) {
   return {
     p_user_id: d.userId,
     p_ambientes: [...d.ambientes],
+  };
+}
+
+export function payloadDefinirAvisos(d: {
+  userId: string;
+  ambientes: readonly AmbienteEquipe[];
+  avisos?: readonly AmbienteEquipe[];
+}) {
+  const escolhidos = (d.avisos ?? d.ambientes).filter((item) =>
+    d.ambientes.includes(item),
+  );
+  return {
+    p_user_id: d.userId,
+    p_avisos: [...escolhidos],
   };
 }
 

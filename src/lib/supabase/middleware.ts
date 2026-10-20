@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
+import { destinoAutenticado } from "@/lib/rotas";
 
 /** Rotas que exigem login (área do staff). */
 const PROTECTED_PREFIXES = [
@@ -13,7 +14,7 @@ const PROTECTED_PREFIXES = [
 
 /**
  * Mantém a sessão do Supabase atualizada nos cookies e protege as áreas
- * internas. Login e a home passam livres.
+ * internas. Quem já entrou não vê de novo a capa nem o login.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -54,5 +55,37 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (user && (path === "/" || path === "/login")) {
+    const { data: perfil } = await supabase
+      .from("usuarios")
+      .select("role, ativo")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const destino = destinoAutenticado(
+      path,
+      perfil,
+      request.nextUrl.searchParams.get("next"),
+    );
+    if (destino) return redirecionarComSessao(request, destino, supabaseResponse);
+  }
+
   return supabaseResponse;
+}
+
+/** Leva os cookies renovados da sessão junto com o redirect. */
+function redirecionarComSessao(
+  request: NextRequest,
+  destino: string,
+  sessao: NextResponse,
+) {
+  const url = request.nextUrl.clone();
+  const [caminho, consulta] = destino.split("?");
+  url.pathname = caminho || "/";
+  url.search = consulta ? `?${consulta}` : "";
+  const resposta = NextResponse.redirect(url);
+  sessao.cookies.getAll().forEach(({ name, value, ...opcoes }) => {
+    resposta.cookies.set(name, value, opcoes);
+  });
+  return resposta;
 }

@@ -12,6 +12,36 @@ import { createServiceClient } from "@/lib/supabase/service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function colunaAvisosAusente(mensagem: string) {
+  const texto = mensagem.toLowerCase();
+  return (
+    texto.includes("avisos") &&
+    (texto.includes("column") ||
+      texto.includes("schema cache") ||
+      texto.includes("could not find"))
+  );
+}
+
+async function listarPessoas(supabase: ReturnType<typeof createServiceClient>) {
+  const comAvisos = await supabase
+    .from("usuarios")
+    .select("id, nome, role, ambientes, ativo, avisos")
+    .eq("ativo", true);
+  if (!comAvisos.error) return { data: comAvisos.data, error: null };
+  if (!colunaAvisosAusente(comAvisos.error.message)) {
+    return { data: null, error: comAvisos.error };
+  }
+  const semAvisos = await supabase
+    .from("usuarios")
+    .select("id, nome, role, ambientes, ativo")
+    .eq("ativo", true);
+  if (semAvisos.error) return { data: null, error: semAvisos.error };
+  return {
+    data: (semAvisos.data ?? []).map((pessoa) => ({ ...pessoa, avisos: null })),
+    error: null,
+  };
+}
+
 function segredoConfere(recebido: string | null, esperado: string | undefined) {
   if (!recebido || !esperado) return false;
   const a = Buffer.from(recebido);
@@ -50,10 +80,7 @@ export async function POST(request: Request) {
   try {
     webpush.setVapidDetails(assunto, publica, privada);
     const supabase = createServiceClient();
-    const pessoas = await supabase
-      .from("usuarios")
-      .select("id, nome, role, ambientes, ativo")
-      .eq("ativo", true);
+    const pessoas = await listarPessoas(supabase);
     if (pessoas.error) {
       console.error("aviso push", pessoas.error.message);
       return Response.json({ ok: false }, { status: 500 });
