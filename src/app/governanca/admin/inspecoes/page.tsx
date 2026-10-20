@@ -11,7 +11,7 @@ export default async function InspecoesPage() {
   const { data } = await supabase
     .from("gov_inspecoes")
     .select(
-      "id, tipo, status, criado_em, finalizada_em, gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome)",
+      "id, tipo, status, criado_em, finalizada_em, gov_acomodacoes(numero), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
     )
     .order("criado_em", { ascending: false })
     .limit(500);
@@ -22,6 +22,7 @@ export default async function InspecoesPage() {
     status: i.status,
     data: i.finalizada_em ?? i.criado_em,
     uh: i.gov_acomodacoes?.numero ?? null,
+    checklist: i.gov_processos?.nome ?? null,
     camareira: i.gov_camareiras?.nome ?? null,
     inspetor: i.usuarios?.nome ?? null,
   }));

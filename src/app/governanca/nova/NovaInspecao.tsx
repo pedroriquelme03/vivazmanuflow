@@ -7,21 +7,27 @@ import { comprimirImagem } from "@/lib/comprimir-imagem";
 import {
   BUCKET_GOVERNANCA,
   MIGRATION_HINT_GOV,
+  agruparPorCategoria,
+  agruparPorGrupo,
   erroSchemaGov,
   filtrarAcomodacoes,
+  normalizarBusca,
+  ordenarSecoes,
+  rotuloAplicacao,
   rotuloTipo,
   secaoCompleta,
+  tipoItem,
   type Acomodacao,
   type Camareira,
   type Processo,
   type SecaoComPerguntas,
-  type TipoAcomodacao,
 } from "@/lib/governanca";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
 import { Erro, Vazio, btnPrimario, btnSecundario, cardCls, inputCls } from "../ui";
 
-type Fase = "acomodacao" | "tipo" | "processo" | "camareira" | "perguntas" | "salvando" | "concluido";
-type ProcessoCompleto = Processo & { secoes: SecaoComPerguntas[] };
+type Fase = "processo" | "acomodacao" | "camareira" | "perguntas" | "salvando" | "concluido";
+type ProcessoResumo = Processo & { itens: number };
+type ProcessoCompleto = ProcessoResumo & { secoes: SecaoComPerguntas[] };
 
 const PREFIXOS_ANDAR = ["10", "11", "12"] as const;
 
@@ -36,64 +42,76 @@ export function NovaInspecao({
   escolheCamareira: boolean;
   acomodacoes: Acomodacao[];
   camareiras: Camareira[];
-  processos: ProcessoCompleto[];
+  processos: ProcessoResumo[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const topo = useRef<HTMLDivElement>(null);
 
-  const [fase, setFase] = useState<Fase>("acomodacao");
+  const [fase, setFase] = useState<Fase>("processo");
   const [erro, setErro] = useState<string | null>(null);
+  const [carregando, setCarregando] = useState(false);
 
-  const [acomodacao, setAcomodacao] = useState<Acomodacao | null>(null);
-  const [tipo, setTipo] = useState<TipoAcomodacao>("apartamento");
   const [processo, setProcesso] = useState<ProcessoCompleto | null>(null);
+  const [acomodacao, setAcomodacao] = useState<Acomodacao | null>(null);
   const [camareira, setCamareira] = useState<Camareira | null>(null);
 
   const [secaoIndex, setSecaoIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, RespostaLocal>>({});
 
   const [inspecaoIdFinal, setInspecaoIdFinal] = useState<string | null>(null);
+  const [buscaProcesso, setBuscaProcesso] = useState("");
   const [busca, setBusca] = useState("");
   const [prefixoAndar, setPrefixoAndar] = useState<string | null>(null);
 
+  const comItens = processos.filter((p) => p.itens > 0);
+  const gruposProcesso = agruparPorCategoria(
+    comItens.filter((p) => {
+      const q = normalizarBusca(buscaProcesso);
+      return !q || normalizarBusca(`${p.categoria ?? ""} ${p.nome}`).includes(q);
+    }),
+  );
+
   const secoes = processo?.secoes ?? [];
   const secaoAtual = secoes[secaoIndex];
-  const processosDoTipo = processos.filter((p) => p.tipo === tipo || p.tipo === "ambos");
-  const filtradas = filtrarAcomodacoes(acomodacoes, busca, prefixoAndar);
+  const acomodacoesDoProcesso = acomodacoes.filter(
+    (a) => !processo || processo.tipo === "ambos" || a.tipo === processo.tipo,
+  );
+  const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, prefixoAndar);
   const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas) : false;
+  const nomesCamareiras = camareiras.map((c) => c.nome);
+  const usaUh = processo?.usa_acomodacao ?? false;
 
   function subir() {
     topo.current?.scrollIntoView({ block: "start" });
   }
 
-  function escolherAcomodacao(a: Acomodacao) {
-    setAcomodacao(a);
-    setTipo(a.tipo === "suite" ? "suite" : "apartamento");
+  async function escolherProcesso(resumo: ProcessoResumo) {
     setErro(null);
-    setFase("tipo");
-  }
-
-  function confirmarTipo() {
-    setErro(null);
-    if (processosDoTipo.length === 0) {
-      setErro("Nenhum checklist ativo para este tipo. Cadastre um em Checklists.");
-      return;
+    setCarregando(true);
+    const { data, error } = await supabase
+      .from("gov_secoes")
+      .select("*, gov_perguntas(*)")
+      .eq("processo_id", resumo.id);
+    setCarregando(false);
+    if (error) return setErro("Não foi possível abrir o checklist. Tente de novo.");
+    const p: ProcessoCompleto = { ...resumo, secoes: ordenarSecoes((data ?? []) as SecaoComPerguntas[]) };
+    if (!p.secoes.some((s) => s.gov_perguntas.length > 0)) {
+      return setErro("Este checklist ainda não tem perguntas.");
     }
-    if (processosDoTipo.length === 1) escolherProcesso(processosDoTipo[0]);
-    else setFase("processo");
-  }
-
-  function escolherProcesso(p: ProcessoCompleto) {
-    if (p.secoes.every((s) => s.gov_perguntas.length === 0)) {
-      setErro("Este checklist ainda não tem perguntas.");
-      return;
-    }
-    setErro(null);
     setProcesso(p);
+    setAcomodacao(null);
+    setCamareira(null);
     const init: Record<string, RespostaLocal> = {};
     p.secoes.forEach((s) => s.gov_perguntas.forEach((q) => (init[q.id] = respostaVazia())));
     setRespostas(init);
     setSecaoIndex(p.secoes.findIndex((s) => s.gov_perguntas.length > 0));
+    setFase(p.usa_acomodacao ? "acomodacao" : "perguntas");
+    subir();
+  }
+
+  function escolherAcomodacao(a: Acomodacao) {
+    setAcomodacao(a);
+    setErro(null);
     setFase(escolheCamareira ? "camareira" : "perguntas");
   }
 
@@ -108,6 +126,14 @@ export function NovaInspecao({
 
   const ultimaSecao = !secoes.slice(secaoIndex + 1).some((s) => s.gov_perguntas.length > 0);
   const temAnterior = secoes.slice(0, secaoIndex).some((s) => s.gov_perguntas.length > 0);
+
+  function voltar() {
+    setErro(null);
+    if (fase === "perguntas" && temAnterior) return irParaSecao(-1);
+    if (fase === "perguntas" && usaUh) return setFase(escolheCamareira ? "camareira" : "acomodacao");
+    if (fase === "camareira") return setFase("acomodacao");
+    setFase("processo");
+  }
 
   async function enviarFoto(inspecaoId: string, perguntaId: string, arquivo: File) {
     const foto = await comprimirImagem(arquivo);
@@ -124,7 +150,7 @@ export function NovaInspecao({
   }
 
   async function finalizar() {
-    if (!acomodacao || !processo) return;
+    if (!processo || (processo.usa_acomodacao && !acomodacao)) return;
     setErro(null);
     setFase("salvando");
     try {
@@ -132,8 +158,8 @@ export function NovaInspecao({
         .from("gov_inspecoes")
         .insert({
           processo_id: processo.id,
-          acomodacao_id: acomodacao.id,
-          tipo,
+          acomodacao_id: acomodacao?.id ?? null,
+          tipo: acomodacao ? (acomodacao.tipo === "suite" ? "suite" : "apartamento") : null,
           camareira_id: camareira?.id ?? null,
           inspetor_id: eu.id,
           status: "finalizada",
@@ -146,17 +172,30 @@ export function NovaInspecao({
       const linhas = [];
       for (const s of secoes) {
         for (const q of s.gov_perguntas) {
-          const r = respostas[q.id];
-          const anexoUrl = r?.anexoFile ? await enviarFoto(insp.id, q.id, r.anexoFile) : null;
+          const r = respostas[q.id] ?? respostaVazia();
+          const tipo = tipoItem(q.tipo);
+          const anexoUrl = r.anexoFile ? await enviarFoto(insp.id, q.id, r.anexoFile) : null;
+          let valor: string | null = null;
+          if (r.resposta !== "na" && tipo !== "sim_nao") {
+            valor =
+              tipo === "selecao_multipla"
+                ? r.selecionadas.length
+                  ? JSON.stringify(r.selecionadas)
+                  : null
+                : r.valor.trim() || null;
+          }
           linhas.push({
             inspecao_id: insp.id,
             pergunta_id: q.id,
             pergunta_texto: q.texto,
             pergunta_ordem: q.ordem,
+            pergunta_tipo: tipo,
+            pergunta_grupo: q.grupo,
             secao_nome: s.nome,
             secao_ordem: s.ordem,
-            resposta: r?.resposta ?? null,
-            comentario: r?.comentario.trim() || null,
+            resposta: tipo === "sim_nao" || r.resposta === "na" ? r.resposta : null,
+            valor,
+            comentario: r.comentario.trim() || null,
             anexo_url: anexoUrl,
           });
         }
@@ -205,41 +244,79 @@ export function NovaInspecao({
 
   return (
     <div ref={topo} className="scroll-mt-6">
-      {fase !== "acomodacao" && fase !== "concluido" && fase !== "salvando" && (
-        <button
-          type="button"
-          onClick={() => {
-            setErro(null);
-            if (fase === "perguntas" && temAnterior) return irParaSecao(-1);
-            if (fase === "perguntas") return setFase(escolheCamareira ? "camareira" : "tipo");
-            if (fase === "camareira") return setFase("tipo");
-            if (fase === "processo") return setFase("tipo");
-            setFase("acomodacao");
-          }}
-          className="mb-3 text-sm text-slate-500 hover:text-slate-800"
-        >
+      {fase !== "processo" && fase !== "concluido" && fase !== "salvando" && (
+        <button type="button" onClick={voltar} className="mb-3 text-sm text-slate-500 hover:text-slate-800">
           ← Voltar
         </button>
       )}
 
-      {acomodacao && fase !== "concluido" && (
+      {processo && fase !== "processo" && fase !== "concluido" && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-          <Chip>UH {acomodacao.numero}</Chip>
-          {(fase === "processo" || fase === "camareira" || fase === "perguntas") && (
-            <Chip>{rotuloTipo(tipo)}</Chip>
+          <Chip>{processo.nome}</Chip>
+          {acomodacao && (
+            <Chip>
+              UH {acomodacao.numero} · {rotuloTipo(acomodacao.tipo)}
+            </Chip>
           )}
-          {processo && fase === "perguntas" && <Chip>{processo.nome}</Chip>}
           {camareira && fase === "perguntas" && <Chip>{camareira.nome}</Chip>}
         </div>
       )}
 
       <Erro texto={erro} />
 
+      {fase === "processo" && (
+        <>
+          <h2 className="mb-3 text-lg font-semibold text-slate-800">Qual checklist?</h2>
+          {comItens.length === 0 ? (
+            <Vazio texto="Nenhum checklist ativo com perguntas. Cadastre um em Modelos." />
+          ) : (
+            <>
+              <input
+                className={`${inputCls} mb-4`}
+                type="search"
+                value={buscaProcesso}
+                onChange={(e) => setBuscaProcesso(e.target.value)}
+                placeholder="Buscar checklist…"
+              />
+              {gruposProcesso.length === 0 && <Vazio texto="Nenhum checklist encontrado." />}
+              {gruposProcesso.map((g) => (
+                <section key={g.categoria} className="mb-5">
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {g.categoria}
+                  </h3>
+                  <div className="space-y-2">
+                    {g.itens.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={carregando}
+                        onClick={() => escolherProcesso(p)}
+                        className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-400"
+                      >
+                        <span className="text-xl">📋</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold text-slate-800">{p.nome}</span>
+                          <span className="block text-xs text-slate-500">
+                            {p.itens} itens ·{" "}
+                            {rotuloAplicacao(p)}
+                            {p.descricao ? ` · ${p.descricao}` : ""}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
       {fase === "acomodacao" && (
         <>
           <h2 className="mb-3 text-lg font-semibold text-slate-800">Escolha a acomodação</h2>
-          {acomodacoes.length === 0 ? (
-            <Vazio texto="Nenhuma acomodação cadastrada." />
+          {acomodacoesDoProcesso.length === 0 ? (
+            <Vazio texto="Nenhuma acomodação cadastrada para este checklist." />
           ) : (
             <>
               <div className="mb-3 grid grid-cols-3 gap-2">
@@ -288,54 +365,6 @@ export function NovaInspecao({
         </>
       )}
 
-      {fase === "tipo" && (
-        <>
-          <h2 className="mb-3 text-lg font-semibold text-slate-800">Tipo de acomodação</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {(["apartamento", "suite"] as TipoAcomodacao[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTipo(t)}
-                className={`flex flex-col items-center gap-2 rounded-2xl border p-6 shadow-sm transition ${
-                  tipo === t
-                    ? "border-brand-600 bg-brand-600 text-white"
-                    : "border-slate-200 bg-white text-slate-700"
-                }`}
-              >
-                <span className="text-3xl">{t === "suite" ? "🛏️" : "🚪"}</span>
-                <span className="font-semibold">{rotuloTipo(t)}</span>
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={confirmarTipo} className={`${btnPrimario} mt-6 w-full`}>
-            Continuar
-          </button>
-        </>
-      )}
-
-      {fase === "processo" && (
-        <>
-          <h2 className="mb-3 text-lg font-semibold text-slate-800">Escolha o checklist</h2>
-          <div className="space-y-2">
-            {processosDoTipo.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => escolherProcesso(p)}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-400"
-              >
-                <span className="text-xl">📋</span>
-                <span>
-                  <span className="block font-semibold text-slate-800">{p.nome}</span>
-                  {p.descricao && <span className="block text-xs text-slate-500">{p.descricao}</span>}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
       {fase === "camareira" && (
         <>
           <h2 className="mb-1 text-lg font-semibold text-slate-800">Quem limpou o quarto?</h2>
@@ -368,7 +397,7 @@ export function NovaInspecao({
             type="button"
             onClick={() => setFase("perguntas")}
             className={`${btnPrimario} mt-6 w-full`}
-            disabled={!camareira}
+            disabled={!camareira && camareiras.length > 0}
           >
             Continuar
           </button>
@@ -394,17 +423,24 @@ export function NovaInspecao({
 
           <h2 className="mb-4 text-xl font-bold text-slate-800">{secaoAtual.nome}</h2>
 
-          <div className="space-y-3 pb-4">
-            {secaoAtual.gov_perguntas.map((q) => (
-              <PerguntaItem
-                key={q.id}
-                pergunta={q}
-                valor={respostas[q.id] ?? respostaVazia()}
-                onChange={(v) => setRespostas((prev) => ({ ...prev, [q.id]: v }))}
-                camareiras={camareiras}
-                camareiraPadrao={camareira?.nome}
-                quemPediu={eu.nome}
-              />
+          <div className="space-y-5 pb-4">
+            {agruparPorGrupo(secaoAtual.gov_perguntas).map((g, i) => (
+              <div key={`${g.grupo ?? ""}-${i}`} className="space-y-3">
+                {g.grupo && (
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-700">{g.grupo}</h3>
+                )}
+                {g.itens.map((q) => (
+                  <PerguntaItem
+                    key={q.id}
+                    pergunta={q}
+                    valor={respostas[q.id] ?? respostaVazia()}
+                    onChange={(v) => setRespostas((prev) => ({ ...prev, [q.id]: v }))}
+                    responsaveis={nomesCamareiras}
+                    responsavelPadrao={camareira?.nome}
+                    quemPediu={eu.nome}
+                  />
+                ))}
+              </div>
             ))}
           </div>
 
@@ -426,7 +462,7 @@ export function NovaInspecao({
             </div>
             {!completa && (
               <p className="pt-2 text-center text-xs text-slate-400">
-                Responda todos os itens (e preencha o plano de ação dos &quot;Não&quot;) para continuar.
+                Responda os itens obrigatórios (e o plano de ação dos &quot;Não&quot;) para continuar.
               </p>
             )}
           </div>
@@ -444,7 +480,9 @@ export function NovaInspecao({
           </div>
           <h2 className="text-lg font-bold text-slate-800">Checklist finalizado!</h2>
           <p className="mt-1 text-sm text-slate-500">
-            A inspeção da UH {acomodacao?.numero} foi registrada com sucesso.
+            {acomodacao
+              ? `A inspeção da UH ${acomodacao.numero} foi registrada com sucesso.`
+              : `"${processo?.nome}" foi registrado com sucesso.`}
           </p>
           <div className="mt-6 grid gap-2">
             {inspecaoIdFinal && (

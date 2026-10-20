@@ -38,7 +38,7 @@ export function EquipeApp({ pessoas }: { pessoas: Pessoa[] }) {
     <>
       <Titulo
         titulo="Acessos"
-        subtitulo="Escolha quem usa o checklist. Líder inspeciona e escolhe a camareira; camareira faz o próprio checklist. Administradores sempre têm acesso."
+        subtitulo="Escolha quem usa os checklists. Líder vê as inspeções de todos e escolhe a camareira nos checklists de UH; camareira (aplicador) vê só as próprias. Administradores sempre têm acesso."
       />
       <Erro texto={erro} />
 
@@ -66,7 +66,7 @@ export function EquipeApp({ pessoas }: { pessoas: Pessoa[] }) {
                 aria-label={`Acesso de ${p.nome} à governança`}
               >
                 <option value="">Sem acesso</option>
-                <option value="camareira">Camareira</option>
+                <option value="camareira">Aplicador / camareira</option>
                 <option value="lider">Líder</option>
               </select>
             )}

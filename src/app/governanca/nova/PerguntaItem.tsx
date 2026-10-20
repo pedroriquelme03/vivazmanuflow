@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Camareira, Pergunta, Prioridade, RespostaValor } from "@/lib/governanca";
+import {
+  CARINHAS,
+  tipoItem,
+  type Pergunta,
+  type Prioridade,
+  type RespostaValor,
+} from "@/lib/governanca";
 import { inputCls, labelCls } from "../ui";
 
 const MAX_ANEXO_BYTES = 10 * 1024 * 1024;
@@ -15,7 +21,9 @@ export type PlanoLocal = {
 };
 
 export type RespostaLocal = {
-  resposta: RespostaValor | null;
+  resposta: RespostaValor | "na" | null;
+  valor: string;
+  selecionadas: string[];
   comentario: string;
   mostrarComentario: boolean;
   anexoFile: File | null;
@@ -26,6 +34,8 @@ export type RespostaLocal = {
 export function respostaVazia(): RespostaLocal {
   return {
     resposta: null,
+    valor: "",
+    selecionadas: [],
     comentario: "",
     mostrarComentario: false,
     anexoFile: null,
@@ -40,40 +50,65 @@ function planoVazio(quemPediu: string, quemVaiFazer = ""): PlanoLocal {
 
 const botao =
   "inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition";
+const botaoSolto = "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50";
 
 export function PerguntaItem({
   pergunta,
   valor,
   onChange,
-  camareiras,
-  camareiraPadrao,
+  responsaveis,
+  responsavelPadrao,
   quemPediu,
 }: {
   pergunta: Pergunta;
   valor: RespostaLocal;
   onChange: (v: RespostaLocal) => void;
-  camareiras: Camareira[];
-  camareiraPadrao?: string;
+  /** Nomes sugeridos em "Quem vai fazer?" (camareiras). */
+  responsaveis: string[];
+  responsavelPadrao?: string;
   quemPediu: string;
 }) {
   const [anexoErro, setAnexoErro] = useState<string | null>(null);
+  const tipo = tipoItem(pergunta.tipo);
+  const na = valor.resposta === "na";
 
-  function setResposta(r: RespostaValor) {
-    if (r === "nao") {
+  function setSimNao(r: RespostaValor) {
+    if (r === "nao" && pergunta.plano_acao) {
       onChange({
         ...valor,
         resposta: "nao",
-        plano: valor.plano ?? planoVazio(quemPediu, camareiraPadrao ?? ""),
+        plano: valor.plano ?? planoVazio(quemPediu, responsavelPadrao ?? ""),
       });
     } else {
-      onChange({ ...valor, resposta: "sim", plano: null });
+      onChange({ ...valor, resposta: r, plano: null });
     }
+  }
+
+  function alternarNa() {
+    onChange(
+      na
+        ? { ...valor, resposta: null }
+        : { ...valor, resposta: "na", valor: "", selecionadas: [], plano: null },
+    );
+  }
+
+  function setValor(v: string) {
+    onChange({ ...valor, valor: v, resposta: null });
+  }
+
+  function alternarOpcao(op: string) {
+    const tem = valor.selecionadas.includes(op);
+    onChange({
+      ...valor,
+      resposta: null,
+      selecionadas: tem ? valor.selecionadas.filter((o) => o !== op) : [...valor.selecionadas, op],
+    });
   }
 
   function setPlano(patch: Partial<PlanoLocal>) {
     onChange({
       ...valor,
-      plano: { ...(valor.plano ?? planoVazio(quemPediu, camareiraPadrao ?? "")), ...patch },
+      plano: { ...(valor.plano ?? planoVazio(quemPediu, responsavelPadrao ?? "")), ...patch },
     });
   }
 
@@ -98,34 +133,156 @@ export function PerguntaItem({
   }
 
   const borda =
-    valor.resposta === null
-      ? "border-slate-200"
-      : valor.resposta === "sim"
-        ? "border-green-300"
-        : "border-red-300";
+    tipo === "sim_nao" && valor.resposta === "sim"
+      ? "border-green-300"
+      : tipo === "sim_nao" && valor.resposta === "nao"
+        ? "border-red-300"
+        : "border-slate-200";
 
   return (
     <div className={`rounded-2xl border bg-white p-5 shadow-sm ${borda}`}>
-      <p className="mb-3 font-medium text-slate-800">{pergunta.texto}</p>
+      <p className="font-medium text-slate-800">
+        {pergunta.texto}
+        {!pergunta.obrigatoria && <span className="ml-1 text-xs font-normal text-slate-400">(opcional)</span>}
+      </p>
+      {pergunta.dica && <p className="mt-0.5 text-xs text-slate-500">{pergunta.dica}</p>}
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => setResposta("sim")}
-          className={`${botao} ${valor.resposta === "sim" ? "bg-green-600 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
-        >
-          ✓ Sim
-        </button>
-        <button
-          type="button"
-          onClick={() => setResposta("nao")}
-          className={`${botao} ${valor.resposta === "nao" ? "bg-red-600 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
-        >
-          ✕ Não
-        </button>
+      <div className="mt-3">
+        {tipo === "sim_nao" && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSimNao("sim")}
+              className={`${botao} ${valor.resposta === "sim" ? "bg-green-600 text-white" : botaoSolto}`}
+            >
+              ✓ Sim
+            </button>
+            <button
+              type="button"
+              onClick={() => setSimNao("nao")}
+              className={`${botao} ${valor.resposta === "nao" ? "bg-red-600 text-white" : botaoSolto}`}
+            >
+              ✕ Não
+            </button>
+          </div>
+        )}
+
+        {tipo === "carinhas" && (
+          <div className="grid grid-cols-3 gap-2">
+            {CARINHAS.map((c) => (
+              <button
+                key={c.valor}
+                type="button"
+                disabled={na}
+                onClick={() => setValor(c.valor)}
+                className={`${botao} flex-col gap-0.5 ${valor.valor === c.valor ? "bg-brand-600 text-white" : botaoSolto}`}
+              >
+                <span className="text-2xl">{c.emoji}</span>
+                <span className="text-xs">{c.rotulo}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tipo === "texto_curto" && (
+          <input className={inputCls} disabled={na} value={valor.valor} onChange={(e) => setValor(e.target.value)} />
+        )}
+
+        {tipo === "texto_longo" && (
+          <textarea
+            className={inputCls}
+            rows={3}
+            disabled={na}
+            value={valor.valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        )}
+
+        {(tipo === "numero" || tipo === "decimal" || tipo === "porcentagem") && (
+          <div className="flex items-center gap-2">
+            <input
+              className={`${inputCls} max-w-48`}
+              type="number"
+              inputMode={tipo === "numero" ? "numeric" : "decimal"}
+              step={tipo === "numero" ? 1 : "any"}
+              disabled={na}
+              value={valor.valor}
+              onChange={(e) => setValor(e.target.value)}
+            />
+            {tipo === "porcentagem" && <span className="text-sm text-slate-500">%</span>}
+          </div>
+        )}
+
+        {(tipo === "data" || tipo === "mes_ano" || tipo === "hora") && (
+          <input
+            className={`${inputCls} max-w-56`}
+            type={tipo === "data" ? "date" : tipo === "mes_ano" ? "month" : "time"}
+            disabled={na}
+            value={valor.valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        )}
+
+        {tipo === "selecao_unica" && (
+          <div className="space-y-1.5">
+            {pergunta.opcoes.map((op) => (
+              <label
+                key={op}
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                  valor.valor === op ? "border-brand-400 bg-brand-50" : "border-slate-200"
+                } ${na ? "opacity-50" : ""}`}
+              >
+                <input
+                  type="radio"
+                  className="mt-0.5"
+                  disabled={na}
+                  checked={valor.valor === op}
+                  onChange={() => setValor(op)}
+                />
+                <span>{op}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {tipo === "selecao_multipla" && (
+          <div className="space-y-1.5">
+            {pergunta.opcoes.map((op) => {
+              const marcada = valor.selecionadas.includes(op);
+              return (
+                <label
+                  key={op}
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+                    marcada ? "border-brand-400 bg-brand-50" : "border-slate-200"
+                  } ${na ? "opacity-50" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    disabled={na}
+                    checked={marcada}
+                    onChange={() => alternarOpcao(op)}
+                  />
+                  <span>{op}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
+        {pergunta.permite_na && (
+          <button
+            type="button"
+            onClick={alternarNa}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+              na ? "border-slate-500 bg-slate-500 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            N/A
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onChange({ ...valor, mostrarComentario: !valor.mostrarComentario })}
@@ -214,18 +371,18 @@ export function PerguntaItem({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
               <span className={labelCls}>Quem vai fazer?</span>
-              <select
+              <input
                 className={inputCls}
+                list={`responsaveis-${pergunta.id}`}
                 value={valor.plano.quem_vai_fazer}
                 onChange={(e) => setPlano({ quem_vai_fazer: e.target.value })}
-              >
-                <option value="">Selecione a camareira</option>
-                {camareiras.map((c) => (
-                  <option key={c.id} value={c.nome}>
-                    {c.nome}
-                  </option>
+                placeholder="Nome do responsável"
+              />
+              <datalist id={`responsaveis-${pergunta.id}`}>
+                {responsaveis.map((nome) => (
+                  <option key={nome} value={nome} />
                 ))}
-              </select>
+              </datalist>
             </label>
             <label className="block">
               <span className={labelCls}>Quem está pedindo?</span>

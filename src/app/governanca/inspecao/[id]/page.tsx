@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
-import { agruparPorSecao, formatDataHora, rotuloTipo } from "@/lib/governanca";
+import {
+  agruparPorGrupo,
+  agruparPorSecao,
+  formatDataHora,
+  formatarValor,
+  rotuloTipo,
+} from "@/lib/governanca";
 import { GovernancaShell } from "../../GovernancaShell";
 import { PrioridadeBadge, StatusBadge, Vazio, cardCls } from "../../ui";
 
@@ -31,7 +37,7 @@ export default async function InspecaoDetalhePage({
   ]);
 
   const lista = respostas ?? [];
-  const grupos = agruparPorSecao(lista);
+  const grupos = agruparPorSecao(lista.map((r) => ({ ...r, grupo: r.pergunta_grupo })));
   const totalSim = lista.filter((r) => r.resposta === "sim").length;
   const totalNao = lista.filter((r) => r.resposta === "nao").length;
 
@@ -48,18 +54,28 @@ export default async function InspecaoDetalhePage({
           <div className={`${cardCls} mb-4`}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-2xl font-bold text-slate-800">UH {insp.gov_acomodacoes?.numero}</p>
-                <p className="text-sm text-slate-500">
-                  {rotuloTipo(insp.tipo)} · {insp.gov_processos?.nome}
-                </p>
+                {insp.gov_acomodacoes ? (
+                  <>
+                    <p className="text-2xl font-bold text-slate-800">UH {insp.gov_acomodacoes.numero}</p>
+                    <p className="text-sm text-slate-500">
+                      {rotuloTipo(insp.tipo ?? insp.gov_acomodacoes.tipo)} · {insp.gov_processos?.nome}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xl font-bold text-slate-800">{insp.gov_processos?.nome}</p>
+                )}
               </div>
               <StatusBadge status={insp.status} />
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <Info rotulo="Camareira" valor={insp.gov_camareiras?.nome ?? "—"} />
+              {insp.gov_acomodacoes && (
+                <Info rotulo="Camareira" valor={insp.gov_camareiras?.nome ?? "—"} />
+              )}
               <Info rotulo="Inspetor" valor={insp.usuarios?.nome ?? "—"} />
               <Info rotulo="Data" valor={formatDataHora(insp.finalizada_em ?? insp.criado_em)} />
-              <Info rotulo="Conformidade" valor={`${totalSim} sim · ${totalNao} não`} />
+              {totalSim + totalNao > 0 && (
+                <Info rotulo="Conformidade" valor={`${totalSim} sim · ${totalNao} não`} />
+              )}
             </dl>
           </div>
 
@@ -69,7 +85,13 @@ export default async function InspecaoDetalhePage({
                 {g.nome}
               </h3>
               <div className="space-y-2">
-                {g.itens.map((r) => (
+                {agruparPorGrupo(g.itens).flatMap((sub, si) => [
+                  sub.grupo ? (
+                    <p key={`g-${si}`} className="pt-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                      {sub.grupo}
+                    </p>
+                  ) : null,
+                  ...sub.itens.map((r) => (
                   <div key={r.id} className={cardCls}>
                     <div className="flex items-start gap-3">
                       <span
@@ -78,13 +100,29 @@ export default async function InspecaoDetalhePage({
                             ? "bg-green-600"
                             : r.resposta === "nao"
                               ? "bg-red-600"
-                              : "bg-slate-400"
+                              : r.pergunta_tipo === "sim_nao" || r.resposta === "na"
+                                ? "bg-slate-400"
+                                : "bg-brand-600"
                         }`}
                       >
-                        {r.resposta === "sim" ? "✓" : r.resposta === "nao" ? "✕" : "?"}
+                        {r.resposta === "sim"
+                          ? "✓"
+                          : r.resposta === "nao"
+                            ? "✕"
+                            : r.resposta === "na"
+                              ? "–"
+                              : r.pergunta_tipo === "sim_nao"
+                                ? "?"
+                                : "•"}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-800">{r.pergunta_texto}</p>
+                        {r.resposta === "na" && <p className="mt-1 text-sm text-slate-500">Não se aplica</p>}
+                        {r.pergunta_tipo !== "sim_nao" && r.resposta !== "na" && (
+                          <p className="mt-1 whitespace-pre-line text-sm text-slate-700">
+                            {formatarValor(r.pergunta_tipo, r.valor)}
+                          </p>
+                        )}
                         {r.comentario && <p className="mt-1 text-sm text-slate-500">{r.comentario}</p>}
                         {r.anexo_url && (
                           <a href={r.anexo_url} target="_blank" rel="noreferrer">
@@ -113,7 +151,8 @@ export default async function InspecaoDetalhePage({
                       </div>
                     </div>
                   </div>
-                ))}
+                  )),
+                ])}
               </div>
             </section>
           ))}

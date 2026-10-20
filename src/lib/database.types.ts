@@ -1063,6 +1063,9 @@ export type Database = {
       }
       gov_processos: {
         Row: {
+          codigo_origem: string | null
+          usa_acomodacao: boolean
+          categoria: string | null
           id: string
           nome: string
           descricao: string | null
@@ -1071,6 +1074,9 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          codigo_origem?: string | null
+          usa_acomodacao?: boolean
+          categoria?: string | null
           id?: string
           nome: string
           descricao?: string | null
@@ -1079,6 +1085,9 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          codigo_origem?: string | null
+          usa_acomodacao?: boolean
+          categoria?: string | null
           id?: string
           nome?: string
           descricao?: string | null
@@ -1122,6 +1131,13 @@ export type Database = {
       }
       gov_perguntas: {
         Row: {
+          dica: string | null
+          grupo: string | null
+          plano_acao: boolean
+          obrigatoria: boolean
+          permite_na: boolean
+          opcoes: string[]
+          tipo: string
           id: string
           secao_id: string
           texto: string
@@ -1129,6 +1145,13 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          dica?: string | null
+          grupo?: string | null
+          plano_acao?: boolean
+          obrigatoria?: boolean
+          permite_na?: boolean
+          opcoes?: string[]
+          tipo?: string
           id?: string
           secao_id: string
           texto: string
@@ -1136,6 +1159,13 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          dica?: string | null
+          grupo?: string | null
+          plano_acao?: boolean
+          obrigatoria?: boolean
+          permite_na?: boolean
+          opcoes?: string[]
+          tipo?: string
           id?: string
           secao_id?: string
           texto?: string
@@ -1156,8 +1186,8 @@ export type Database = {
         Row: {
           id: string
           processo_id: string
-          acomodacao_id: string
-          tipo: string
+          acomodacao_id: string | null
+          tipo: string | null
           camareira_id: string | null
           inspetor_id: string
           status: string
@@ -1167,8 +1197,8 @@ export type Database = {
         Insert: {
           id?: string
           processo_id: string
-          acomodacao_id: string
-          tipo: string
+          acomodacao_id?: string | null
+          tipo?: string | null
           camareira_id?: string | null
           inspetor_id: string
           status?: string
@@ -1178,8 +1208,8 @@ export type Database = {
         Update: {
           id?: string
           processo_id?: string
-          acomodacao_id?: string
-          tipo?: string
+          acomodacao_id?: string | null
+          tipo?: string | null
           camareira_id?: string | null
           inspetor_id?: string
           status?: string
@@ -1219,6 +1249,9 @@ export type Database = {
       }
       gov_respostas: {
         Row: {
+          valor: string | null
+          pergunta_grupo: string | null
+          pergunta_tipo: string
           id: string
           inspecao_id: string
           pergunta_id: string | null
@@ -1232,6 +1265,9 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          valor?: string | null
+          pergunta_grupo?: string | null
+          pergunta_tipo?: string
           id?: string
           inspecao_id: string
           pergunta_id?: string | null
@@ -1245,6 +1281,9 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          valor?: string | null
+          pergunta_grupo?: string | null
+          pergunta_tipo?: string
           id?: string
           inspecao_id?: string
           pergunta_id?: string | null

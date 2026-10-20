@@ -21,7 +21,7 @@ export const MIGRATION_HINT_GOV =
 export const PAPEL_GOV_LABEL: Record<GovPapel, string> = {
   admin: "Administrador",
   lider: "Líder",
-  camareira: "Camareira",
+  camareira: "Aplicador",
 };
 
 export const PRIORIDADE_LABEL: Record<Prioridade, string> = {
@@ -55,6 +55,11 @@ export function rotuloTipo(tipo: string, curto = false) {
 export function rotuloTipoProcesso(tipo: string) {
   if (tipo === "ambos") return "Ambos";
   return tipo === "suite" ? "Suítes" : "Apartamentos";
+}
+
+/** Onde o checklist se aplica: tipo de UH ou nenhum. */
+export function rotuloAplicacao(p: { usa_acomodacao: boolean; tipo: string }) {
+  return p.usa_acomodacao ? rotuloTipoProcesso(p.tipo) : "Sem UH";
 }
 
 export function formatDataHora(iso: string | null | undefined): string {
@@ -105,22 +110,160 @@ export function proximaOrdem(itens: { ordem: number }[]) {
   return itens.length ? Math.max(...itens.map((i) => i.ordem)) + 1 : 1;
 }
 
+// ---- Tipos de item ----
+
+export const TIPOS_ITEM = [
+  "sim_nao",
+  "carinhas",
+  "texto_curto",
+  "texto_longo",
+  "numero",
+  "decimal",
+  "porcentagem",
+  "data",
+  "mes_ano",
+  "hora",
+  "selecao_unica",
+  "selecao_multipla",
+] as const;
+export type TipoItem = (typeof TIPOS_ITEM)[number];
+
+export const TIPO_ITEM_LABEL: Record<TipoItem, string> = {
+  sim_nao: "Sim / Não",
+  carinhas: "Carinhas (ruim, regular, bom)",
+  texto_curto: "Texto curto",
+  texto_longo: "Texto longo",
+  numero: "Número inteiro",
+  decimal: "Número decimal",
+  porcentagem: "Porcentagem",
+  data: "Data",
+  mes_ano: "Mês/ano",
+  hora: "Hora",
+  selecao_unica: "Lista (uma opção)",
+  selecao_multipla: "Lista (várias opções)",
+};
+
+export const CARINHAS = [
+  { valor: "ruim", rotulo: "Ruim", emoji: "☹️" },
+  { valor: "regular", rotulo: "Regular", emoji: "😐" },
+  { valor: "bom", rotulo: "Bom", emoji: "🙂" },
+] as const;
+
+export function tipoItem(valor: string | null | undefined): TipoItem {
+  return (TIPOS_ITEM as readonly string[]).includes(valor ?? "") ? (valor as TipoItem) : "sim_nao";
+}
+
+export function tipoTemOpcoes(tipo: string) {
+  return tipo === "selecao_unica" || tipo === "selecao_multipla";
+}
+
 export type RespostaParcial = {
-  resposta: RespostaValor | null;
+  resposta: RespostaValor | "na" | null;
+  valor?: string;
+  selecionadas?: string[];
   plano: { o_que_fazer: string } | null;
 };
 
-/** Seção pronta: tudo respondido e todo "Não" com o que precisa ser feito. */
+type ItemRegra = {
+  id: string;
+  tipo?: string;
+  obrigatoria?: boolean;
+  plano_acao?: boolean;
+};
+
+/**
+ * Item pronto para seguir. Obrigatório precisa de resposta (ou N/A);
+ * "Não" com plano de ação precisa do que fazer, mesmo se o item for opcional.
+ */
+export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) {
+  const obrigatoria = item.obrigatoria ?? true;
+  const tipo = tipoItem(item.tipo);
+  if (r?.resposta === "na") return true;
+  if (tipo === "sim_nao") {
+    if (!r || r.resposta === null) return !obrigatoria;
+    if (r.resposta === "nao" && (item.plano_acao ?? true) && !r.plano?.o_que_fazer.trim()) {
+      return false;
+    }
+    return true;
+  }
+  const preenchido =
+    tipo === "selecao_multipla"
+      ? (r?.selecionadas?.length ?? 0) > 0
+      : Boolean(r?.valor?.trim());
+  return preenchido || !obrigatoria;
+}
+
+/** Seção pronta: todos os itens prontos para seguir. */
 export function secaoCompleta(
-  perguntas: { id: string }[],
+  perguntas: ItemRegra[],
   respostas: Record<string, RespostaParcial | undefined>,
 ) {
-  return perguntas.every((q) => {
-    const r = respostas[q.id];
-    if (!r || r.resposta === null) return false;
-    if (r.resposta === "nao" && !r.plano?.o_que_fazer.trim()) return false;
-    return true;
-  });
+  return perguntas.every((q) => itemRespondido(q, respostas[q.id]));
+}
+
+/** Valor gravado de um item que não é Sim/Não, do jeito que a pessoa lê. */
+export function formatarValor(tipo: string, valor: string | null | undefined) {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  switch (tipoItem(tipo)) {
+    case "data": {
+      const [a, m, d] = valor.split("-");
+      return d ? `${d}/${m}/${a}` : valor;
+    }
+    case "mes_ano": {
+      const [a, m] = valor.split("-");
+      return m ? `${m}/${a}` : valor;
+    }
+    case "porcentagem":
+      return `${valor}%`;
+    case "decimal":
+      return valor.replace(".", ",");
+    case "carinhas": {
+      const c = CARINHAS.find((x) => x.valor === valor);
+      return c ? `${c.emoji} ${c.rotulo}` : valor;
+    }
+    case "selecao_multipla":
+      try {
+        const lista = JSON.parse(valor);
+        return Array.isArray(lista) ? lista.join(" · ") : valor;
+      } catch {
+        return valor;
+      }
+    default:
+      return valor;
+  }
+}
+
+/** Subgrupos de uma seção, na ordem em que aparecem. */
+export function agruparPorGrupo<T extends { grupo: string | null }>(itens: T[]) {
+  const grupos: { grupo: string | null; itens: T[] }[] = [];
+  for (const item of itens) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.grupo === item.grupo) ultimo.itens.push(item);
+    else grupos.push({ grupo: item.grupo, itens: [item] });
+  }
+  return grupos;
+}
+
+/** Checklists agrupados pela categoria (sem categoria fica por último). */
+export function agruparPorCategoria<T extends { categoria: string | null; nome: string }>(
+  lista: T[],
+) {
+  const mapa = new Map<string, T[]>();
+  for (const p of lista) {
+    const c = p.categoria?.trim() || "Outros";
+    mapa.set(c, [...(mapa.get(c) ?? []), p]);
+  }
+  return [...mapa.entries()]
+    .sort(([a], [b]) => (a === "Outros" ? 1 : b === "Outros" ? -1 : a.localeCompare(b, "pt-BR")))
+    .map(([categoria, itens]) => ({
+      categoria,
+      itens: [...itens].sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR")),
+    }));
+}
+
+/** Busca sem diferenciar acento nem maiúscula. */
+export function normalizarBusca(texto: string) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 type ItemSecao = {

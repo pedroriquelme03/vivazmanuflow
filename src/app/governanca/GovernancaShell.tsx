@@ -46,7 +46,7 @@ export function GovernancaShell({
         </Link>
         <BrandMark className="h-9 w-9 rounded-lg bg-[#06b6d4]" />
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-sm font-bold">Governança Vivaz</p>
+          <p className="truncate text-sm font-bold">Checklists Vivaz</p>
           <p className="truncate text-xs text-white/60">
             {perfil.nome} · {PAPEL_GOV_LABEL[papel]}
           </p>

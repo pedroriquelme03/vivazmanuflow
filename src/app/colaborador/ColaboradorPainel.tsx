@@ -742,7 +742,7 @@ function PerfilColab({ perfil }: { perfil: Perfil }) {
           href="/governanca"
           className="mt-4 block w-full rounded-xl bg-brand-600 px-4 py-3.5 text-center text-base font-semibold text-white transition hover:bg-brand-700"
         >
-          Checklist de governança
+          Checklists
         </Link>
       )}
 

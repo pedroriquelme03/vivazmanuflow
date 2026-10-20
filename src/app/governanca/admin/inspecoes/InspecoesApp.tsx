@@ -7,10 +7,11 @@ import { StatusBadge, Titulo, Vazio, inputCls } from "../../ui";
 
 export type LinhaInspecao = {
   id: string;
-  tipo: string;
+  tipo: string | null;
   status: string;
   data: string;
   uh: string | null;
+  checklist: string | null;
   camareira: string | null;
   inspetor: string | null;
 };
@@ -22,7 +23,7 @@ export function InspecoesApp({ lista }: { lista: LinhaInspecao[] }) {
     const q = busca.trim().toLowerCase();
     if (!q) return lista;
     return lista.filter((i) =>
-      [i.uh, i.camareira, i.inspetor].some((v) => v?.toLowerCase().includes(q)),
+      [i.uh, i.checklist, i.camareira, i.inspetor].some((v) => v?.toLowerCase().includes(q)),
     );
   }, [lista, busca]);
 
@@ -35,7 +36,7 @@ export function InspecoesApp({ lista }: { lista: LinhaInspecao[] }) {
         type="search"
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar por UH, camareira ou inspetor…"
+        placeholder="Buscar por checklist, UH, camareira ou inspetor…"
       />
 
       {filtradas.length === 0 ? (
@@ -45,8 +46,8 @@ export function InspecoesApp({ lista }: { lista: LinhaInspecao[] }) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-medium">Checklist</th>
                 <th className="px-4 py-3 font-medium">UH</th>
-                <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="hidden px-4 py-3 font-medium md:table-cell">Camareira</th>
                 <th className="hidden px-4 py-3 font-medium sm:table-cell">Inspetor</th>
                 <th className="px-4 py-3 font-medium">Data</th>
@@ -58,10 +59,12 @@ export function InspecoesApp({ lista }: { lista: LinhaInspecao[] }) {
                 <tr key={i.id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <Link href={`/governanca/inspecao/${i.id}`} className="font-semibold text-brand-700 hover:underline">
-                      {i.uh ?? "—"}
+                      {i.checklist ?? "Checklist"}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">{rotuloTipo(i.tipo, true)}</td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {i.uh ? `${i.uh} · ${rotuloTipo(i.tipo ?? "", true)}` : "—"}
+                  </td>
                   <td className="hidden px-4 py-3 text-slate-500 md:table-cell">{i.camareira ?? "—"}</td>
                   <td className="hidden px-4 py-3 text-slate-500 sm:table-cell">{i.inspetor ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-500">{formatDataHora(i.data)}</td>

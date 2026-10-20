@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  agruparPorCategoria,
+  agruparPorGrupo,
   agruparPorSecao,
+  formatarValor,
+  itemRespondido,
+  normalizarBusca,
   conformidade,
   filtrarAcomodacoes,
   inicioPeriodo,
@@ -123,5 +128,80 @@ describe("proximaOrdem", () => {
   it("vai depois da maior ordem", () => {
     expect(proximaOrdem([])).toBe(1);
     expect(proximaOrdem([{ ordem: 3 }, { ordem: 1 }])).toBe(4);
+  });
+});
+
+describe("itemRespondido", () => {
+  const vazio = { resposta: null, plano: null };
+
+  it("opcional pode ficar em branco", () => {
+    expect(itemRespondido({ id: "a", tipo: "texto_curto", obrigatoria: false }, vazio)).toBe(true);
+    expect(itemRespondido({ id: "a", tipo: "texto_curto", obrigatoria: true }, vazio)).toBe(false);
+  });
+
+  it("N/A conta como respondido", () => {
+    expect(itemRespondido({ id: "a", tipo: "numero" }, { resposta: "na", plano: null })).toBe(true);
+  });
+
+  it("Não sem plano de ação ativo não pede o que fazer", () => {
+    expect(
+      itemRespondido({ id: "a", tipo: "sim_nao", plano_acao: false }, { resposta: "nao", plano: null }),
+    ).toBe(true);
+    expect(
+      itemRespondido({ id: "a", tipo: "sim_nao", plano_acao: true }, { resposta: "nao", plano: null }),
+    ).toBe(false);
+  });
+
+  it("lista de várias opções precisa de ao menos uma", () => {
+    const item = { id: "a", tipo: "selecao_multipla" };
+    expect(itemRespondido(item, { ...vazio, selecionadas: [] })).toBe(false);
+    expect(itemRespondido(item, { ...vazio, selecionadas: ["Bar"] })).toBe(true);
+  });
+});
+
+describe("formatarValor", () => {
+  it("escreve datas e números do jeito brasileiro", () => {
+    expect(formatarValor("data", "2026-10-19")).toBe("19/10/2026");
+    expect(formatarValor("mes_ano", "2026-10")).toBe("10/2026");
+    expect(formatarValor("decimal", "7.4")).toBe("7,4");
+    expect(formatarValor("porcentagem", "80")).toBe("80%");
+  });
+
+  it("junta as opções marcadas", () => {
+    expect(formatarValor("selecao_multipla", '["Bar","Lanchonete"]')).toBe("Bar · Lanchonete");
+  });
+
+  it("mostra a carinha", () => {
+    expect(formatarValor("carinhas", "bom")).toBe("🙂 Bom");
+    expect(formatarValor("texto_curto", null)).toBe("—");
+  });
+});
+
+describe("agrupamentos", () => {
+  it("agrupa itens seguidos da mesma subárea", () => {
+    const g = agruparPorGrupo([
+      { grupo: null },
+      { grupo: "Bomba 1" },
+      { grupo: "Bomba 1" },
+      { grupo: "Bomba 2" },
+    ]);
+    expect(g.map((x) => [x.grupo, x.itens.length])).toEqual([
+      [null, 1],
+      ["Bomba 1", 2],
+      ["Bomba 2", 1],
+    ]);
+  });
+
+  it("ordena categorias e deixa Outros por último", () => {
+    const g = agruparPorCategoria([
+      { categoria: null, nome: "Avaliação" },
+      { categoria: "MANUTENÇÃO", nome: "B" },
+      { categoria: "AQUAMANIA", nome: "A" },
+    ]);
+    expect(g.map((x) => x.categoria)).toEqual(["AQUAMANIA", "MANUTENÇÃO", "Outros"]);
+  });
+
+  it("busca ignora acento", () => {
+    expect(normalizarBusca(" Manutenção ")).toBe("manutencao");
   });
 });

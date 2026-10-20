@@ -31,7 +31,7 @@ const ABAS: Aba[] = [
   },
   {
     href: "/governanca/admin/processos",
-    rotulo: "Checklists",
+    rotulo: "Modelos",
     soAdmin: true,
     ativa: (p) => p.startsWith("/governanca/admin/processos"),
   },

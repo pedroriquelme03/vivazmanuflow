@@ -21,7 +21,7 @@ export default async function GovernancaHome() {
   let query = supabase
     .from("gov_inspecoes")
     .select(
-      "id, tipo, status, criado_em, finalizada_em, gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome)",
+      "id, tipo, status, criado_em, finalizada_em, gov_acomodacoes(numero), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
     )
     .order("criado_em", { ascending: false })
     .limit(20);
@@ -41,7 +41,7 @@ export default async function GovernancaHome() {
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-2xl">✓</span>
         <span>
           <span className="block text-base font-semibold">Iniciar checklist</span>
-          <span className="block text-sm text-white/80">Conferir uma acomodação após o checkout</span>
+          <span className="block text-sm text-white/80">Governança, manutenção, Aquamania, eventos e rondas</span>
         </span>
       </Link>
 
@@ -59,17 +59,26 @@ export default async function GovernancaHome() {
                 href={`/governanca/inspecao/${i.id}`}
                 className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
               >
-                <span className="flex h-11 w-11 flex-col items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                  <span className="text-[10px] font-medium uppercase">UH</span>
-                  <span className="text-sm font-bold leading-none">
-                    {i.gov_acomodacoes?.numero ?? "?"}
-                  </span>
+                <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+                  {i.gov_acomodacoes ? (
+                    <>
+                      <span className="text-[10px] font-medium uppercase">UH</span>
+                      <span className="text-sm font-bold leading-none">{i.gov_acomodacoes.numero}</span>
+                    </>
+                  ) : (
+                    <span className="text-lg">📋</span>
+                  )}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-800">
-                    {rotuloTipo(i.tipo)}
-                    {i.gov_camareiras?.nome ? ` · ${i.gov_camareiras.nome}` : ""}
+                    {i.gov_processos?.nome ?? "Checklist"}
                   </p>
+                  {i.gov_acomodacoes && i.tipo && (
+                    <p className="truncate text-xs text-slate-500">
+                      UH {i.gov_acomodacoes.numero} · {rotuloTipo(i.tipo)}
+                      {i.gov_camareiras?.nome ? ` · ${i.gov_camareiras.nome}` : ""}
+                    </p>
+                  )}
                   <p className="truncate text-xs text-slate-500">
                     {formatDataHora(i.finalizada_em ?? i.criado_em)}
                     {equipe && i.usuarios?.nome ? ` · por ${i.usuarios.nome}` : ""}

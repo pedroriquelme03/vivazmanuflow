@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
-import { inspecionaEquipe, ordenarSecoes, type SecaoComPerguntas } from "@/lib/governanca";
+import { inspecionaEquipe } from "@/lib/governanca";
 import { GovernancaShell } from "../GovernancaShell";
 import { NovaInspecao } from "./NovaInspecao";
 
@@ -14,9 +14,10 @@ export default async function NovaInspecaoPage() {
     await Promise.all([
       supabase.from("gov_acomodacoes").select("*").eq("ativo", true).order("numero"),
       supabase.from("gov_camareiras").select("*").eq("ativo", true).order("nome"),
+      // Só a contagem de itens aqui; as perguntas vêm quando o checklist é escolhido.
       supabase
         .from("gov_processos")
-        .select("*, gov_secoes(*, gov_perguntas(*))")
+        .select("*, gov_secoes(gov_perguntas(id))")
         .eq("ativo", true)
         .order("nome"),
     ]);
@@ -30,7 +31,7 @@ export default async function NovaInspecaoPage() {
         camareiras={camareiras ?? []}
         processos={(processos ?? []).map(({ gov_secoes, ...p }) => ({
           ...p,
-          secoes: ordenarSecoes((gov_secoes ?? []) as SecaoComPerguntas[]),
+          itens: (gov_secoes ?? []).reduce((n, s) => n + (s.gov_perguntas?.length ?? 0), 0),
         }))}
       />
     </GovernancaShell>

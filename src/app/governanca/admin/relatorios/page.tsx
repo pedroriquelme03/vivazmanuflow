@@ -10,7 +10,7 @@ import {
   type Periodo,
 } from "@/lib/governanca";
 import { GovernancaShell } from "../../GovernancaShell";
-import { Kpi, PrioridadeBadge, Titulo, Vazio } from "../../ui";
+import { Kpi, PrioridadeBadge, Titulo, Vazio, btnSecundario, inputCls } from "../../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -24,22 +24,26 @@ const PERIODOS: { id: Periodo; rotulo: string }[] = [
 export default async function RelatoriosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string }>;
+  searchParams: Promise<{ periodo?: string; checklist?: string }>;
 }) {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/relatorios", true);
-  const { periodo: bruto } = await searchParams;
+  const { periodo: bruto, checklist } = await searchParams;
   const periodo: Periodo = PERIODOS.some((p) => p.id === bruto) ? (bruto as Periodo) : "30";
 
   const supabase = await createClient();
   let query = supabase
     .from("gov_inspecoes")
     .select(
-      "id, criado_em, gov_camareiras(nome), gov_respostas(id, resposta, pergunta_texto, gov_planos_acao(*))",
+      "id, criado_em, processo_id, gov_processos(nome), gov_camareiras(nome), gov_respostas(id, resposta, pergunta_texto, gov_planos_acao(*))",
     )
     .order("criado_em", { ascending: false });
   const inicio = inicioPeriodo(periodo);
   if (inicio) query = query.gte("criado_em", inicio.toISOString());
-  const { data } = await query;
+  if (checklist) query = query.eq("processo_id", checklist);
+  const [{ data }, { data: processos }] = await Promise.all([
+    query,
+    supabase.from("gov_processos").select("id, nome, categoria").order("nome"),
+  ]);
   const inspecoes = data ?? [];
 
   const respostas = inspecoes.flatMap((i) =>
@@ -58,6 +62,22 @@ export default async function RelatoriosPage({
     respostas,
   );
   const reprovados = itensMaisReprovados(respostas);
+  const comCamareira = inspecoes.some((i) => i.gov_camareiras);
+
+  const porChecklist = [...inspecoes.reduce((mapa, i) => {
+    const nome = i.gov_processos?.nome ?? "Checklist";
+    const linha = mapa.get(i.processo_id) ?? { id: i.processo_id, nome, inspecoes: 0, sim: 0, nao: 0 };
+    linha.inspecoes += 1;
+    for (const r of i.gov_respostas) {
+      if (r.resposta === "sim") linha.sim += 1;
+      if (r.resposta === "nao") linha.nao += 1;
+    }
+    return mapa.set(i.processo_id, linha);
+  }, new Map<string, { id: string; nome: string; inspecoes: number; sim: number; nao: number }>()).values()]
+    .sort((a, b) => b.inspecoes - a.inspecoes);
+
+  const linkPeriodo = (id: string) =>
+    `/governanca/admin/relatorios?periodo=${id}${checklist ? `&checklist=${checklist}` : ""}`;
   const maxReprovado = reprovados[0]?.qtd ?? 1;
 
   return (
@@ -71,7 +91,7 @@ export default async function RelatoriosPage({
         {PERIODOS.map((p) => (
           <Link
             key={p.id}
-            href={`/governanca/admin/relatorios?periodo=${p.id}`}
+            href={linkPeriodo(p.id)}
             className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
               periodo === p.id
                 ? "bg-brand-600 text-white"
@@ -83,6 +103,22 @@ export default async function RelatoriosPage({
         ))}
       </div>
 
+      <form method="get" className="mb-6 flex flex-col gap-2 sm:flex-row">
+        <input type="hidden" name="periodo" value={periodo} />
+        <select name="checklist" defaultValue={checklist ?? ""} className={`${inputCls} sm:max-w-md`}>
+          <option value="">Todos os checklists</option>
+          {(processos ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.categoria ? `${p.categoria} · ` : ""}
+              {p.nome}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className={btnSecundario}>
+          Filtrar
+        </button>
+      </form>
+
       <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi titulo="Inspeções" valor={inspecoes.length} cor="text-brand-700" />
         <Kpi titulo="Conformidade" valor={`${conformidade(totalSim, totalNao)}%`} cor="text-emerald-600" />
@@ -90,6 +126,40 @@ export default async function RelatoriosPage({
         <Kpi titulo="Planos de ação" valor={planos.length} cor="text-amber-600" />
       </div>
 
+      {!checklist && (
+        <Secao titulo="Por checklist">
+          {porChecklist.length === 0 ? (
+            <Vazio texto="Nenhuma inspeção no período." />
+          ) : (
+            <Tabela>
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Checklist</th>
+                  <th className="px-4 py-3 font-medium">Inspeções</th>
+                  <th className="px-4 py-3 font-medium">Não</th>
+                  <th className="px-4 py-3 font-medium">Conformidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porChecklist.map((c) => (
+                  <tr key={c.id} className="border-t border-slate-100">
+                    <td className="px-4 py-3">
+                      <Link href={`/governanca/admin/relatorios?periodo=${periodo}&checklist=${c.id}`} className="font-medium text-brand-700 hover:underline">
+                        {c.nome}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">{c.inspecoes}</td>
+                    <td className="px-4 py-3">{c.nao}</td>
+                    <td className="px-4 py-3">{c.sim + c.nao > 0 ? `${conformidade(c.sim, c.nao)}%` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Tabela>
+          )}
+        </Secao>
+      )}
+
+      {comCamareira && (
       <Secao titulo="Por camareira">
         {porCamareira.length === 0 ? (
           <Vazio texto="Nenhuma inspeção no período." />
@@ -118,6 +188,7 @@ export default async function RelatoriosPage({
           </Tabela>
         )}
       </Secao>
+      )}
 
       <Secao titulo="Itens mais reprovados">
         {reprovados.length === 0 ? (

@@ -132,7 +132,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/governanca",
-    rotulo: "Governança",
+    rotulo: "Checklists",
     soGovernanca: true,
     match: (p) => p.startsWith("/governanca"),
     icone: (
