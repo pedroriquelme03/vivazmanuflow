@@ -1,8 +1,8 @@
 import type { Tables } from "@/lib/database.types";
 
 export type GovPapel = "admin" | "lider" | "camareira";
-export type TipoAcomodacao = "suite" | "apartamento";
-export type TipoProcesso = TipoAcomodacao | "ambos";
+export type TipoAcomodacao = "suite" | "apartamento" | "setor";
+export type TipoProcesso = "suite" | "apartamento" | "ambos";
 export type Prioridade = "baixa" | "media" | "alta";
 export type RespostaValor = "sim" | "nao";
 
@@ -53,6 +53,7 @@ export function inspecionaEquipe(papel: GovPapel | null) {
 
 export function rotuloTipo(tipo: string, curto = false) {
   if (tipo === "suite") return "Suíte";
+  if (tipo === "setor") return "Setor";
   return curto ? "Apto" : "Apartamento";
 }
 

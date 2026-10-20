@@ -29,6 +29,11 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
     setSalvando(false);
     if (error) {
       if (erroSchemaGov(error.message, error.code)) return setErro(MIGRATION_HINT_GOV);
+      if (error.code === "23514" && tipo === "setor") {
+        return setErro(
+          "O banco ainda não aceita setores. Rode o SQL em supabase/migrations/20261020191000_checklist_setores.sql no Supabase.",
+        );
+      }
       return setErro(
         error.code === "23505" ? "Já existe uma acomodação com esse número." : error.message,
       );
@@ -43,7 +48,7 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
   }
 
   async function remover(a: Acomodacao) {
-    if (!confirm(`Remover a acomodação UH ${a.numero}?`)) return;
+    if (!confirm(`Remover ${a.tipo === "setor" ? "o setor" : "a acomodação UH"} ${a.numero}?`)) return;
     const { error } = await supabase.from("gov_acomodacoes").delete().eq("id", a.id);
     if (error) {
       setErro(
@@ -62,7 +67,7 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
 
       <form onSubmit={adicionar} className={`${cardCls} mb-6 flex flex-col gap-3 sm:flex-row sm:items-end`}>
         <label className="block flex-1">
-          <span className={labelCls}>Número da UH</span>
+          <span className={labelCls}>Número da UH ou nome do setor</span>
           <input className={inputCls} value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ex.: 1005" />
         </label>
         <label className="block sm:w-48">
@@ -70,6 +75,7 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
           <select className={inputCls} value={tipo} onChange={(e) => setTipo(e.target.value as TipoAcomodacao)}>
             <option value="apartamento">Apartamento</option>
             <option value="suite">Suíte</option>
+            <option value="setor">Setor</option>
           </select>
         </label>
         <button type="submit" className={btnPrimario} disabled={salvando}>
@@ -84,7 +90,7 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
           <div key={a.id} className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${a.ativo ? "" : "opacity-60"}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase text-slate-400">UH</p>
+                <p className="text-xs uppercase text-slate-400">{a.tipo === "setor" ? "Setor" : "UH"}</p>
                 <p className="text-2xl font-bold">{a.numero}</p>
               </div>
               <button

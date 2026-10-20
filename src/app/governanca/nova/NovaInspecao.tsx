@@ -136,7 +136,8 @@ export function NovaInspecao({
   const secoes = processo?.secoes ?? [];
   const secaoAtual = secoes[secaoIndex];
   const acomodacoesDoProcesso = acomodacoes.filter(
-    (a) => !processo || processo.tipo === "ambos" || a.tipo === processo.tipo,
+    (a) =>
+      a.tipo !== "setor" && (!processo || processo.tipo === "ambos" || a.tipo === processo.tipo),
   );
   const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, prefixoAndar);
   const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas) : false;
