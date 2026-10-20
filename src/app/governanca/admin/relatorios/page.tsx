@@ -2,10 +2,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import {
+  MINUTOS_PARADO,
   conformidade,
   formatDataHora,
+  formatarDuracao,
+  indicadoresAndamento,
   inicioPeriodo,
   itensMaisReprovados,
+  resumoPorAplicador,
   resumoPorCamareira,
   type Periodo,
 } from "@/lib/governanca";
@@ -34,7 +38,7 @@ export default async function RelatoriosPage({
   let query = supabase
     .from("gov_inspecoes")
     .select(
-      "id, criado_em, processo_id, gov_processos(nome), gov_camareiras(nome), gov_respostas(id, resposta, pergunta_texto, gov_planos_acao(*))",
+      "id, status, criado_em, finalizada_em, processo_id, gov_processos(nome), gov_camareiras(nome), usuarios(nome), gov_respostas(id, resposta, pergunta_texto, gov_planos_acao(*))",
     )
     .order("criado_em", { ascending: false });
   const inicio = inicioPeriodo(periodo);
@@ -44,7 +48,17 @@ export default async function RelatoriosPage({
     query,
     supabase.from("gov_processos").select("id, nome, categoria").order("nome"),
   ]);
-  const inspecoes = data ?? [];
+  const todas = data ?? [];
+  // Conformidade e planos contam só o que já foi finalizado.
+  const inspecoes = todas.filter((i) => i.status === "finalizada");
+  const andamento = indicadoresAndamento(
+    todas.map((i) => ({ ...i, aplicador: i.usuarios?.nome ?? null })),
+    todas.flatMap((i) => i.gov_respostas.flatMap((r) => r.gov_planos_acao)),
+  );
+  const porAplicador = resumoPorAplicador(
+    todas.map((i) => ({ ...i, aplicador: i.usuarios?.nome ?? null })),
+    inspecoes.flatMap((i) => i.gov_respostas.map((r) => ({ ...r, inspecao_id: i.id }))),
+  );
 
   const respostas = inspecoes.flatMap((i) =>
     i.gov_respostas.map((r) => ({ ...r, inspecao_id: i.id })),
@@ -119,12 +133,74 @@ export default async function RelatoriosPage({
         </button>
       </form>
 
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi titulo="Inspeções" valor={inspecoes.length} cor="text-brand-700" />
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi titulo="Inspeções finalizadas" valor={inspecoes.length} cor="text-brand-700" />
         <Kpi titulo="Conformidade" valor={`${conformidade(totalSim, totalNao)}%`} cor="text-emerald-600" />
         <Kpi titulo="Não conformidades" valor={totalNao} cor="text-red-600" />
         <Kpi titulo="Planos de ação" valor={planos.length} cor="text-amber-600" />
       </div>
+
+      <Secao titulo="Andamento">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <Kpi titulo="Em andamento" valor={andamento.emAndamento} cor="text-amber-600" />
+          <Kpi
+            titulo={`Parados há mais de ${MINUTOS_PARADO / 60} h`}
+            valor={andamento.parados}
+            cor={andamento.parados > 0 ? "text-red-600" : "text-slate-500"}
+          />
+          <Kpi
+            titulo="Tempo médio de preenchimento"
+            valor={formatarDuracao(andamento.tempoPreenchimento)}
+            cor="text-slate-800"
+          />
+          <Kpi titulo="Pendências abertas" valor={andamento.planosAbertos} cor="text-red-600" />
+          <Kpi titulo="Pendências resolvidas" valor={andamento.planosResolvidos} cor="text-sky-600" />
+          <Kpi
+            titulo="Tempo médio até resolver"
+            valor={formatarDuracao(andamento.tempoResolucao)}
+            cor="text-slate-800"
+          />
+        </div>
+        <Link
+          href="/governanca/admin/kanban"
+          className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:underline"
+        >
+          Ver no Kanban →
+        </Link>
+      </Secao>
+
+      <Secao titulo="Por aplicador">
+        {porAplicador.length === 0 ? (
+          <Vazio texto="Nenhuma inspeção no período." />
+        ) : (
+          <Tabela>
+            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">Aplicador</th>
+                <th className="px-4 py-3 font-medium">Finalizadas</th>
+                <th className="hidden px-4 py-3 font-medium sm:table-cell">Em andamento</th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">Tempo médio</th>
+                <th className="px-4 py-3 font-medium">Conformidade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {porAplicador.map((a) => (
+                <tr key={a.nome} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-medium">{a.nome}</td>
+                  <td className="px-4 py-3">{a.finalizadas}</td>
+                  <td className="hidden px-4 py-3 sm:table-cell">{a.emAndamento}</td>
+                  <td className="hidden px-4 py-3 text-slate-500 md:table-cell">
+                    {formatarDuracao(a.tempoMedio)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {a.sim + a.nao > 0 ? `${conformidade(a.sim, a.nao)}%` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabela>
+        )}
+      </Secao>
 
       {!checklist && (
         <Secao titulo="Por checklist">
@@ -225,6 +301,7 @@ export default async function RelatoriosPage({
                 <th className="px-4 py-3 font-medium">Prioridade</th>
                 <th className="hidden px-4 py-3 font-medium sm:table-cell">Responsável</th>
                 <th className="hidden px-4 py-3 font-medium sm:table-cell">Data</th>
+                <th className="px-4 py-3 font-medium">Situação</th>
               </tr>
             </thead>
             <tbody>
@@ -246,6 +323,17 @@ export default async function RelatoriosPage({
                   </td>
                   <td className="hidden px-4 py-3 text-slate-500 sm:table-cell">{p.quem_vai_fazer ?? "—"}</td>
                   <td className="hidden px-4 py-3 text-slate-500 sm:table-cell">{formatDataHora(p.criado_em)}</td>
+                  <td className="px-4 py-3">
+                    {p.resolvido_em ? (
+                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                        Resolvido
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                        Aberto
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

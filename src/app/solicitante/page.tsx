@@ -29,7 +29,7 @@ export default async function SolicitanteHome({
 }) {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/solicitante");
-  if (perfil.role !== "solicitante") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "solicitante") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const { aba } = await searchParams;
   const supabase = await createClient();

@@ -40,6 +40,20 @@ describe("destinoAutenticado", () => {
     );
   });
 
+  it("quem só tem Checklist entra direto nos checklists", () => {
+    expect(
+      destinoAutenticado("/", { role: "colaborador", ativo: true, ambientes: ["checklist"] }),
+    ).toBe("/governanca");
+    expect(rotaInicial("admin", ["checklist"])).toBe("/governanca");
+  });
+
+  it("com Checklist e chamados, o seletor decide; sem escolha vale o quadro", () => {
+    const ambos = ["manutencao", "checklist"];
+    expect(rotaInicial("lider", ambos)).toBe("/lider");
+    expect(rotaInicial("lider", ambos, "checklist")).toBe("/governanca");
+    expect(rotaInicial("lider", ["manutencao"], "checklist")).toBe("/lider");
+  });
+
   it("não redireciona sem sessão ativa nem fora da entrada", () => {
     expect(destinoAutenticado("/", null)).toBeNull();
     expect(destinoAutenticado("/", { role: "lider", ativo: false })).toBeNull();

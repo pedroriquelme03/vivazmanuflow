@@ -1,57 +1,72 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   COOKIE_AMBIENTE,
-  type AmbienteEquipe,
+  ROTULO_PAINEL,
+  type PainelEquipe,
 } from "@/lib/ambiente-equipe";
+import { ROTA_CHECKLIST } from "@/lib/rotas";
 
-export function TrocaAmbiente({ valor }: { valor: AmbienteEquipe }) {
+const ATIVO: Record<PainelEquipe, string> = {
+  ti: "bg-white text-[#1E293B]",
+  manutencao: "bg-[#0891b2] text-white",
+  checklist: "bg-[#7c3aed] text-white",
+};
+
+function gravarPainel(painel: PainelEquipe) {
+  document.cookie = `${COOKIE_AMBIENTE}=${painel}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
+export function TrocaAmbiente({
+  valor,
+  opcoes,
+  role,
+}: {
+  valor: PainelEquipe;
+  opcoes: readonly PainelEquipe[];
+  role: string;
+}) {
   const router = useRouter();
-  const [atual, setAtual] = useState(valor);
-  const tiAtivo = atual === "ti";
+  const pathname = usePathname();
+  const [escolhido, setEscolhido] = useState<PainelEquipe | null>(null);
+  const atual = escolhido ?? valor;
 
-  useEffect(() => {
-    setAtual(valor);
-  }, [valor]);
-
-  function escolher(proximo: AmbienteEquipe) {
+  function escolher(proximo: PainelEquipe) {
     if (proximo === atual) return;
-    setAtual(proximo);
-    document.cookie = `${COOKIE_AMBIENTE}=${proximo}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    setEscolhido(proximo);
+    gravarPainel(proximo);
+    if (proximo === "checklist") return router.push(ROTA_CHECKLIST);
+    if (pathname.startsWith(ROTA_CHECKLIST)) {
+      return router.push(role === "colaborador" ? "/colaborador" : "/lider");
+    }
     router.refresh();
   }
 
   return (
     <div
-      className="relative grid h-9 w-full grid-cols-2 rounded-full bg-white/15 p-1 text-xs font-bold"
+      className="grid h-9 w-full gap-1 rounded-full bg-white/15 p-1 text-xs font-bold"
+      style={{ gridTemplateColumns: `repeat(${opcoes.length}, minmax(0, 1fr))` }}
       role="group"
       aria-label="Ambiente"
     >
-      <span
-        className={`absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] rounded-full shadow transition-transform ${
-          tiAtivo
-            ? "translate-x-0 bg-white"
-            : "translate-x-full bg-[#0891b2]"
-        }`}
-      />
-      <button
-        type="button"
-        onClick={() => escolher("ti")}
-        className={`relative z-10 rounded-full ${tiAtivo ? "text-[#1E293B]" : "text-white/70"}`}
-        aria-pressed={tiAtivo}
-      >
-        TI
-      </button>
-      <button
-        type="button"
-        onClick={() => escolher("manutencao")}
-        className={`relative z-10 rounded-full ${tiAtivo ? "text-white/70" : "text-white"}`}
-        aria-pressed={!tiAtivo}
-      >
-        Manutenção
-      </button>
+      {opcoes.map((opcao) => {
+        const ativo = opcao === atual;
+        return (
+          <button
+            key={opcao}
+            type="button"
+            onClick={() => escolher(opcao)}
+            className={`truncate rounded-full px-1 shadow-none transition ${
+              ativo ? `${ATIVO[opcao]} shadow` : "text-white/70 hover:text-white"
+            }`}
+            aria-pressed={ativo}
+          >
+            {ROTULO_PAINEL[opcao]}
+          </button>
+        );
+      })}
     </div>
   );
 }

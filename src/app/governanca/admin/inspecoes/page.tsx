@@ -6,7 +6,7 @@ import { InspecoesApp } from "./InspecoesApp";
 export const dynamic = "force-dynamic";
 
 export default async function InspecoesPage() {
-  const { perfil, papel } = await exigirGovernanca("/governanca/admin/inspecoes", true);
+  const { perfil, papel } = await exigirGovernanca("/governanca/admin/inspecoes", "equipe");
   const supabase = await createClient();
   const { data } = await supabase
     .from("gov_inspecoes")

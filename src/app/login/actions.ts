@@ -30,7 +30,7 @@ export async function login(
 
   const { data: perfil } = await supabase
     .from("usuarios")
-    .select("role, ativo")
+    .select("role, ativo, ambientes")
     .eq("id", auth.user.id)
     .single();
 
@@ -39,5 +39,7 @@ export async function login(
     return { error: "Este usuário não tem acesso ativo ao sistema." };
   }
 
-  redirect(next && next.startsWith("/") ? next : rotaInicial(perfil.role));
+  redirect(
+    next && next.startsWith("/") ? next : rotaInicial(perfil.role, perfil.ambientes),
+  );
 }

@@ -5,6 +5,7 @@ import {
   payloadAtualizarUsuario,
   payloadDefinirAmbientes,
   payloadDefinirAvisos,
+  payloadDefinirGovernanca,
   rotuloAmbientes,
   rotuloUltimaAlteracao,
   validarEdicaoEquipe,
@@ -60,8 +61,10 @@ describe("validarEdicaoEquipe", () => {
     ).toBeNull();
   });
 
-  it("exige Manutenção, TI ou os dois", () => {
-    expect(validarEdicaoEquipe({ ...base, ambientes: [] as const })).toBe(
+  it("solicitante precisa de Manutenção, TI ou os dois", () => {
+    expect(
+      validarEdicaoEquipe({ ...base, role: "solicitante", ambientes: [] as const }),
+    ).toBe(
       "Marque Manutenção, TI ou os dois.",
     );
   });
@@ -115,6 +118,25 @@ describe("ambientes", () => {
     expect(rotuloAmbientes(["manutencao", "ti"])).toBe("Manutenção e TI");
     expect(rotuloAmbientes(["ti"])).toBe("TI");
     expect(rotuloAmbientes(undefined)).toBe("Manutenção");
+    expect(rotuloAmbientes(["manutencao", "ti", "checklist"])).toBe(
+      "Manutenção, TI e Checklist",
+    );
+    expect(rotuloAmbientes(["checklist"])).toBe("Checklist");
+  });
+
+  it("Checklist entra nos ambientes e grava o perfil", () => {
+    const so = { ...base, ambientes: [] as const, checklist: true, perfilChecklist: "lider" as const };
+    expect(validarEdicaoEquipe(so)).toBeNull();
+    expect(payloadDefinirAmbientes(so).p_ambientes).toEqual(["checklist"]);
+    expect(payloadDefinirGovernanca(so)).toEqual({ p_user_id: "u1", p_papel: "lider" });
+    expect(payloadDefinirGovernanca({ ...so, checklist: false }).p_papel).toBeNull();
+    expect(payloadDefinirGovernanca({ ...so, role: "admin" }).p_papel).toBeNull();
+  });
+
+  it("sem nenhum ambiente marcado pede pelo menos um", () => {
+    expect(validarEdicaoEquipe({ ...base, ambientes: [] as const, checklist: false })).toBe(
+      "Marque Manutenção, TI ou Checklist.",
+    );
   });
 
   it("envia o papel escolhido", () => {

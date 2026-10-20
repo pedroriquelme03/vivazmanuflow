@@ -15,7 +15,7 @@ export default async function MetricasPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/lider/metricas");
   if (perfil.role === "colaborador" || perfil.role === "solicitante") {
-    redirect(rotaInicial(perfil.role));
+    redirect(rotaInicial(perfil.role, perfil.ambientes));
   }
 
   const supabase = await createClient();

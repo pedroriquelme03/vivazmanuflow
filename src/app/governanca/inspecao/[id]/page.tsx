@@ -6,10 +6,12 @@ import {
   agruparPorSecao,
   formatDataHora,
   formatarValor,
+  inspecionaEquipe,
   rotuloTipo,
 } from "@/lib/governanca";
 import { GovernancaShell } from "../../GovernancaShell";
 import { PrioridadeBadge, StatusBadge, Vazio, cardCls } from "../../ui";
+import { ResolverPlano } from "./ResolverPlano";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +45,20 @@ export default async function InspecaoDetalhePage({
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
-      <Link href="/governanca" className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800">
-        ← Voltar
+      <Link
+        href={inspecionaEquipe(papel) ? "/governanca/admin/kanban" : "/governanca"}
+        className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800"
+      >
+        ← {inspecionaEquipe(papel) ? "Voltar ao Kanban" : "Voltar"}
       </Link>
+      {insp?.status === "em_andamento" && insp.inspetor_id === perfil.id && (
+        <Link
+          href={`/governanca/nova?continuar=${insp.id}`}
+          className="mb-4 block rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200"
+        >
+          Este checklist ainda está em andamento. Toque para continuar de onde parou.
+        </Link>
+      )}
 
       {!insp ? (
         <Vazio texto="Inspeção não encontrada." />
@@ -146,6 +159,14 @@ export default async function InspecaoDetalhePage({
                               {p.quem_pediu && <>Solicitante: {p.quem_pediu}.</>}
                             </p>
                             {p.observacao && <p className="mt-1 text-xs text-slate-500">Obs.: {p.observacao}</p>}
+                            {insp.status === "finalizada" && (
+                              <ResolverPlano
+                                planoId={p.id}
+                                resolvidoEm={p.resolvido_em ?? null}
+                                usuarioId={perfil.id}
+                                podeResolver={inspecionaEquipe(papel)}
+                              />
+                            )}
                           </div>
                         ))}
                       </div>

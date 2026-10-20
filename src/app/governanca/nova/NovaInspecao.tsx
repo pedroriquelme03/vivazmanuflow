@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
@@ -16,9 +16,11 @@ import {
   rotuloAplicacao,
   rotuloTipo,
   secaoCompleta,
+  secaoParaRetomar,
   tipoItem,
   type Acomodacao,
   type Camareira,
+  type Prioridade,
   type Processo,
   type SecaoComPerguntas,
 } from "@/lib/governanca";
@@ -29,7 +31,60 @@ type Fase = "processo" | "acomodacao" | "camareira" | "perguntas" | "salvando" |
 type ProcessoResumo = Processo & { itens: number };
 type ProcessoCompleto = ProcessoResumo & { secoes: SecaoComPerguntas[] };
 
+/** Checklist em andamento que a pessoa reabriu pelo Início. */
+export type RascunhoInspecao = {
+  id: string;
+  processoId: string;
+  acomodacaoId: string | null;
+  camareiraId: string | null;
+  respostas: {
+    pergunta_id: string | null;
+    resposta: string | null;
+    valor: string | null;
+    comentario: string | null;
+    anexo_url: string | null;
+    plano: {
+      prioridade: string;
+      o_que_fazer: string;
+      quem_vai_fazer: string | null;
+      quem_pediu: string | null;
+    } | null;
+  }[];
+};
+
 const PREFIXOS_ANDAR = ["10", "11", "12"] as const;
+
+function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaLocal {
+  const base = respostaVazia();
+  let selecionadas: string[] = [];
+  if (r.valor?.startsWith("[")) {
+    try {
+      const lista = JSON.parse(r.valor);
+      if (Array.isArray(lista)) selecionadas = lista.map(String);
+    } catch {
+      selecionadas = [];
+    }
+  }
+  return {
+    ...base,
+    resposta: r.resposta === "sim" || r.resposta === "nao" || r.resposta === "na" ? r.resposta : null,
+    valor: selecionadas.length ? "" : (r.valor ?? ""),
+    selecionadas,
+    comentario: r.comentario ?? "",
+    mostrarComentario: Boolean(r.comentario),
+    anexoPreview: r.anexo_url,
+    plano: r.plano
+      ? {
+          prioridade: (["baixa", "media", "alta"].includes(r.plano.prioridade)
+            ? r.plano.prioridade
+            : "media") as Prioridade,
+          o_que_fazer: r.plano.o_que_fazer,
+          quem_vai_fazer: r.plano.quem_vai_fazer ?? "",
+          quem_pediu: r.plano.quem_pediu ?? "",
+        }
+      : null,
+  };
+}
 
 export function NovaInspecao({
   eu,
@@ -38,6 +93,7 @@ export function NovaInspecao({
   acomodacoes,
   camareiras,
   processos,
+  rascunho,
 }: {
   eu: { id: string; nome: string };
   ehAdmin: boolean;
@@ -45,6 +101,7 @@ export function NovaInspecao({
   acomodacoes: Acomodacao[];
   camareiras: Camareira[];
   processos: ProcessoResumo[];
+  rascunho?: RascunhoInspecao | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const topo = useRef<HTMLDivElement>(null);
@@ -60,6 +117,9 @@ export function NovaInspecao({
   const [secaoIndex, setSecaoIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, RespostaLocal>>({});
 
+  const [inspecaoId, setInspecaoId] = useState<string | null>(rascunho?.id ?? null);
+  const [salvandoSecao, setSalvandoSecao] = useState(false);
+  const criando = useRef<Promise<string> | null>(null);
   const [inspecaoIdFinal, setInspecaoIdFinal] = useState<string | null>(null);
   const [buscaProcesso, setBuscaProcesso] = useState("");
   const [busca, setBusca] = useState("");
@@ -87,7 +147,7 @@ export function NovaInspecao({
     topo.current?.scrollIntoView({ block: "start" });
   }
 
-  async function escolherProcesso(resumo: ProcessoResumo) {
+  async function carregarProcesso(resumo: ProcessoResumo) {
     setErro(null);
     setCarregando(true);
     const { data, error } = await supabase
@@ -95,10 +155,60 @@ export function NovaInspecao({
       .select("*, gov_perguntas(*)")
       .eq("processo_id", resumo.id);
     setCarregando(false);
-    if (error) return setErro("Não foi possível abrir o checklist. Tente de novo.");
+    if (error) {
+      setErro("Não foi possível abrir o checklist. Tente de novo.");
+      return null;
+    }
     const p: ProcessoCompleto = { ...resumo, secoes: ordenarSecoes((data ?? []) as SecaoComPerguntas[]) };
     if (!p.secoes.some((s) => s.gov_perguntas.length > 0)) {
-      return setErro("Este checklist ainda não tem perguntas.");
+      setErro("Este checklist ainda não tem perguntas.");
+      return null;
+    }
+    return p;
+  }
+
+  // Continua de onde parou: mesmo checklist, UH, camareira e respostas já salvas.
+  const retomado = useRef(false);
+  useEffect(() => {
+    if (!rascunho || retomado.current) return;
+    retomado.current = true;
+    void (async () => {
+      const resumo = processos.find((p) => p.id === rascunho.processoId);
+      if (!resumo) {
+        setErro("O checklist em andamento não está mais disponível.");
+        return;
+      }
+      const p = await carregarProcesso(resumo);
+      if (!p) return;
+      const salvas = new Map(
+        rascunho.respostas
+          .filter((r) => r.pergunta_id)
+          .map((r) => [r.pergunta_id as string, respostaDoRascunho(r)]),
+      );
+      const init: Record<string, RespostaLocal> = {};
+      p.secoes.forEach((s) =>
+        s.gov_perguntas.forEach((q) => (init[q.id] = salvas.get(q.id) ?? respostaVazia())),
+      );
+      setProcesso(p);
+      setAcomodacao(acomodacoes.find((a) => a.id === rascunho.acomodacaoId) ?? null);
+      setCamareira(camareiras.find((c) => c.id === rascunho.camareiraId) ?? null);
+      setRespostas(init);
+      setSecaoIndex(secaoParaRetomar(p.secoes, init));
+      setFase("perguntas");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rascunho]);
+
+  async function escolherProcesso(resumo: ProcessoResumo) {
+    const p = await carregarProcesso(resumo);
+    if (!p) return;
+    // Trocou de checklist antes de responder: o rascunho anterior não serve mais.
+    if (inspecaoId && processo?.id !== p.id) {
+      await supabase.from("gov_inspecoes").delete().eq("id", inspecaoId).eq("status", "em_andamento");
+    }
+    if (processo?.id !== p.id) {
+      setInspecaoId(null);
+      criando.current = null;
     }
     setProcesso(p);
     setAcomodacao(null);
@@ -117,10 +227,14 @@ export function NovaInspecao({
     setFase(escolheCamareira ? "camareira" : "perguntas");
   }
 
-  function irParaSecao(delta: 1 | -1) {
+  async function irParaSecao(delta: 1 | -1) {
     let i = secaoIndex + delta;
     while (i >= 0 && i < secoes.length && secoes[i].gov_perguntas.length === 0) i += delta;
     if (i < 0) return;
+    if (delta === 1 && secaoAtual) {
+      const salvou = await salvarSecao(secaoAtual);
+      if (!salvou) return;
+    }
     if (i >= secoes.length) return finalizar();
     setSecaoIndex(i);
     subir();
@@ -151,57 +265,109 @@ export function NovaInspecao({
     return supabase.storage.from(BUCKET_GOVERNANCA).getPublicUrl(caminho).data.publicUrl;
   }
 
-  async function finalizar() {
-    if (!processo || (processo.usa_acomodacao && !acomodacao)) return;
-    setErro(null);
-    setFase("salvando");
-    try {
-      const { data: insp, error: e1 } = await supabase
-        .from("gov_inspecoes")
-        .insert({
-          processo_id: processo.id,
-          acomodacao_id: acomodacao?.id ?? null,
-          tipo: acomodacao ? (acomodacao.tipo === "suite" ? "suite" : "apartamento") : null,
-          camareira_id: camareira?.id ?? null,
-          inspetor_id: eu.id,
-          status: "finalizada",
-          finalizada_em: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-      if (e1 || !insp) throw e1 ?? new Error("Falha ao criar inspeção");
+  function cabecalho() {
+    return {
+      acomodacao_id: acomodacao?.id ?? null,
+      tipo: acomodacao ? (acomodacao.tipo === "suite" ? "suite" : "apartamento") : null,
+      camareira_id: camareira?.id ?? null,
+    };
+  }
 
-      const linhas = [];
-      for (const s of secoes) {
-        for (const q of s.gov_perguntas) {
-          const r = respostas[q.id] ?? respostaVazia();
-          const tipo = tipoItem(q.tipo);
-          const anexoUrl = r.anexoFile ? await enviarFoto(insp.id, q.id, r.anexoFile) : null;
-          let valor: string | null = null;
-          if (r.resposta !== "na" && tipo !== "sim_nao") {
-            valor =
-              tipo === "selecao_multipla"
-                ? r.selecionadas.length
-                  ? JSON.stringify(r.selecionadas)
-                  : null
-                : r.valor.trim() || null;
-          }
-          linhas.push({
-            inspecao_id: insp.id,
-            pergunta_id: q.id,
-            pergunta_texto: q.texto,
-            pergunta_ordem: q.ordem,
-            pergunta_tipo: tipo,
-            pergunta_grupo: q.grupo,
-            secao_nome: s.nome,
-            secao_ordem: s.ordem,
-            resposta: tipo === "sim_nao" || r.resposta === "na" ? r.resposta : null,
-            valor,
-            comentario: r.comentario.trim() || null,
-            anexo_url: anexoUrl,
-          });
+  /** Cria a inspeção em andamento uma vez só, para o Kanban ver quem está preenchendo. */
+  async function garantirInspecao(): Promise<string> {
+    if (inspecaoId) return inspecaoId;
+    if (!processo) throw new Error("Escolha o checklist");
+    if (!criando.current) {
+      criando.current = (async () => {
+        const { data, error } = await supabase
+          .from("gov_inspecoes")
+          .insert({
+            processo_id: processo.id,
+            ...cabecalho(),
+            inspetor_id: eu.id,
+            status: "em_andamento",
+          })
+          .select("id")
+          .single();
+        if (error || !data) {
+          criando.current = null;
+          throw error ?? new Error("Falha ao criar inspeção");
         }
+        setInspecaoId(data.id);
+        return data.id;
+      })();
+    }
+    return criando.current;
+  }
+
+  useEffect(() => {
+    if (fase !== "perguntas" || inspecaoId || rascunho) return;
+    garantirInspecao().catch((err) => mostrarFalha(err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, inspecaoId]);
+
+  function mostrarFalha(err: unknown) {
+    console.error(err);
+    const msg = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? "");
+    setErro(
+      erroSchemaGov(msg)
+        ? MIGRATION_HINT_GOV
+        : "Não foi possível salvar o checklist. Verifique a conexão e tente novamente.",
+    );
+  }
+
+  /** Grava as respostas e os planos de ação da seção, trocando o que já estava salvo dela. */
+  async function salvarSecao(secao: SecaoComPerguntas) {
+    setErro(null);
+    setSalvandoSecao(true);
+    try {
+      const id = await garantirInspecao();
+      const { error: e0 } = await supabase.from("gov_inspecoes").update(cabecalho()).eq("id", id);
+      if (e0) throw e0;
+
+      const fotos: Record<string, string | null> = {};
+      const linhas = [];
+      for (const q of secao.gov_perguntas) {
+        const r = respostas[q.id] ?? respostaVazia();
+        const tipo = tipoItem(q.tipo);
+        const anexoUrl = r.anexoFile
+          ? await enviarFoto(id, q.id, r.anexoFile)
+          : r.anexoPreview?.startsWith("http")
+            ? r.anexoPreview
+            : null;
+        if (r.anexoFile) fotos[q.id] = anexoUrl;
+        let valor: string | null = null;
+        if (r.resposta !== "na" && tipo !== "sim_nao") {
+          valor =
+            tipo === "selecao_multipla"
+              ? r.selecionadas.length
+                ? JSON.stringify(r.selecionadas)
+                : null
+              : r.valor.trim() || null;
+        }
+        linhas.push({
+          inspecao_id: id,
+          pergunta_id: q.id,
+          pergunta_texto: q.texto,
+          pergunta_ordem: q.ordem,
+          pergunta_tipo: tipo,
+          pergunta_grupo: q.grupo,
+          secao_nome: secao.nome,
+          secao_ordem: secao.ordem,
+          resposta: tipo === "sim_nao" || r.resposta === "na" ? r.resposta : null,
+          valor,
+          comentario: r.comentario.trim() || null,
+          anexo_url: anexoUrl,
+        });
       }
+
+      const ids = secao.gov_perguntas.map((q) => q.id);
+      const { error: eApaga } = await supabase
+        .from("gov_respostas")
+        .delete()
+        .eq("inspecao_id", id)
+        .in("pergunta_id", ids);
+      if (eApaga) throw eApaga;
 
       const { data: inseridas, error: e2 } = await supabase
         .from("gov_respostas")
@@ -210,36 +376,58 @@ export function NovaInspecao({
       if (e2) throw e2;
 
       const idPorPergunta = new Map((inseridas ?? []).map((r) => [r.pergunta_id, r.id]));
-      const planos = Object.entries(respostas)
-        .filter(([, r]) => r.resposta === "nao" && r.plano)
-        .flatMap(([perguntaId, r]) => {
-          const respostaId = idPorPergunta.get(perguntaId);
-          if (!respostaId) return [];
-          return [
-            {
-              resposta_id: respostaId,
-              prioridade: r.plano!.prioridade,
-              o_que_fazer: r.plano!.o_que_fazer.trim(),
-              quem_vai_fazer: r.plano!.quem_vai_fazer.trim() || null,
-              quem_pediu: r.plano!.quem_pediu.trim() || eu.nome,
-            },
-          ];
-        });
+      const planos = ids.flatMap((perguntaId) => {
+        const r = respostas[perguntaId];
+        const respostaId = idPorPergunta.get(perguntaId);
+        if (!r || r.resposta !== "nao" || !r.plano || !respostaId) return [];
+        return [
+          {
+            resposta_id: respostaId,
+            prioridade: r.plano.prioridade,
+            o_que_fazer: r.plano.o_que_fazer.trim(),
+            quem_vai_fazer: r.plano.quem_vai_fazer.trim() || null,
+            quem_pediu: r.plano.quem_pediu.trim() || eu.nome,
+          },
+        ];
+      });
       if (planos.length > 0) {
         const { error: e3 } = await supabase.from("gov_planos_acao").insert(planos);
         if (e3) throw e3;
       }
 
-      setInspecaoIdFinal(insp.id);
+      if (Object.keys(fotos).length > 0) {
+        setRespostas((prev) => {
+          const prox = { ...prev };
+          for (const [perguntaId, url] of Object.entries(fotos)) {
+            prox[perguntaId] = { ...prox[perguntaId], anexoFile: null, anexoPreview: url };
+          }
+          return prox;
+        });
+      }
+      return true;
+    } catch (err) {
+      mostrarFalha(err);
+      return false;
+    } finally {
+      setSalvandoSecao(false);
+    }
+  }
+
+  async function finalizar() {
+    if (!processo || (processo.usa_acomodacao && !acomodacao)) return;
+    setErro(null);
+    setFase("salvando");
+    try {
+      const id = await garantirInspecao();
+      const { error } = await supabase
+        .from("gov_inspecoes")
+        .update({ status: "finalizada", finalizada_em: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      setInspecaoIdFinal(id);
       setFase("concluido");
     } catch (err) {
-      console.error(err);
-      const msg = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? "");
-      setErro(
-        erroSchemaGov(msg)
-          ? MIGRATION_HINT_GOV
-          : "Não foi possível salvar o checklist. Verifique a conexão e tente novamente.",
-      );
+      mostrarFalha(err);
       setFase("perguntas");
     }
   }
@@ -476,14 +664,22 @@ export function NovaInspecao({
                 type="button"
                 onClick={() => irParaSecao(1)}
                 className={`${btnPrimario} flex-1`}
-                disabled={!completa}
+                disabled={!completa || salvandoSecao}
               >
-                {ultimaSecao ? "Finalizar checklist" : "Próxima seção"}
+                {salvandoSecao
+                  ? "Salvando…"
+                  : ultimaSecao
+                    ? "Finalizar checklist"
+                    : "Próxima seção"}
               </button>
             </div>
-            {!completa && (
+            {!completa ? (
               <p className="pt-2 text-center text-xs text-slate-400">
                 Responda os itens obrigatórios (e o plano de ação dos &quot;Não&quot;) para continuar.
+              </p>
+            ) : (
+              <p className="pt-2 text-center text-xs text-slate-400">
+                As respostas ficam salvas a cada seção. Se sair agora, continue pelo Início.
               </p>
             )}
           </div>

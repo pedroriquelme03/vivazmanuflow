@@ -13,7 +13,7 @@ export default async function LiderHome() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/lider");
   if (perfil.role === "colaborador" || perfil.role === "solicitante") {
-    redirect(rotaInicial(perfil.role));
+    redirect(rotaInicial(perfil.role, perfil.ambientes));
   }
 
   const supabase = await createClient();

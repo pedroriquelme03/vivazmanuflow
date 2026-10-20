@@ -16,7 +16,7 @@ export default async function SolicitanteAbrirPage({
 }) {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/solicitante");
-  if (perfil.role !== "solicitante") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "solicitante") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const { tipo } = await searchParams;
   const permitidos = listaAmbientes(perfil.ambientes);

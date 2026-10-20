@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin");
-  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const supabase = await createClient();
   const [

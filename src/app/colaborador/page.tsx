@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ColaboradorHome() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/colaborador");
-  if (perfil.role !== "colaborador") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "colaborador") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const supabase = await createClient();
   const ambiente = await resolverAmbiente(perfil.ambientes, perfil.role);

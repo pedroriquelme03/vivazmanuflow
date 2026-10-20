@@ -3,13 +3,34 @@ import {
   ambienteEscolhido,
   ambientesDoPapel,
   listaAmbientes,
+  painelEscolhido,
+  paineisDoUsuario,
   pessoaDoAmbiente,
   recursoAmbienteAusente,
 } from "@/lib/ambiente-equipe";
 
+describe("paineisDoUsuario", () => {
+  it("lista os chamados marcados e o Checklist por último", () => {
+    expect(paineisDoUsuario(["checklist", "ti"])).toEqual(["ti", "checklist"]);
+    expect(paineisDoUsuario(["checklist"])).toEqual(["checklist"]);
+    expect(paineisDoUsuario(null)).toEqual(["manutencao"]);
+  });
+
+  it("o seletor só escolhe painel marcado", () => {
+    expect(painelEscolhido(["manutencao", "checklist"], "checklist")).toBe("checklist");
+    expect(painelEscolhido(["manutencao"], "checklist")).toBe("manutencao");
+    expect(painelEscolhido([], "ti")).toBeNull();
+  });
+});
+
 describe("listaAmbientes", () => {
   it("quem não tem o campo fica na manutenção", () => {
     expect(listaAmbientes(undefined)).toEqual(["manutencao"]);
+  });
+
+  it("quem só tem Checklist não entra em quadro de chamados", () => {
+    expect(listaAmbientes(["checklist"])).toEqual([]);
+    expect(listaAmbientes(["ti", "checklist"])).toEqual(["ti"]);
   });
 
   it("aceita os dois sem repetir", () => {

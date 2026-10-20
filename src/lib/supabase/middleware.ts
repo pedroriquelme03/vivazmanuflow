@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { destinoAutenticado } from "@/lib/rotas";
+import { COOKIE_AMBIENTE } from "@/lib/ambiente-equipe";
 
 /** Rotas que exigem login (área do staff). */
 const PROTECTED_PREFIXES = [
@@ -58,7 +59,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path === "/" || path === "/login")) {
     const { data: perfil } = await supabase
       .from("usuarios")
-      .select("role, ativo")
+      .select("role, ativo, ambientes")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -66,6 +67,7 @@ export async function updateSession(request: NextRequest) {
       path,
       perfil,
       request.nextUrl.searchParams.get("next"),
+      request.cookies.get(COOKIE_AMBIENTE)?.value,
     );
     if (destino) return redirecionarComSessao(request, destino, supabaseResponse);
   }

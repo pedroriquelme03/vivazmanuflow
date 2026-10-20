@@ -14,8 +14,101 @@ import {
   proximaOrdem,
   resumoPorCamareira,
   secaoCompleta,
+  colunaKanban,
+  formatarDuracao,
+  indicadoresAndamento,
+  resumoPorAplicador,
+  secaoParaRetomar,
+  tempoDesde,
   type Acomodacao,
 } from "./governanca";
+
+describe("colunaKanban", () => {
+  it("em andamento enquanto não finaliza", () => {
+    expect(colunaKanban({ status: "em_andamento", planos: [] })).toBe("andamento");
+  });
+
+  it("finalizado sem plano fica sem problema", () => {
+    expect(colunaKanban({ status: "finalizada", planos: [] })).toBe("ok");
+  });
+
+  it("plano aberto é pendência; todos resolvidos viram resolvida", () => {
+    expect(
+      colunaKanban({
+        status: "finalizada",
+        planos: [{ resolvido_em: "2026-10-20T12:00:00Z" }, { resolvido_em: null }],
+      }),
+    ).toBe("pendencia");
+    expect(
+      colunaKanban({ status: "finalizada", planos: [{ resolvido_em: "2026-10-20T12:00:00Z" }] }),
+    ).toBe("resolvida");
+  });
+});
+
+describe("andamento nos relatórios", () => {
+  const agora = new Date("2026-10-20T15:00:00Z").getTime();
+  const inspecoes = [
+    { id: "a", status: "em_andamento", criado_em: "2026-10-20T14:30:00Z", finalizada_em: null, aplicador: "Ana" },
+    { id: "b", status: "em_andamento", criado_em: "2026-10-20T10:00:00Z", finalizada_em: null, aplicador: "Bia" },
+    {
+      id: "c",
+      status: "finalizada",
+      criado_em: "2026-10-20T12:00:00Z",
+      finalizada_em: "2026-10-20T12:30:00Z",
+      aplicador: "Ana",
+    },
+  ];
+
+  it("conta parados, tempo de preenchimento e pendências", () => {
+    const r = indicadoresAndamento(
+      inspecoes,
+      [
+        { criado_em: "2026-10-20T12:30:00Z", resolvido_em: "2026-10-20T14:30:00Z" },
+        { criado_em: "2026-10-20T12:30:00Z", resolvido_em: null },
+      ],
+      agora,
+    );
+    expect(r.emAndamento).toBe(2);
+    expect(r.parados).toBe(1);
+    expect(r.tempoPreenchimento).toBe(30);
+    expect(r.planosAbertos).toBe(1);
+    expect(r.planosResolvidos).toBe(1);
+    expect(r.tempoResolucao).toBe(120);
+  });
+
+  it("resume por aplicador", () => {
+    const r = resumoPorAplicador(inspecoes, [
+      { inspecao_id: "c", resposta: "sim", pergunta_texto: "x" },
+      { inspecao_id: "c", resposta: "nao", pergunta_texto: "y" },
+    ]);
+    expect(r[0]).toEqual({ nome: "Ana", finalizadas: 1, emAndamento: 1, sim: 1, nao: 1, tempoMedio: 30 });
+  });
+
+  it("formata durações e tempo desde", () => {
+    expect(formatarDuracao(null)).toBe("—");
+    expect(formatarDuracao(45)).toBe("45 min");
+    expect(formatarDuracao(130)).toBe("2 h 10 min");
+    expect(tempoDesde("2026-10-20T14:48:00Z", agora)).toBe("há 12 min");
+  });
+});
+
+describe("secaoParaRetomar", () => {
+  it("volta na primeira seção com item obrigatório sem resposta", () => {
+    const secoes = [
+      { gov_perguntas: [{ id: "p1" }] },
+      { gov_perguntas: [] },
+      { gov_perguntas: [{ id: "p2" }] },
+    ];
+    expect(secaoParaRetomar(secoes, { p1: { resposta: "sim", plano: null } })).toBe(2);
+    expect(
+      secaoParaRetomar(secoes, {
+        p1: { resposta: "sim", plano: null },
+        p2: { resposta: "sim", plano: null },
+      }),
+    ).toBe(2);
+    expect(secaoParaRetomar(secoes, {})).toBe(0);
+  });
+});
 
 const uh = (numero: string, tipo: string): Acomodacao => ({
   id: numero,
@@ -27,15 +120,20 @@ const uh = (numero: string, tipo: string): Acomodacao => ({
 
 describe("papelGovernanca", () => {
   it("admin do sistema é admin da governança", () => {
-    expect(papelGovernanca("admin", null)).toBe("admin");
-    expect(papelGovernanca("admin", "camareira")).toBe("admin");
+    expect(papelGovernanca("admin", null, ["checklist"])).toBe("admin");
+    expect(papelGovernanca("admin", "camareira", ["ti", "checklist"])).toBe("admin");
   });
 
-  it("demais seguem o campo do usuário", () => {
-    expect(papelGovernanca("lider", "lider")).toBe("lider");
-    expect(papelGovernanca("colaborador", "camareira")).toBe("camareira");
-    expect(papelGovernanca("lider", null)).toBeNull();
-    expect(papelGovernanca("colaborador", "outro")).toBeNull();
+  it("demais seguem o perfil no checklist, com aplicador como padrão", () => {
+    expect(papelGovernanca("lider", "lider", ["checklist"])).toBe("lider");
+    expect(papelGovernanca("colaborador", "camareira", ["checklist"])).toBe("camareira");
+    expect(papelGovernanca("lider", null, ["manutencao", "checklist"])).toBe("camareira");
+  });
+
+  it("sem o ambiente Checklist marcado ninguém entra, nem o admin", () => {
+    expect(papelGovernanca("admin", null, ["manutencao", "ti"])).toBeNull();
+    expect(papelGovernanca("lider", "lider", ["manutencao"])).toBeNull();
+    expect(papelGovernanca("solicitante", null, ["checklist"])).toBeNull();
   });
 });
 

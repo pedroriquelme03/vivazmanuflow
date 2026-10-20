@@ -8,14 +8,31 @@ import type { Perfil } from "@/lib/auth";
 import { BrandMark } from "@/components/BrandMark";
 import { AvisoPush } from "@/components/AvisoPush";
 import { TrocaAmbiente } from "@/components/TrocaAmbiente";
-import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
-import { papelGovernanca } from "@/lib/governanca";
+import {
+  ROTULO_PAINEL,
+  paineisDoUsuario,
+  type PainelEquipe,
+} from "@/lib/ambiente-equipe";
+import { PAPEL_GOV_LABEL, papelGovernanca } from "@/lib/governanca";
+import { itemChecklistAtivo, menuChecklist } from "@/lib/menu-checklist";
 
 const ROLE_BADGE: Record<Perfil["role"], string> = {
   admin: "ADMIN",
   lider: "LÍDER",
   colaborador: "COLAB",
   solicitante: "SOLIC",
+};
+
+const FUNDO: Record<PainelEquipe, string> = {
+  manutencao: "bg-[#063b45]",
+  ti: "bg-[#1E293B]",
+  checklist: "bg-[#2e1065]",
+};
+
+const ATIVO_MOBILE: Record<PainelEquipe, string> = {
+  manutencao: "bg-[#0891b2] text-white",
+  ti: "bg-white text-[#1E293B]",
+  checklist: "bg-[#7c3aed] text-white",
 };
 
 type NavItem = {
@@ -26,7 +43,59 @@ type NavItem = {
   soAdmin?: boolean;
   soManutencao?: boolean;
   soTi?: boolean;
-  soGovernanca?: boolean;
+};
+
+const ICONE_CHECKLIST: Record<string, React.ReactNode> = {
+  "/governanca": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 11l9-7 9 7M5 10v10h14V10" />
+    </svg>
+  ),
+  "/governanca/nova": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 4V3h6v1M9 12l2 2 4-4" />
+    </svg>
+  ),
+  "/governanca/admin/inspecoes": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+    </svg>
+  ),
+  "/governanca/admin/processos": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" />
+    </svg>
+  ),
+  "/governanca/admin/acomodacoes": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6M3 18h18M3 14h18M7 10V7h4v3" />
+    </svg>
+  ),
+  "/governanca/admin/camareiras": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <circle cx="12" cy="8" r="3.5" />
+      <path strokeLinecap="round" d="M5 20a7 7 0 0 1 14 0" />
+    </svg>
+  ),
+  "/governanca/como-funciona": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6M12 17h.01" />
+    </svg>
+  ),
+  "/governanca/admin/kanban": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="10" y="4" width="5" height="11" rx="1.5" />
+      <rect x="17" y="4" width="4" height="7" rx="1.5" />
+    </svg>
+  ),
+  "/governanca/admin/relatorios": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V9M10 19V5M16 19v-7M22 19H2" />
+    </svg>
+  ),
 };
 
 const NAV: NavItem[] = [
@@ -131,18 +200,6 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: "/governanca",
-    rotulo: "Checklists",
-    soGovernanca: true,
-    match: (p) => p.startsWith("/governanca"),
-    icone: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-        <rect x="5" y="4" width="14" height="17" rx="2" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6" />
-      </svg>
-    ),
-  },
-  {
     href: "/lider/metricas",
     rotulo: "Métricas",
     match: (p) => p.startsWith("/lider/metricas"),
@@ -160,17 +217,19 @@ export function AdminSidebar({
   mostraTroca = false,
 }: {
   perfil: Perfil;
-  ambiente?: AmbienteEquipe;
+  ambiente?: PainelEquipe;
   mostraTroca?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const ti = ambiente === "ti";
-  const itens = itensDoMenu(perfil, ti);
-  const destaque = ti ? "text-white" : "text-brand-500";
-  const ponto = ti ? "bg-white" : "bg-brand-500";
+  const itens = itensDoMenu(perfil, ambiente);
+  const claro = ambiente !== "manutencao";
+  const destaque = claro ? "text-white" : "text-brand-500";
+  const ponto = claro ? "bg-white" : "bg-brand-500";
 
   useEffect(() => {
+    if (ambiente === "checklist") return;
     if (ti) {
       if (
         pathname.startsWith("/admin/projetos") ||
@@ -185,12 +244,10 @@ export function AdminSidebar({
     if (pathname.startsWith("/lider/sistemas")) {
       router.replace("/lider");
     }
-  }, [ti, pathname, router]);
+  }, [ambiente, ti, pathname, router]);
 
   return (
-    <aside
-      className={`flex w-64 shrink-0 flex-col text-white ${ti ? "bg-[#1E293B]" : "bg-[#063b45]"}`}
-    >
+    <aside className={`flex w-64 shrink-0 flex-col text-white ${FUNDO[ambiente]}`}>
       <div className="px-5 pt-5">
         <div className="flex items-center gap-3">
           <BrandMark
@@ -198,12 +255,16 @@ export function AdminSidebar({
           />
           <div className="leading-tight">
             <p className="text-sm font-bold tracking-wide">VIVAZ CATARATAS</p>
-            <p className="text-xs text-white/55">{ti ? "TI" : "Manutenção"}</p>
+            <p className="text-xs text-white/55">{ROTULO_PAINEL[ambiente]}</p>
           </div>
         </div>
         {mostraTroca && (
           <div className="pb-4 pt-4">
-            <TrocaAmbiente valor={ambiente} />
+            <TrocaAmbiente
+              valor={ambiente}
+              opcoes={paineisDoUsuario(perfil.ambientes)}
+              role={perfil.role}
+            />
           </div>
         )}
       </div>
@@ -239,9 +300,14 @@ export function AdminSidebar({
         </p>
         <p className="mt-1 truncate text-sm font-semibold">{perfil.nome}</p>
         <span
-          className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white ${ti ? "bg-white/20" : "bg-brand-500"}`}
+          className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white ${claro ? "bg-white/20" : "bg-brand-500"}`}
         >
-          {ROLE_BADGE[perfil.role]}
+          {ambiente === "checklist"
+            ? PAPEL_GOV_LABEL[
+                papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes) ??
+                  "camareira"
+              ].toUpperCase()
+            : ROLE_BADGE[perfil.role]}
         </span>
 
         <form action={logout} className="mt-4">
@@ -278,7 +344,7 @@ export function PainelShell({
   children,
 }: {
   perfil: Perfil;
-  ambiente?: AmbienteEquipe;
+  ambiente?: PainelEquipe;
   mostraTroca?: boolean;
   children: React.ReactNode;
 }) {
@@ -313,15 +379,23 @@ export function PainelShell({
   );
 }
 
-function itensDoMenu(perfil: Perfil, ti: boolean) {
+function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
+  if (ambiente === "checklist") {
+    const papel = papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes);
+    return menuChecklist(papel).map((item) => ({
+      href: item.href,
+      rotulo: item.rotulo,
+      match: (p: string) => itemChecklistAtivo(item.href, p),
+      icone: ICONE_CHECKLIST[item.href],
+    }));
+  }
   const ehAdmin = perfil.role === "admin";
-  const governanca = papelGovernanca(perfil.role, perfil.governanca_papel) !== null;
+  const ti = ambiente === "ti";
   return NAV.filter(
     (item) =>
       (!item.soAdmin || ehAdmin) &&
       (!item.soManutencao || !ti) &&
-      (!item.soTi || ti) &&
-      (!item.soGovernanca || governanca),
+      (!item.soTi || ti),
   );
 }
 
@@ -331,20 +405,17 @@ function MobileBar({
   mostraTroca,
 }: {
   perfil: Perfil;
-  ambiente: AmbienteEquipe;
+  ambiente: PainelEquipe;
   mostraTroca: boolean;
 }) {
   const pathname = usePathname();
-  const ti = ambiente === "ti";
-  const itens = itensDoMenu(perfil, ti);
+  const itens = itensDoMenu(perfil, ambiente);
 
   return (
-    <div
-      className={`border-b border-slate-200 text-white md:hidden ${ti ? "bg-[#1E293B]" : "bg-[#063b45]"}`}
-    >
+    <div className={`border-b border-slate-200 text-white md:hidden ${FUNDO[ambiente]}`}>
       <div className="flex items-center justify-between px-4 py-3">
         <div className="leading-tight">
-          <p className="text-sm font-bold">{ti ? "TI Vivaz" : "Manutenção Vivaz"}</p>
+          <p className="text-sm font-bold">{ROTULO_PAINEL[ambiente]} Vivaz</p>
           <p className="text-xs text-white/55">{perfil.nome}</p>
         </div>
         <form action={logout}>
@@ -358,7 +429,11 @@ function MobileBar({
       </div>
       {mostraTroca && (
         <div className="px-4 pb-2">
-          <TrocaAmbiente valor={ambiente} />
+          <TrocaAmbiente
+            valor={ambiente}
+            opcoes={paineisDoUsuario(perfil.ambientes)}
+            role={perfil.role}
+          />
         </div>
       )}
       <nav
@@ -373,11 +448,7 @@ function MobileBar({
               key={item.href}
               href={item.href}
               className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${
-                ativo
-                  ? ti
-                    ? "bg-white text-[#1E293B]"
-                    : "bg-[#0891b2] text-white"
-                  : "text-white/70"
+                ativo ? ATIVO_MOBILE[ambiente] : "text-white/70"
               }`}
             >
               {item.rotulo}

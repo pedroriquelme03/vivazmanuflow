@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
@@ -33,7 +32,7 @@ import { ChatChamado } from "@/components/ChatChamado";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
-import { ambientesDoPapel } from "@/lib/ambiente-equipe";
+import { paineisDoUsuario } from "@/lib/ambiente-equipe";
 import { AvisoPush } from "@/components/AvisoPush";
 import { TrocaAmbiente } from "@/components/TrocaAmbiente";
 import {
@@ -192,13 +191,16 @@ export function ColaboradorPainel({
     void recarregar();
   }
 
-  const mostraTroca = ambientesDoPapel(perfil.role, perfil.ambientes).length > 1;
+  const paineis = paineisDoUsuario(perfil.ambientes);
+  const mostraTroca = paineis.length > 1;
 
   return (
     <div className="flex min-h-full flex-1 flex-col" data-ambiente={ambiente}>
       {mostraTroca && (
-        <div className="flex justify-end border-b border-slate-200 bg-white px-4 py-2">
-          <TrocaAmbiente valor={ambiente} />
+        <div
+          className={`px-4 py-2 ${ambiente === "ti" ? "bg-[#1E293B]" : "bg-[#063b45]"}`}
+        >
+          <TrocaAmbiente valor={ambiente} opcoes={paineis} role={perfil.role} />
         </div>
       )}
       <AvisoPush />
@@ -736,15 +738,6 @@ function PerfilColab({ perfil }: { perfil: Perfil }) {
           </div>
         </dl>
       </div>
-
-      {perfil.governanca_papel && (
-        <Link
-          href="/governanca"
-          className="mt-4 block w-full rounded-xl bg-brand-600 px-4 py-3.5 text-center text-base font-semibold text-white transition hover:bg-brand-700"
-        >
-          Checklists
-        </Link>
-      )}
 
       <form action={logout} className="mt-4">
         <button

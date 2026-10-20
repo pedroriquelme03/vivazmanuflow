@@ -21,7 +21,7 @@ export default async function GovernancaHome() {
   let query = supabase
     .from("gov_inspecoes")
     .select(
-      "id, tipo, status, criado_em, finalizada_em, gov_acomodacoes(numero), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
+      "id, tipo, status, criado_em, finalizada_em, inspetor_id, gov_acomodacoes(numero), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
     )
     .order("criado_em", { ascending: false })
     .limit(20);
@@ -56,7 +56,11 @@ export default async function GovernancaHome() {
           {inspecoes.map((i) => (
             <li key={i.id}>
               <Link
-                href={`/governanca/inspecao/${i.id}`}
+                href={
+                  i.status === "em_andamento" && i.inspetor_id === perfil.id
+                    ? `/governanca/nova?continuar=${i.id}`
+                    : `/governanca/inspecao/${i.id}`
+                }
                 className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
               >
                 <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-brand-50 text-brand-700">
@@ -82,6 +86,9 @@ export default async function GovernancaHome() {
                   <p className="truncate text-xs text-slate-500">
                     {formatDataHora(i.finalizada_em ?? i.criado_em)}
                     {equipe && i.usuarios?.nome ? ` · por ${i.usuarios.nome}` : ""}
+                    {i.status === "em_andamento" && i.inspetor_id === perfil.id
+                      ? " · toque para continuar"
+                      : ""}
                   </p>
                 </div>
                 <StatusBadge status={i.status} />

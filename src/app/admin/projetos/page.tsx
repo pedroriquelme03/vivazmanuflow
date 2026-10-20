@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjetosPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin/projetos");
-  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const supabase = await createClient();
   const [{ data: propriedades }, projetosRes, membrosRes, equipeRes] =

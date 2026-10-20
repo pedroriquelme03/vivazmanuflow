@@ -30,16 +30,20 @@ export const PRIORIDADE_LABEL: Record<Prioridade, string> = {
   alta: "Alta",
 };
 
-/** Admin do sistema é admin da governança; os demais dependem do campo do usuário. */
+/**
+ * Só entra nos checklists quem tem o ambiente Checklist marcado. O admin do
+ * sistema é admin do checklist; os demais são líder ou aplicador (padrão).
+ */
 export function papelGovernanca(
   role: string | null | undefined,
   governancaPapel: string | null | undefined,
+  ambientes: readonly string[] | null | undefined,
 ): GovPapel | null {
+  if (!(ambientes ?? []).includes("checklist")) return null;
+  if (role === "solicitante") return null;
   if (role === "admin") return "admin";
-  if (governancaPapel === "lider" || governancaPapel === "camareira") {
-    return governancaPapel;
-  }
-  return null;
+  if (governancaPapel === "lider") return "lider";
+  return "camareira";
 }
 
 /** Líder e admin escolhem a camareira e veem todas as inspeções. */
@@ -201,6 +205,54 @@ export function secaoCompleta(
   return perguntas.every((q) => itemRespondido(q, respostas[q.id]));
 }
 
+// ---- Kanban ----
+
+export type ColunaKanban = "andamento" | "ok" | "pendencia" | "resolvida";
+
+export const COLUNAS_KANBAN: { id: ColunaKanban; titulo: string; ajuda: string }[] = [
+  { id: "andamento", titulo: "Em andamento", ajuda: "Sendo preenchidos agora" },
+  { id: "ok", titulo: "Finalizado sem problema", ajuda: "Sem plano de ação aberto" },
+  { id: "pendencia", titulo: "Com pendência", ajuda: "Plano de ação aguardando" },
+  { id: "resolvida", titulo: "Pendência resolvida", ajuda: "Todos os planos resolvidos" },
+];
+
+/**
+ * Coluna do Kanban: em andamento enquanto não finaliza; depois, pendência se
+ * algum "Não" abriu plano de ação ainda não resolvido.
+ */
+export function colunaKanban(inspecao: {
+  status: string;
+  planos: { resolvido_em: string | null }[];
+}): ColunaKanban {
+  if (inspecao.status !== "finalizada") return "andamento";
+  if (inspecao.planos.length === 0) return "ok";
+  return inspecao.planos.some((p) => !p.resolvido_em) ? "pendencia" : "resolvida";
+}
+
+/** "há 12 min", "há 3 h", "há 2 dias" a partir de um horário. */
+export function tempoDesde(iso: string, agora: number) {
+  const minutos = Math.max(0, Math.floor((agora - new Date(iso).getTime()) / 60000));
+  if (minutos < 1) return "agora";
+  if (minutos < 60) return `há ${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `há ${horas} h`;
+  const dias = Math.floor(horas / 24);
+  return `há ${dias} ${dias === 1 ? "dia" : "dias"}`;
+}
+
+/** Ao continuar um checklist em andamento, volta na primeira seção com item pendente. */
+export function secaoParaRetomar(
+  secoes: { gov_perguntas: ItemRegra[] }[],
+  respostas: Record<string, RespostaParcial | undefined>,
+) {
+  const comItens = secoes
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.gov_perguntas.length > 0);
+  if (comItens.length === 0) return 0;
+  const pendente = comItens.find(({ s }) => !secaoCompleta(s.gov_perguntas, respostas));
+  return (pendente ?? comItens[comItens.length - 1]).i;
+}
+
 /** Valor gravado de um item que não é Sim/Não, do jeito que a pessoa lê. */
 export function formatarValor(tipo: string, valor: string | null | undefined) {
   if (valor === null || valor === undefined || valor === "") return "—";
@@ -328,6 +380,88 @@ export function resumoPorCamareira(inspecoes: InspecaoRel[], respostas: Resposta
     if (r.resposta === "nao") linha.nao += 1;
   }
   return [...mapa.values()].sort((a, b) => b.nao - a.nao || b.inspecoes - a.inspecoes);
+}
+
+/** Checklist em andamento há mais que isso aparece como parado. */
+export const MINUTOS_PARADO = 120;
+
+function minutosEntre(inicio: string, fim: string | number) {
+  const ate = typeof fim === "number" ? fim : new Date(fim).getTime();
+  return Math.max(0, (ate - new Date(inicio).getTime()) / 60000);
+}
+
+function media(valores: number[]) {
+  return valores.length ? valores.reduce((s, v) => s + v, 0) / valores.length : null;
+}
+
+/** "45 min", "2 h 10 min", "3 dias" para tempos médios. */
+export function formatarDuracao(minutos: number | null) {
+  if (minutos === null) return "—";
+  const m = Math.round(minutos);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+  return `${Math.round(h / 24)} dias`;
+}
+
+type InspecaoAndamento = {
+  id: string;
+  status: string;
+  criado_em: string;
+  finalizada_em: string | null;
+  aplicador?: string | null;
+};
+type PlanoRel = { criado_em: string; resolvido_em: string | null };
+
+/** Números do andamento: quem está preenchendo, quanto demora e as pendências. */
+export function indicadoresAndamento(
+  inspecoes: InspecaoAndamento[],
+  planos: PlanoRel[],
+  agora = Date.now(),
+) {
+  const emAndamento = inspecoes.filter((i) => i.status !== "finalizada");
+  const finalizadas = inspecoes.filter((i) => i.status === "finalizada" && i.finalizada_em);
+  const resolvidos = planos.filter((p) => p.resolvido_em);
+  return {
+    emAndamento: emAndamento.length,
+    parados: emAndamento.filter((i) => minutosEntre(i.criado_em, agora) > MINUTOS_PARADO).length,
+    tempoPreenchimento: media(finalizadas.map((i) => minutosEntre(i.criado_em, i.finalizada_em!))),
+    planosAbertos: planos.length - resolvidos.length,
+    planosResolvidos: resolvidos.length,
+    tempoResolucao: media(resolvidos.map((p) => minutosEntre(p.criado_em, p.resolvido_em!))),
+  };
+}
+
+/** Quanto cada aplicador preencheu, quanto demora e a conformidade do que fez. */
+export function resumoPorAplicador(inspecoes: InspecaoAndamento[], respostas: RespostaRel[]) {
+  const SEM = "Sem nome";
+  const mapa = new Map<
+    string,
+    { nome: string; finalizadas: number; emAndamento: number; sim: number; nao: number; tempos: number[] }
+  >();
+  const nomePorInspecao = new Map<string, string>();
+  for (const i of inspecoes) {
+    const nome = i.aplicador ?? SEM;
+    nomePorInspecao.set(i.id, nome);
+    const linha =
+      mapa.get(nome) ?? { nome, finalizadas: 0, emAndamento: 0, sim: 0, nao: 0, tempos: [] };
+    if (i.status === "finalizada") {
+      linha.finalizadas += 1;
+      if (i.finalizada_em) linha.tempos.push(minutosEntre(i.criado_em, i.finalizada_em));
+    } else {
+      linha.emAndamento += 1;
+    }
+    mapa.set(nome, linha);
+  }
+  for (const r of respostas) {
+    const linha = mapa.get(nomePorInspecao.get(r.inspecao_id) ?? "");
+    if (!linha) continue;
+    if (r.resposta === "sim") linha.sim += 1;
+    if (r.resposta === "nao") linha.nao += 1;
+  }
+  return [...mapa.values()]
+    .map(({ tempos, ...linha }) => ({ ...linha, tempoMedio: media(tempos) }))
+    .sort((a, b) => b.finalizadas - a.finalizadas || b.emAndamento - a.emAndamento);
 }
 
 export function itensMaisReprovados(respostas: RespostaRel[], limite = 10) {

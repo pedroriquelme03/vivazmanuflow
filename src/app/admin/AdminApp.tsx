@@ -15,11 +15,16 @@ import {
   payloadAtualizarUsuario,
   payloadDefinirAmbientes,
   payloadDefinirAvisos,
+  payloadDefinirGovernanca,
+  perfilChecklistInicial,
+  PERFIL_CHECKLIST_LABEL,
   rotuloAmbientes,
   rotuloUltimaAlteracao,
+  usaChecklist,
   validarEdicaoEquipe,
   validarExclusaoConta,
   type DadosEdicaoEquipe,
+  type PerfilChecklist,
 } from "@/lib/equipe-edicao";
 import {
   idPrimeiraPropriedadeAtiva,
@@ -60,6 +65,29 @@ async function salvarEscolhaAvisos(
     });
     if (mesmosAvisos(padrao, gravar.p_avisos)) return null;
     return "Rode o SQL admin_definir_avisos no Supabase para gravar de qual equipe chega o aviso.";
+  }
+  return error.message;
+}
+
+function mensagemAmbiente(mensagem: string, checklist: boolean) {
+  if (checklist && mensagem.toLowerCase().includes("inválido")) {
+    return "Rode no Supabase os SQLs do Checklist (20261020175900 e 20261020180000) para gravar esse ambiente.";
+  }
+  return mensagem;
+}
+
+async function salvarPerfilChecklist(
+  supabase: ReturnType<typeof createClient>,
+  dados: DadosEdicaoEquipe,
+) {
+  if (!usaChecklist(dados.role) || dados.role === "admin") return null;
+  const { error } = await supabase.rpc(
+    "admin_definir_governanca",
+    payloadDefinirGovernanca(dados),
+  );
+  if (!error) return null;
+  if (recursoAmbienteAusente(error.message)) {
+    return "Rode o SQL da governança no Supabase para gravar o perfil no checklist.";
   }
   return error.message;
 }
@@ -408,6 +436,10 @@ function ModalEditarEquipe({
     ambientesAtuais.includes("manutencao"),
   );
   const [ti, setTi] = useState(ambientesAtuais.includes("ti"));
+  const [checklist, setChecklist] = useState(ambientesAtuais.includes("checklist"));
+  const [perfilChecklist, setPerfilChecklist] = useState(
+    perfilChecklistInicial(usuario.governanca_papel),
+  );
   const [role, setRole] = useState(usuario.role);
   const efetivosNoInicio = avisosEfetivos({
     role: usuario.role,
@@ -451,6 +483,8 @@ function ModalEditarEquipe({
       role,
       ambientes: ambientesMarcados(manutencao, ti),
       avisos: ambientesMarcados(avisoManutencao, avisoTi),
+      checklist,
+      perfilChecklist,
     };
     const falha = validarEdicaoEquipe(dados);
     if (falha) return setErro(falha);
@@ -477,7 +511,12 @@ function ModalEditarEquipe({
     );
     if (erroAmbiente && !recursoAmbienteAusente(erroAmbiente.message)) {
       setSalvando(false);
-      return setErro(erroAmbiente.message);
+      return setErro(mensagemAmbiente(erroAmbiente.message, checklist));
+    }
+    const falhaChecklist = await salvarPerfilChecklist(supabase, dados);
+    if (falhaChecklist) {
+      setSalvando(false);
+      return setErro(falhaChecklist);
     }
     const falhaAvisos = await salvarEscolhaAvisos(supabase, dados);
     setSalvando(false);
@@ -562,6 +601,7 @@ function ModalEditarEquipe({
                 if (proximo === "solicitante") {
                   setManutencao(true);
                   setTi(true);
+                  setChecklist(false);
                 }
               }}
             >
@@ -578,6 +618,8 @@ function ModalEditarEquipe({
               ti={ti}
               onManutencao={(valor) => marcarPainel("manutencao", valor)}
               onTi={(valor) => marcarPainel("ti", valor)}
+              checklist={usaChecklist(role) ? checklist : undefined}
+              onChecklist={setChecklist}
               rotulo=""
               ajuda={
                 role === "solicitante"
@@ -586,6 +628,13 @@ function ModalEditarEquipe({
               }
             />
           </div>
+          {usaChecklist(role) && checklist && (
+            <EscolhaPerfilChecklist
+              role={role}
+              valor={perfilChecklist}
+              onChange={setPerfilChecklist}
+            />
+          )}
           {role !== "solicitante" && manutencao && ti && (
             <div className="grid gap-1">
               <span className="text-xs font-medium text-slate-500">
@@ -1715,6 +1764,8 @@ function Equipe({
   const [ti, setTi] = useState(Boolean(preencher));
   const [avisoManutencao, setAvisoManutencao] = useState(true);
   const [avisoTi, setAvisoTi] = useState(false);
+  const [checklist, setChecklist] = useState(false);
+  const [perfilChecklist, setPerfilChecklist] = useState<PerfilChecklist>("camareira");
   const [propId, setPropId] = useState("");
   const [filtroRole, setFiltroRole] = useState("");
   const [filtroProp, setFiltroProp] = useState("");
@@ -1772,8 +1823,9 @@ function Equipe({
       role === "solicitante"
         ? (["manutencao", "ti"] as const)
         : ambientesMarcados(manutencao, ti);
-    if (ambientes.length === 0) {
-      return setErro("Marque Manutenção, TI ou os dois.");
+    const comChecklist = checklist && usaChecklist(role);
+    if (ambientes.length === 0 && !comChecklist) {
+      return setErro("Marque Manutenção, TI ou Checklist.");
     }
     const veioDaSolicitacao = Boolean(preencher);
     const nomeCriado = nome.trim();
@@ -1789,16 +1841,35 @@ function Equipe({
     if (error) return setErro(error.message);
     let ambienteAindaNaoGrava = false;
     if (novoId) {
+      const dadosChecklist = {
+        nome,
+        email,
+        senha,
+        senha2: senha,
+        ativo: true,
+        propriedadeId: propId,
+        userId: novoId,
+        role,
+        ambientes,
+        checklist: comChecklist,
+        perfilChecklist,
+      };
       const { error: erroAmbiente } = await supabase.rpc(
         "admin_definir_ambientes",
-        { p_user_id: novoId, p_ambientes: [...ambientes] },
+        payloadDefinirAmbientes(dadosChecklist),
       );
       if (erroAmbiente && !recursoAmbienteAusente(erroAmbiente.message)) {
-        setErro(erroAmbiente.message);
+        setErro(mensagemAmbiente(erroAmbiente.message, comChecklist));
         refresh();
         return;
       }
       ambienteAindaNaoGrava = Boolean(erroAmbiente);
+      const falhaChecklist = await salvarPerfilChecklist(supabase, dadosChecklist);
+      if (falhaChecklist) {
+        setErro(falhaChecklist);
+        refresh();
+        return;
+      }
       const falhaAvisos = await salvarEscolhaAvisos(supabase, {
         userId: novoId,
         role,
@@ -1843,6 +1914,8 @@ function Equipe({
     setManutencao(true);
     setAvisoManutencao(true);
     setAvisoTi(false);
+    setChecklist(false);
+    setPerfilChecklist("camareira");
     onPreencherConsumido?.();
     refresh();
   }
@@ -1880,6 +1953,7 @@ function Equipe({
             if (proximo === "solicitante") {
               setManutencao(true);
               setTi(true);
+              setChecklist(false);
             }
           }}
         >
@@ -1899,9 +1973,18 @@ function Equipe({
               ti={ti}
               onManutencao={(valor) => marcarPainel("manutencao", valor)}
               onTi={(valor) => marcarPainel("ti", valor)}
+              checklist={checklist}
+              onChecklist={setChecklist}
               rotulo="Ambientes"
               ajuda="Marcado abre o painel. Desmarcado deixa de ver."
             />
+            {checklist && (
+              <EscolhaPerfilChecklist
+                role={role}
+                valor={perfilChecklist}
+                onChange={setPerfilChecklist}
+              />
+            )}
             {manutencao && ti && (
               <EscolhaAmbientes
                 manutencao={avisoManutencao}
@@ -1983,6 +2066,13 @@ function Equipe({
               u.email || emails[u.id] || "Sem e-mail",
               ROLE_LABEL[u.role],
               rotuloAmbientes(u.ambientes),
+              (u.ambientes ?? []).includes("checklist") && usaChecklist(u.role)
+                ? `Checklist: ${
+                    u.role === "admin"
+                      ? "Administrador"
+                      : PERFIL_CHECKLIST_LABEL[perfilChecklistInicial(u.governanca_papel)]
+                  }`
+                : "",
               u.role !== "solicitante" &&
               (u.ambientes ?? []).includes("manutencao") &&
               (u.ambientes ?? []).includes("ti")
@@ -2013,11 +2103,44 @@ function Equipe({
   );
 }
 
+function EscolhaPerfilChecklist({
+  role,
+  valor,
+  onChange,
+}: {
+  role: string;
+  valor: PerfilChecklist;
+  onChange: (valor: PerfilChecklist) => void;
+}) {
+  if (role === "admin") {
+    return (
+      <p className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500">
+        No Checklist, o administrador é o administrador do módulo.
+      </p>
+    );
+  }
+  return (
+    <label className="grid gap-1">
+      <span className="text-xs font-medium text-slate-500">Perfil no checklist</span>
+      <select
+        className={inputCls}
+        value={valor}
+        onChange={(e) => onChange(e.target.value as PerfilChecklist)}
+      >
+        <option value="camareira">{PERFIL_CHECKLIST_LABEL.camareira}: vê só o que preencheu</option>
+        <option value="lider">{PERFIL_CHECKLIST_LABEL.lider}: vê todos e o Kanban</option>
+      </select>
+    </label>
+  );
+}
+
 function EscolhaAmbientes({
   manutencao,
   ti,
   onManutencao,
   onTi,
+  checklist,
+  onChecklist,
   soManutencao = false,
   rotulo = "Ambientes",
   ajuda,
@@ -2026,6 +2149,8 @@ function EscolhaAmbientes({
   ti: boolean;
   onManutencao: (valor: boolean) => void;
   onTi: (valor: boolean) => void;
+  checklist?: boolean;
+  onChecklist?: (valor: boolean) => void;
   soManutencao?: boolean;
   rotulo?: string;
   ajuda?: string;
@@ -2054,6 +2179,16 @@ function EscolhaAmbientes({
               onChange={(e) => onTi(e.target.checked)}
             />
             TI
+          </label>
+        )}
+        {checklist !== undefined && onChecklist && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={checklist}
+              onChange={(e) => onChecklist(e.target.checked)}
+            />
+            Checklist
           </label>
         )}
       </div>

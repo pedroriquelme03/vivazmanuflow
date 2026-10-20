@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function EventosPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/admin/eventos");
-  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role));
+  if (perfil.role !== "admin") redirect(rotaInicial(perfil.role, perfil.ambientes));
 
   const supabase = await createClient();
   const [{ data: propriedades }, eventosRes] = await Promise.all([

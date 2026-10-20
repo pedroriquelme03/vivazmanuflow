@@ -10,7 +10,7 @@ type Etapa = {
   numero: number;
   titulo: string;
   quem: string;
-  onde?: { href: string; rotulo: string; soAdmin?: boolean };
+  onde?: { href: string; rotulo: string; soAdmin?: boolean; soEquipe?: boolean };
   itens: React.ReactNode[];
 };
 
@@ -19,15 +19,18 @@ const ETAPAS: Etapa[] = [
     numero: 1,
     titulo: "Liberar o acesso",
     quem: "Administrador",
-    onde: { href: "/governanca/admin/equipe", rotulo: "Acessos", soAdmin: true },
+    onde: { href: "/admin", rotulo: "Cadastros > Equipe", soAdmin: true },
     itens: [
-      "Administradores do sistema já entram no módulo sem precisar de nada.",
       <>
-        Para os demais, escolha em <b>Acessos</b> o papel de cada pessoa: <b>Líder</b> vê as
-        inspeções de todos e escolhe a camareira nos checklists de quarto; <b>Aplicador / camareira</b>{" "}
-        vê só as inspeções que fez.
+        Em <b>Cadastros &gt; Equipe</b>, marque o ambiente <b>Checklist</b> na pessoa. Desmarcado,
+        ela não vê os checklists, inclusive o administrador.
       </>,
-      "Quem não tem acesso não vê o item Checklists no menu.",
+      <>
+        Com Checklist marcado, escolha o <b>Perfil no checklist</b>: <b>Líder</b> vê as inspeções de
+        todos, o Kanban e escolhe a camareira nos checklists de quarto; <b>Aplicador</b> vê só as
+        inspeções que fez. O administrador marcado é o administrador do checklist.
+      </>,
+      "Quem tem mais de um ambiente troca entre Manutenção, TI e Checklist no seletor do menu.",
     ],
   },
   {
@@ -91,9 +94,27 @@ const ETAPAS: Etapa[] = [
         quem vai fazer.
       </>,
       <>
+        As respostas ficam salvas a cada seção. Se sair no meio, o checklist fica{" "}
+        <b>Em andamento</b> no Início e dá para continuar de onde parou.
+      </>,
+      <>
         Ao final, clique em <b>Finalizar checklist</b>. Quem preencheu, a data e a hora ficam
         registrados automaticamente.
       </>,
+    ],
+  },
+  {
+    numero: 6,
+    titulo: "Acompanhar no Kanban",
+    quem: "Líder e administrador",
+    onde: { href: "/governanca/admin/kanban", rotulo: "Kanban", soEquipe: true },
+    itens: [
+      <>
+        O <b>Kanban</b> mostra quem está preenchendo agora (<b>Em andamento</b>), o que terminou sem
+        problema, o que ficou <b>Com pendência</b> (item reprovado ou plano de ação aberto) e o que
+        já teve a <b>Pendência resolvida</b>.
+      </>,
+      "Abra o cartão para ver as respostas e marcar cada plano de ação como resolvido.",
     ],
   },
   {
@@ -113,7 +134,7 @@ const ETAPAS: Etapa[] = [
     ],
   },
   {
-    numero: 6,
+    numero: 7,
     titulo: "Acompanhar os relatórios",
     quem: "Administrador",
     onde: { href: "/governanca/admin/relatorios", rotulo: "Relatórios", soAdmin: true },
@@ -159,7 +180,9 @@ export default async function ComoFuncionaPage() {
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
-                {e.onde && (!e.onde.soAdmin || ehAdmin) && (
+                {e.onde &&
+                  (!e.onde.soAdmin || ehAdmin) &&
+                  (!e.onde.soEquipe || papel !== "camareira") && (
                   <Link
                     href={e.onde.href}
                     className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:underline"

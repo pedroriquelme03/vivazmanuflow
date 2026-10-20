@@ -2,6 +2,13 @@
 
 export type AmbienteEquipe = "manutencao" | "ti";
 
+export type PerfilChecklist = "lider" | "camareira";
+
+export const PERFIL_CHECKLIST_LABEL: Record<PerfilChecklist, string> = {
+  lider: "Líder",
+  camareira: "Aplicador",
+};
+
 export type DadosEdicaoEquipe = {
   nome: string;
   email: string;
@@ -11,9 +18,21 @@ export type DadosEdicaoEquipe = {
   propriedadeId: string;
   userId: string;
   role: "admin" | "lider" | "colaborador" | "solicitante";
+  /** Ambientes de chamado marcados. */
   ambientes: readonly AmbienteEquipe[];
   avisos?: readonly AmbienteEquipe[];
+  checklist?: boolean;
+  perfilChecklist?: PerfilChecklist;
 };
+
+/** Solicitante só abre chamado; os demais podem ganhar o ambiente Checklist. */
+export function usaChecklist(role: string) {
+  return role !== "solicitante";
+}
+
+export function perfilChecklistInicial(governancaPapel: string | null | undefined): PerfilChecklist {
+  return governancaPapel === "lider" ? "lider" : "camareira";
+}
 
 export function rotuloUltimaAlteracao(iso: string | null | undefined) {
   if (!iso) return "Ainda não houve alteração";
@@ -30,7 +49,12 @@ export function validarEdicaoEquipe(d: DadosEdicaoEquipe): string | null {
       return "A senha deve ter no mínimo 6 caracteres.";
     }
   }
-  if (d.ambientes.length === 0) return "Marque Manutenção, TI ou os dois.";
+  const comChecklist = Boolean(d.checklist) && usaChecklist(d.role);
+  if (d.ambientes.length === 0 && !comChecklist) {
+    return usaChecklist(d.role)
+      ? "Marque Manutenção, TI ou Checklist."
+      : "Marque Manutenção, TI ou os dois.";
+  }
   if (
     d.ambientes.length > 1 &&
     d.role !== "solicitante" &&
@@ -55,11 +79,17 @@ export function ambientesMarcados(
 export function rotuloAmbientes(
   ambientes: readonly string[] | null | undefined,
 ) {
-  const temManutencao = !ambientes || ambientes.includes("manutencao");
   const temTi = Boolean(ambientes?.includes("ti"));
-  if (temManutencao && temTi) return "Manutenção e TI";
-  if (temTi) return "TI";
-  return "Manutenção";
+  const temChecklist = Boolean(ambientes?.includes("checklist"));
+  const temManutencao =
+    !ambientes || ambientes.includes("manutencao") || (!temTi && !temChecklist);
+  const nomes = [
+    temManutencao ? "Manutenção" : null,
+    temTi ? "TI" : null,
+    temChecklist ? "Checklist" : null,
+  ].filter((nome): nome is string => Boolean(nome));
+  if (nomes.length === 1) return nomes[0];
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
 }
 
 export function payloadAtualizarUsuario(d: DadosEdicaoEquipe) {
@@ -75,9 +105,19 @@ export function payloadAtualizarUsuario(d: DadosEdicaoEquipe) {
 }
 
 export function payloadDefinirAmbientes(d: DadosEdicaoEquipe) {
+  const comChecklist = Boolean(d.checklist) && usaChecklist(d.role);
   return {
     p_user_id: d.userId,
-    p_ambientes: [...d.ambientes],
+    p_ambientes: comChecklist ? [...d.ambientes, "checklist"] : [...d.ambientes],
+  };
+}
+
+/** Perfil gravado no checklist. Admin não precisa: ele é o admin do checklist. */
+export function payloadDefinirGovernanca(d: DadosEdicaoEquipe) {
+  const comChecklist = Boolean(d.checklist) && usaChecklist(d.role);
+  return {
+    p_user_id: d.userId,
+    p_papel: comChecklist && d.role !== "admin" ? (d.perfilChecklist ?? "camareira") : null,
   };
 }
 

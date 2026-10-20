@@ -11,7 +11,7 @@ export default async function PreventivasPage() {
   const perfil = await getPerfil();
   if (!perfil) redirect("/login?next=/lider/preventivas");
   if (perfil.role === "colaborador" || perfil.role === "solicitante") {
-    redirect(rotaInicial(perfil.role));
+    redirect(rotaInicial(perfil.role, perfil.ambientes));
   }
 
   const supabase = await createClient();

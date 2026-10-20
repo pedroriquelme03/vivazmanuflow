@@ -1326,6 +1326,8 @@ export type Database = {
           quem_pediu: string | null
           observacao: string | null
           criado_em: string
+          resolvido_em: string | null
+          resolvido_por: string | null
         }
         Insert: {
           id?: string
@@ -1336,6 +1338,8 @@ export type Database = {
           quem_pediu?: string | null
           observacao?: string | null
           criado_em?: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
         }
         Update: {
           id?: string
@@ -1346,6 +1350,8 @@ export type Database = {
           quem_pediu?: string | null
           observacao?: string | null
           criado_em?: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
         }
         Relationships: [
           {
@@ -1620,7 +1626,7 @@ export type Database = {
         | "concluida"
         | "cancelada"
       user_role: "admin" | "lider" | "colaborador" | "solicitante"
-      ambiente_equipe: "manutencao" | "ti"
+      ambiente_equipe: "manutencao" | "ti" | "checklist"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1760,7 +1766,7 @@ export const Constants = {
         "cancelada",
       ],
       user_role: ["admin", "lider", "colaborador", "solicitante"],
-      ambiente_equipe: ["manutencao", "ti"],
+      ambiente_equipe: ["manutencao", "ti", "checklist"],
     },
   },
 } as const
