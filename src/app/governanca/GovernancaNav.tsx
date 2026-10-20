@@ -53,6 +53,11 @@ const ABAS: Aba[] = [
     soAdmin: true,
     ativa: (p) => p.startsWith("/governanca/admin/equipe"),
   },
+  {
+    href: "/governanca/como-funciona",
+    rotulo: "Como funciona",
+    ativa: (p) => p.startsWith("/governanca/como-funciona"),
+  },
 ];
 
 export function GovernancaNav({ papel }: { papel: GovPapel }) {
