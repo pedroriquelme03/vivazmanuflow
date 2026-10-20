@@ -26,6 +26,7 @@ export default async function NovaInspecaoPage() {
     <GovernancaShell perfil={perfil} papel={papel}>
       <NovaInspecao
         eu={{ id: perfil.id, nome: perfil.nome }}
+        ehAdmin={papel === "admin"}
         escolheCamareira={inspecionaEquipe(papel)}
         acomodacoes={acomodacoes ?? []}
         camareiras={camareiras ?? []}

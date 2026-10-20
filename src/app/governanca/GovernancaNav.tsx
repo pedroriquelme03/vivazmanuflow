@@ -14,7 +14,7 @@ const ABAS: Aba[] = [
   },
   {
     href: "/governanca/nova",
-    rotulo: "Novo checklist",
+    rotulo: "Preencher checklist",
     ativa: (p) => p.startsWith("/governanca/nova"),
   },
   {
@@ -31,7 +31,7 @@ const ABAS: Aba[] = [
   },
   {
     href: "/governanca/admin/processos",
-    rotulo: "Modelos",
+    rotulo: "Gerenciar checklists",
     soAdmin: true,
     ativa: (p) => p.startsWith("/governanca/admin/processos"),
   },

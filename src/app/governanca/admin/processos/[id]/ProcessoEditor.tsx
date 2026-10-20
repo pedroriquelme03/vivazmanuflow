@@ -103,7 +103,7 @@ export function ProcessoEditor({
         href="/governanca/admin/processos"
         className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800"
       >
-        ← Modelos
+        ← Gerenciar checklists
       </Link>
 
       <DadosProcesso processo={processo} total={total} onSalvar={(patch) => rodar(supabase.from("gov_processos").update(patch).eq("id", processo.id))} />

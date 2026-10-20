@@ -15,10 +15,16 @@ import {
 } from "@/lib/governanca";
 import { Erro, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../ui";
 
-export function ProcessosApp({ lista }: { lista: (Processo & { perguntas: number })[] }) {
+export function ProcessosApp({
+  lista,
+  abrirNovo = false,
+}: {
+  lista: (Processo & { perguntas: number })[];
+  abrirNovo?: boolean;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(abrirNovo);
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -83,13 +89,13 @@ export function ProcessosApp({ lista }: { lista: (Processo & { perguntas: number
     <>
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Modelos de checklist</h1>
+          <h1 className="text-xl font-bold">Gerenciar checklists</h1>
           <p className="mt-0.5 text-sm text-slate-500">
             {lista.length} checklists. Cada um tem seções e itens de vários tipos.
           </p>
         </div>
         <button type="button" onClick={() => setAberto((v) => !v)} className={btnPrimario}>
-          + Novo
+          + Criar checklist
         </button>
       </div>
 

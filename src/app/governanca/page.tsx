@@ -40,7 +40,7 @@ export default async function GovernancaHome() {
       >
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-2xl">✓</span>
         <span>
-          <span className="block text-base font-semibold">Iniciar checklist</span>
+          <span className="block text-base font-semibold">Preencher checklist</span>
           <span className="block text-sm text-white/80">Governança, manutenção, Aquamania, eventos e rondas</span>
         </span>
       </Link>

@@ -33,12 +33,14 @@ const PREFIXOS_ANDAR = ["10", "11", "12"] as const;
 
 export function NovaInspecao({
   eu,
+  ehAdmin,
   escolheCamareira,
   acomodacoes,
   camareiras,
   processos,
 }: {
   eu: { id: string; nome: string };
+  ehAdmin: boolean;
   escolheCamareira: boolean;
   acomodacoes: Acomodacao[];
   camareiras: Camareira[];
@@ -266,9 +268,28 @@ export function NovaInspecao({
 
       {fase === "processo" && (
         <>
-          <h2 className="mb-3 text-lg font-semibold text-slate-800">Qual checklist?</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">Preencher checklist</h1>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Escolha qual checklist você vai preencher agora.
+                {ehAdmin ? " Para criar ou alterar um checklist, use Criar checklist." : ""}
+              </p>
+            </div>
+            {ehAdmin && (
+              <Link href="/governanca/admin/processos?novo=1" className={`${btnSecundario} shrink-0`}>
+                + Criar checklist
+              </Link>
+            )}
+          </div>
           {comItens.length === 0 ? (
-            <Vazio texto="Nenhum checklist ativo com perguntas. Cadastre um em Modelos." />
+            <Vazio
+              texto={
+                ehAdmin
+                  ? "Nenhum checklist ativo com perguntas. Use Criar checklist para montar o primeiro."
+                  : "Nenhum checklist disponível ainda. Peça ao administrador para cadastrar."
+              }
+            />
           ) : (
             <>
               <input

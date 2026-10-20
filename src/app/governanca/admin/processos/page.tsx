@@ -5,7 +5,11 @@ import { ProcessosApp } from "./ProcessosApp";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProcessosPage() {
+export default async function ProcessosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ novo?: string }>;
+}) {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/processos", true);
   const supabase = await createClient();
   const { data } = await supabase
@@ -20,7 +24,7 @@ export default async function ProcessosPage() {
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
-      <ProcessosApp lista={lista} />
+      <ProcessosApp lista={lista} abrirNovo={(await searchParams).novo === "1"} />
     </GovernancaShell>
   );
 }
