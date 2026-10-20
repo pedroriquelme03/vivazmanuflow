@@ -47,7 +47,7 @@ export function ResolverPlano({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {resolvidoEm && (
-        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+        <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
           Resolvido em {formatDataHora(resolvidoEm)}
         </span>
       )}
@@ -59,7 +59,7 @@ export function ResolverPlano({
           className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
             resolvidoEm
               ? "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-              : "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-brand-600 text-white hover:bg-brand-700"
           }`}
         >
           {salvando ? "Salvando…" : resolvidoEm ? "Reabrir" : "Marcar plano como resolvido"}

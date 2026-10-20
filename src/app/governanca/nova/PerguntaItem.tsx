@@ -134,7 +134,7 @@ export function PerguntaItem({
 
   const borda =
     tipo === "sim_nao" && valor.resposta === "sim"
-      ? "border-green-300"
+      ? "border-brand-300"
       : tipo === "sim_nao" && valor.resposta === "nao"
         ? "border-red-300"
         : "border-slate-200";
@@ -153,7 +153,7 @@ export function PerguntaItem({
             <button
               type="button"
               onClick={() => setSimNao("sim")}
-              className={`${botao} ${valor.resposta === "sim" ? "bg-green-600 text-white" : botaoSolto}`}
+              className={`${botao} ${valor.resposta === "sim" ? "bg-brand-600 text-white" : botaoSolto}`}
             >
               ✓ Sim
             </button>

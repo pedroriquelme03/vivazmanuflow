@@ -46,7 +46,7 @@ function Decisao({ children, nao }: { children: React.ReactNode; nao: string }) 
   return (
     <span className="flex flex-col items-center">
       <span
-        className="flex h-24 w-36 items-center justify-center bg-amber-100 px-7 text-center text-xs font-semibold leading-tight text-amber-900"
+        className="flex h-24 w-36 items-center justify-center bg-brand-100 px-7 text-center text-xs font-semibold leading-tight text-brand-800"
         style={{ clipPath: "polygon(50% 0, 100% 50%, 50% 100%, 0 50%)" }}
       >
         {children}
@@ -79,7 +79,7 @@ function SetaEntreFaixas() {
 export function Fluxograma() {
   return (
     <figure aria-label="Fluxograma do módulo de checklists">
-      <Faixa titulo="1 · Cadastro (administrador)" cor="border-violet-200 bg-violet-50/60">
+      <Faixa titulo="1 · Cadastro (administrador)" cor="border-slate-200 bg-slate-50">
         <Caixa etapa={1}>Liberar acessos</Caixa>
         <Seta />
         <Caixa etapa={2}>Cadastrar UHs e camareiras</Caixa>
@@ -89,7 +89,7 @@ export function Fluxograma() {
 
       <SetaEntreFaixas />
 
-      <Faixa titulo="2 · Preenchimento (líder, aplicador ou admin)" cor="border-cyan-200 bg-cyan-50/60">
+      <Faixa titulo="2 · Preenchimento (líder, aplicador ou admin)" cor="border-brand-200 bg-brand-50/60">
         <Caixa etapa={4}>Escolher o checklist</Caixa>
         <Seta />
         <Decisao nao="vai direto para as perguntas">Pede a UH?</Decisao>
@@ -107,7 +107,7 @@ export function Fluxograma() {
 
       <SetaEntreFaixas />
 
-      <Faixa titulo="3 · Acompanhamento" cor="border-emerald-200 bg-emerald-50/60">
+      <Faixa titulo="3 · Acompanhamento" cor="border-brand-300 bg-brand-100/50">
         <Caixa etapa={5}>Ver as inspeções e o resumo</Caixa>
         <Seta />
         <Caixa etapa={6}>Analisar os relatórios</Caixa>

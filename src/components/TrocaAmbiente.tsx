@@ -12,7 +12,7 @@ import { ROTA_CHECKLIST } from "@/lib/rotas";
 const ATIVO: Record<PainelEquipe, string> = {
   ti: "bg-white text-[#1E293B]",
   manutencao: "bg-[#0891b2] text-white",
-  checklist: "bg-[#7c3aed] text-white",
+  checklist: "bg-[#059669] text-white",
 };
 
 function gravarPainel(painel: PainelEquipe) {

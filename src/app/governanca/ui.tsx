@@ -36,7 +36,7 @@ export function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-        finalizada ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+        finalizada ? "bg-brand-100 text-brand-700" : "bg-amber-100 text-amber-700"
       }`}
     >
       {finalizada ? "Finalizada" : "Em andamento"}

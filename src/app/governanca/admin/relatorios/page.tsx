@@ -135,7 +135,7 @@ export default async function RelatoriosPage({
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi titulo="Inspeções finalizadas" valor={inspecoes.length} cor="text-brand-700" />
-        <Kpi titulo="Conformidade" valor={`${conformidade(totalSim, totalNao)}%`} cor="text-emerald-600" />
+        <Kpi titulo="Conformidade" valor={`${conformidade(totalSim, totalNao)}%`} cor="text-brand-600" />
         <Kpi titulo="Não conformidades" valor={totalNao} cor="text-red-600" />
         <Kpi titulo="Planos de ação" valor={planos.length} cor="text-amber-600" />
       </div>
@@ -154,7 +154,7 @@ export default async function RelatoriosPage({
             cor="text-slate-800"
           />
           <Kpi titulo="Pendências abertas" valor={andamento.planosAbertos} cor="text-red-600" />
-          <Kpi titulo="Pendências resolvidas" valor={andamento.planosResolvidos} cor="text-sky-600" />
+          <Kpi titulo="Pendências resolvidas" valor={andamento.planosResolvidos} cor="text-brand-700" />
           <Kpi
             titulo="Tempo médio até resolver"
             valor={formatarDuracao(andamento.tempoResolucao)}
@@ -325,7 +325,7 @@ export default async function RelatoriosPage({
                   <td className="hidden px-4 py-3 text-slate-500 sm:table-cell">{formatDataHora(p.criado_em)}</td>
                   <td className="px-4 py-3">
                     {p.resolvido_em ? (
-                      <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
                         Resolvido
                       </span>
                     ) : (

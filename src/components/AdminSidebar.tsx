@@ -26,13 +26,13 @@ const ROLE_BADGE: Record<Perfil["role"], string> = {
 const FUNDO: Record<PainelEquipe, string> = {
   manutencao: "bg-[#063b45]",
   ti: "bg-[#1E293B]",
-  checklist: "bg-[#2e1065]",
+  checklist: "bg-[#064e3b]",
 };
 
 const ATIVO_MOBILE: Record<PainelEquipe, string> = {
   manutencao: "bg-[#0891b2] text-white",
   ti: "bg-white text-[#1E293B]",
-  checklist: "bg-[#7c3aed] text-white",
+  checklist: "bg-[#059669] text-white",
 };
 
 type NavItem = {
@@ -224,7 +224,7 @@ export function AdminSidebar({
   const router = useRouter();
   const ti = ambiente === "ti";
   const itens = itensDoMenu(perfil, ambiente);
-  const claro = ambiente !== "manutencao";
+  const claro = ti;
   const destaque = claro ? "text-white" : "text-brand-500";
   const ponto = claro ? "bg-white" : "bg-brand-500";
 

@@ -4,11 +4,8 @@
 -- O checklist passa a ser salvo aos poucos (em andamento) e o plano de ação
 -- ganha a marcação de resolvido, para o Kanban acompanhar o andamento.
 
--- Quem já usava os checklists continua com acesso.
-UPDATE public.usuarios
-SET ambientes = array_append(ambientes, 'checklist'::public.ambiente_equipe)
-WHERE (role = 'admin'::user_role OR governanca_papel IS NOT NULL)
-  AND NOT ('checklist'::public.ambiente_equipe = ANY (ambientes));
+-- Ninguém ganha o Checklist automaticamente: o administrador marca em
+-- Cadastros > Equipe quem usa. Solicitante nunca entra nos checklists.
 
 CREATE OR REPLACE FUNCTION private.governanca_papel()
 RETURNS text
@@ -19,6 +16,7 @@ SET search_path = public
 AS $$
   SELECT CASE
     WHEN NOT ('checklist'::public.ambiente_equipe = ANY (u.ambientes)) THEN NULL
+    WHEN u.role = 'solicitante'::user_role THEN NULL
     WHEN u.role = 'admin'::user_role THEN 'admin'
     ELSE COALESCE(u.governanca_papel, 'camareira')
   END
@@ -59,6 +57,17 @@ BEGIN
   SELECT COALESCE(array_agg(DISTINCT a::public.ambiente_equipe), '{}')
   INTO v_ambientes
   FROM unnest(p_ambientes) AS a;
+
+  -- Solicitante só abre chamado: nunca fica com o Checklist.
+  IF EXISTS (
+    SELECT 1 FROM public.usuarios
+    WHERE id = p_user_id AND role = 'solicitante'::user_role
+  ) THEN
+    v_ambientes := array_remove(v_ambientes, 'checklist'::public.ambiente_equipe);
+    IF cardinality(v_ambientes) < 1 THEN
+      RAISE EXCEPTION 'Marque Manutenção, TI ou os dois';
+    END IF;
+  END IF;
 
   UPDATE public.usuarios
   SET

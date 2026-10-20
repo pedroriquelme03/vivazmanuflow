@@ -103,7 +103,7 @@ export function AcomodacoesApp({ lista }: { lista: Acomodacao[] }) {
               <button
                 type="button"
                 onClick={() => alternarAtivo(a)}
-                className={`text-xs font-medium ${a.ativo ? "text-emerald-600" : "text-slate-400"}`}
+                className={`text-xs font-medium ${a.ativo ? "text-brand-600" : "text-slate-400"}`}
               >
                 {a.ativo ? "Ativa" : "Inativa"}
               </button>

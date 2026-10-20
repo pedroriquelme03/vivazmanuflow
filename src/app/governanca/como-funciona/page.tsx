@@ -22,8 +22,9 @@ const ETAPAS: Etapa[] = [
     onde: { href: "/admin", rotulo: "Cadastros > Equipe", soAdmin: true },
     itens: [
       <>
-        Em <b>Cadastros &gt; Equipe</b>, marque o ambiente <b>Checklist</b> na pessoa. Desmarcado,
-        ela não vê os checklists, inclusive o administrador.
+        Todo mundo começa sem o Checklist. Em <b>Cadastros &gt; Equipe</b>, marque o ambiente{" "}
+        <b>Checklist</b> em quem vai usar. Desmarcado, a pessoa não vê os checklists, inclusive o
+        administrador. Solicitante não tem essa opção.
       </>,
       <>
         Com Checklist marcado, escolha o <b>Perfil no checklist</b>: <b>Líder</b> vê as inspeções de

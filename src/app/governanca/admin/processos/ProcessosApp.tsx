@@ -182,7 +182,7 @@ export function ProcessosApp({
                 <button
                   type="button"
                   onClick={() => alternarAtivo(p)}
-                  className={`text-xs font-medium ${p.ativo ? "text-emerald-600" : "text-slate-400"}`}
+                  className={`text-xs font-medium ${p.ativo ? "text-brand-600" : "text-slate-400"}`}
                 >
                   {p.ativo ? "Ativo" : "Inativo"}
                 </button>

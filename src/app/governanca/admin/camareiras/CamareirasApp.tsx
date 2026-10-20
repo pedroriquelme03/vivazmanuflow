@@ -71,7 +71,7 @@ export function CamareirasApp({ lista }: { lista: Camareira[] }) {
             <button
               type="button"
               onClick={() => alternarAtivo(c)}
-              className={`text-xs font-medium ${c.ativo ? "text-emerald-600" : "text-slate-400"}`}
+              className={`text-xs font-medium ${c.ativo ? "text-brand-600" : "text-slate-400"}`}
             >
               {c.ativo ? "Ativa" : "Inativa"}
             </button>

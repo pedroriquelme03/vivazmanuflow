@@ -692,7 +692,7 @@ export function NovaInspecao({
 
       {fase === "concluido" && (
         <div className={`${cardCls} mx-auto max-w-md text-center`}>
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-3xl text-brand-700">
             ✓
           </div>
           <h2 className="text-lg font-bold text-slate-800">Checklist finalizado!</h2>

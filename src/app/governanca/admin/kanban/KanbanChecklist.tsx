@@ -30,9 +30,9 @@ export type CartaoKanban = {
 
 const COR_COLUNA: Record<ColunaKanban, string> = {
   andamento: "border-t-amber-400",
-  ok: "border-t-emerald-500",
+  ok: "border-t-brand-500",
   pendencia: "border-t-red-500",
-  resolvida: "border-t-sky-500",
+  resolvida: "border-t-brand-300",
 };
 
 export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
@@ -149,7 +149,7 @@ export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
                         </span>
                       )}
                       {c.planosTotal > 0 && c.planosAbertos === 0 && (
-                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700">
+                        <span className="rounded-full bg-brand-100 px-2 py-0.5 text-brand-700">
                           {c.planosTotal} {c.planosTotal === 1 ? "plano resolvido" : "planos resolvidos"}
                         </span>
                       )}
