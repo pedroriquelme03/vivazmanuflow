@@ -6,10 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { Tables, Enums } from "@/lib/database.types";
 import { formatarData } from "@/lib/demanda-ui";
 import { garantirSolicitantesGestor } from "@/lib/solicitante-gestor";
-import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
+import { listaAmbientes, recursoAmbienteAusente } from "@/lib/ambiente-equipe";
 import { emailJaCadastrado } from "@/lib/requisicao-acesso";
 import { abrirRascunhoEmail, rascunhoAcessoOutlook } from "@/lib/email-acesso";
-import { avisosEfetivos, mesmosAvisos } from "@/lib/aviso-push";
+import { avisosEfetivos, mesmosAvisos, rotuloAvisos } from "@/lib/aviso-push";
 import {
   ambientesMarcados,
   payloadAtualizarUsuario,
@@ -46,17 +46,17 @@ async function salvarEscolhaAvisos(
   supabase: ReturnType<typeof createClient>,
   dados: Pick<DadosEdicaoEquipe, "userId" | "role" | "ambientes" | "avisos">,
 ) {
-  if (dados.role === "solicitante" || dados.ambientes.length < 2) return null;
+  if (dados.role === "solicitante" || dados.ambientes.length === 0) return null;
   const gravar = payloadDefinirAvisos({
     userId: dados.userId,
     ambientes: dados.ambientes,
     avisos: dados.avisos,
   });
-  if (gravar.p_avisos.length === 0) {
-    return "Marque o aviso de Manutenção, de TI ou dos dois.";
-  }
   const { error } = await supabase.rpc("admin_definir_avisos", gravar);
   if (!error) return null;
+  if (gravar.p_avisos.length === 0 && error.message.includes("Marque o aviso")) {
+    return "Rode o SQL em supabase/migrations/20261021130000_avisos_nenhum.sql no Supabase para deixar a pessoa sem notificação.";
+  }
   if (recursoAmbienteAusente(error.message)) {
     const padrao = avisosEfetivos({
       role: dados.role,
@@ -460,7 +460,11 @@ function ModalEditarEquipe({
     const entrouNosDois = !(manutencao && ti) && proximoManutencao && proximoTi;
     if (qual === "manutencao") setManutencao(valor);
     else setTi(valor);
-    if (!entrouNosDois) return;
+    if (!entrouNosDois) {
+      if (valor && qual === "manutencao") setAvisoManutencao(true);
+      if (valor && qual === "ti") setAvisoTi(true);
+      return;
+    }
     const padrao = avisosAoMarcarOsDois(role);
     setAvisoManutencao(padrao.manutencao);
     setAvisoTi(padrao.ti);
@@ -635,18 +639,19 @@ function ModalEditarEquipe({
               onChange={setPerfilChecklist}
             />
           )}
-          {role !== "solicitante" && manutencao && ti && (
+          {role !== "solicitante" && (manutencao || ti) && (
             <div className="grid gap-1">
               <span className="text-xs font-medium text-slate-500">
                 Notificações
               </span>
-              <EscolhaAmbientes
+              <EscolhaAvisos
+                painelManutencao={manutencao}
+                painelTi={ti}
                 manutencao={avisoManutencao}
                 ti={avisoTi}
                 onManutencao={setAvisoManutencao}
                 onTi={setAvisoTi}
                 rotulo=""
-                ajuda="O aviso de chamado novo chega só do que estiver marcado aqui. Os dois painéis continuam visíveis."
               />
             </div>
           )}
@@ -1782,7 +1787,11 @@ function Equipe({
     const entrouNosDois = !(manutencao && ti) && proximoManutencao && proximoTi;
     if (qual === "manutencao") setManutencao(valor);
     else setTi(valor);
-    if (!entrouNosDois) return;
+    if (!entrouNosDois) {
+      if (valor && qual === "manutencao") setAvisoManutencao(true);
+      if (valor && qual === "ti") setAvisoTi(true);
+      return;
+    }
     const padrao = avisosAoMarcarOsDois(role);
     setAvisoManutencao(padrao.manutencao);
     setAvisoTi(padrao.ti);
@@ -1985,14 +1994,15 @@ function Equipe({
                 onChange={setPerfilChecklist}
               />
             )}
-            {manutencao && ti && (
-              <EscolhaAmbientes
+            {(manutencao || ti) && (
+              <EscolhaAvisos
+                painelManutencao={manutencao}
+                painelTi={ti}
                 manutencao={avisoManutencao}
                 ti={avisoTi}
                 onManutencao={setAvisoManutencao}
                 onTi={setAvisoTi}
                 rotulo="Notificações"
-                ajuda="O aviso de chamado novo chega só do que estiver marcado aqui."
               />
             )}
           </div>
@@ -2073,11 +2083,7 @@ function Equipe({
                       : PERFIL_CHECKLIST_LABEL[perfilChecklistInicial(u.governanca_papel)]
                   }`
                 : "",
-              u.role !== "solicitante" &&
-              (u.ambientes ?? []).includes("manutencao") &&
-              (u.ambientes ?? []).includes("ti")
-                ? `Avisos: ${rotuloAmbientes(avisosEfetivos(u))}`
-                : "",
+              rotuloAvisosDaLista(u),
               nomeProp(u.propriedade_id),
             ]
               .filter(Boolean)
@@ -2193,6 +2199,67 @@ function EscolhaAmbientes({
         )}
       </div>
       {ajuda && <p className="mt-1 text-xs text-slate-500">{ajuda}</p>}
+    </div>
+  );
+}
+
+/** Lista da equipe: mostra o aviso quando há escolha (dois painéis) ou quando está sem nenhum. */
+function rotuloAvisosDaLista(u: Usuario) {
+  if (u.role === "solicitante") return "";
+  const paineis = listaAmbientes(u.ambientes);
+  if (paineis.length === 0) return "";
+  const avisos = avisosEfetivos(u);
+  if (paineis.length < 2 && avisos.length > 0) return "";
+  return `Avisos: ${rotuloAvisos(avisos)}`;
+}
+
+/** Aviso de chamado novo só dos painéis marcados; dá para deixar sem nenhum. */
+function EscolhaAvisos({
+  painelManutencao,
+  painelTi,
+  manutencao,
+  ti,
+  onManutencao,
+  onTi,
+  rotulo,
+}: {
+  painelManutencao: boolean;
+  painelTi: boolean;
+  manutencao: boolean;
+  ti: boolean;
+  onManutencao: (valor: boolean) => void;
+  onTi: (valor: boolean) => void;
+  rotulo: string;
+}) {
+  const nenhum = !(painelManutencao && manutencao) && !(painelTi && ti);
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 px-3 py-2">
+        {rotulo ? (
+          <span className="text-xs font-semibold text-slate-500">{rotulo}</span>
+        ) : null}
+        {painelManutencao && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={manutencao}
+              onChange={(e) => onManutencao(e.target.checked)}
+            />
+            Manutenção
+          </label>
+        )}
+        {painelTi && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={ti} onChange={(e) => onTi(e.target.checked)} />
+            TI
+          </label>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        {nenhum
+          ? "Sem notificação de chamado novo. Os painéis continuam visíveis."
+          : "O aviso de chamado novo chega só do que estiver marcado aqui. Desmarque tudo para não receber nenhum."}
+      </p>
     </div>
   );
 }

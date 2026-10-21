@@ -6,6 +6,7 @@ import {
   eventoDoWebhook,
   recebeAvisoChamado,
   recebeAvisoNovoChamado,
+  rotuloAvisos,
   textoAviso,
   textoResposta,
 } from "@/lib/aviso-push";
@@ -94,6 +95,34 @@ describe("recebeAvisoChamado", () => {
         ambientes: ["ti"],
         avisos: ["manutencao"],
       }),
+    ).toEqual(["ti"]);
+  });
+
+  it("lista vazia gravada não manda aviso de nenhum quadro", () => {
+    const semAviso = {
+      role: "colaborador",
+      ambientes: ["manutencao"],
+      avisos: [],
+      ativo: true,
+    };
+    expect(avisosEfetivos(semAviso)).toEqual([]);
+    expect(recebeAvisoChamado(semAviso, "manutencao")).toBe(false);
+    expect(
+      recebeAvisoChamado(
+        { role: "lider", ambientes: ["manutencao", "ti"], avisos: [], ativo: true },
+        "ti",
+      ),
+    ).toBe(false);
+    expect(rotuloAvisos([])).toBe("nenhum");
+    expect(rotuloAvisos(["manutencao", "ti"])).toBe("Manutenção e TI");
+  });
+
+  it("quem está em um quadro só pode desligar o aviso dele", () => {
+    expect(
+      avisosEfetivos({ role: "colaborador", ambientes: ["ti"], avisos: null }),
+    ).toEqual(["ti"]);
+    expect(
+      avisosEfetivos({ role: "colaborador", ambientes: ["ti"], avisos: ["ti"] }),
     ).toEqual(["ti"]);
   });
 

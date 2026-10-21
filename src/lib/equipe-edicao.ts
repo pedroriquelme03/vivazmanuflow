@@ -55,14 +55,6 @@ export function validarEdicaoEquipe(d: DadosEdicaoEquipe): string | null {
       ? "Marque Manutenção, TI ou Checklist."
       : "Marque Manutenção, TI ou os dois.";
   }
-  if (
-    d.ambientes.length > 1 &&
-    d.role !== "solicitante" &&
-    d.avisos &&
-    d.avisos.length === 0
-  ) {
-    return "Marque o aviso de Manutenção, de TI ou dos dois.";
-  }
   return null;
 }
 

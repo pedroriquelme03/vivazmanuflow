@@ -18,23 +18,29 @@ function listaEscolhida(
 }
 
 /**
- * Quem está em um quadro só recebe aviso desse quadro.
- * Quem está nos dois usa a escolha gravada.
- * Admin e líder nos dois, sem escolha ainda, recebem só Manutenção.
+ * Vale a escolha gravada, dentro dos painéis que a pessoa vê. Lista vazia
+ * gravada é "nenhum aviso". Sem escolha: quem está em um quadro recebe dele;
+ * admin e líder nos dois recebem só Manutenção.
  */
 export function avisosEfetivos(pessoa: {
   role: string;
   ambientes: readonly string[] | null;
   avisos?: readonly string[] | null;
 }): AmbienteEquipe[] {
+  if (pessoa.avisos && pessoa.avisos.length === 0) return [];
   const visiveis = listaAmbientes(pessoa.ambientes);
-  if (visiveis.length < 2) return visiveis;
   const escolhidos = listaEscolhida(pessoa.avisos).filter((item) =>
     visiveis.includes(item),
   );
   if (escolhidos.length > 0) return escolhidos;
+  if (visiveis.length < 2) return visiveis;
   if (pessoa.role === "admin" || pessoa.role === "lider") return ["manutencao"];
   return visiveis;
+}
+
+export function rotuloAvisos(avisos: readonly AmbienteEquipe[]) {
+  if (avisos.length === 0) return "nenhum";
+  return avisos.map((a) => (a === "ti" ? "TI" : "Manutenção")).join(" e ");
 }
 
 export function mesmosAvisos(

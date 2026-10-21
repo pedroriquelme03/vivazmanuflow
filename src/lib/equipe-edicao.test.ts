@@ -69,7 +69,7 @@ describe("validarEdicaoEquipe", () => {
     );
   });
 
-  it("exige um aviso quando a pessoa vê os dois painéis", () => {
+  it("aceita deixar a pessoa sem nenhum aviso", () => {
     expect(
       validarEdicaoEquipe({
         ...base,
@@ -77,7 +77,10 @@ describe("validarEdicaoEquipe", () => {
         ambientes: ["manutencao", "ti"],
         avisos: [],
       }),
-    ).toBe("Marque o aviso de Manutenção, de TI ou dos dois.");
+    ).toBeNull();
+    expect(
+      payloadDefinirAvisos({ userId: "u1", ambientes: ["manutencao"], avisos: [] }),
+    ).toEqual({ p_user_id: "u1", p_avisos: [] });
   });
 });
 
