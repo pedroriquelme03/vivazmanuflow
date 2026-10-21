@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   type DemandaKanban,
+  type OrdemColuna,
+  ORDEM_COLUNA_LABEL,
   concluidaNosUltimos7Dias,
+  ordenarColuna,
   ordenarFilaPorPeso,
-  ordenarPorConclusao,
+  ordensDaColuna,
 } from "@/lib/demanda-select";
 import {
   PRAZO_COR,
@@ -70,6 +73,51 @@ const COLUNAS: { status: Status; titulo: string; curto: string }[] = [
   { status: "concluida", titulo: "Concluídas", curto: "Concluídas" },
 ];
 
+function OrdemSelect({
+  titulo,
+  ordem,
+  ordens,
+  onOrdem,
+  grande,
+}: {
+  titulo: string;
+  ordem: OrdemColuna;
+  ordens: OrdemColuna[];
+  onOrdem: (ordem: OrdemColuna) => void;
+  grande: boolean;
+}) {
+  return (
+    <label className="relative inline-flex shrink-0 items-center" title="Ordem dos cards">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-2 text-xs leading-none text-slate-400"
+      >
+        ⇅
+      </span>
+      <select
+        value={ordem}
+        onChange={(e) => onOrdem(e.target.value as OrdemColuna)}
+        aria-label={`Ordem dos cards em ${titulo}`}
+        className={`cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pl-6 pr-6 font-medium text-slate-600 shadow-sm transition hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+          grande ? "py-1.5 text-xs" : "py-1 text-[11px]"
+        }`}
+      >
+        {ordens.map((o) => (
+          <option key={o} value={o}>
+            {ORDEM_COLUNA_LABEL[o]}
+          </option>
+        ))}
+      </select>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-2 text-[9px] leading-none text-slate-400"
+      >
+        ▼
+      </span>
+    </label>
+  );
+}
+
 function ColunaQuadro({
   titulo,
   subtitulo,
@@ -79,6 +127,9 @@ function ColunaQuadro({
   onAbrir,
   onEditar,
   cheia = false,
+  ordem,
+  ordens,
+  onOrdem,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -88,6 +139,9 @@ function ColunaQuadro({
   onAbrir: (d: DemandaKanban) => void;
   onEditar: (d: DemandaKanban) => void;
   cheia?: boolean;
+  ordem: OrdemColuna;
+  ordens: OrdemColuna[];
+  onOrdem: (ordem: OrdemColuna) => void;
 }) {
   return (
     <section
@@ -98,14 +152,23 @@ function ColunaQuadro({
       } ${className}`}
     >
       <header className="shrink-0 px-2 py-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">{titulo}</h2>
-          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
-            {itens.length}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <h2 className="truncate text-sm font-semibold text-slate-700">{titulo}</h2>
+            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
+              {itens.length}
+            </span>
+          </div>
+          <OrdemSelect
+            titulo={titulo}
+            ordem={ordem}
+            ordens={ordens}
+            onOrdem={onOrdem}
+            grande={cheia}
+          />
         </div>
         {subtitulo && (
-          <p className="mt-0.5 text-[11px] text-slate-400">{subtitulo}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-400">{subtitulo}</p>
         )}
       </header>
       <div
@@ -181,6 +244,11 @@ export function KanbanLider({
   const [visao, setVisao] = useState<"fila" | "projetos">("fila");
   const [projetoFiltro, setProjetoFiltro] = useState("");
   const [colunaCel, setColunaCel] = useState<Status>("aberta");
+  const [ordens, setOrdens] = useState<Partial<Record<Status, OrdemColuna>>>({});
+  const ordemDe = (s: Status): OrdemColuna =>
+    ordens[s] ?? (s === "concluida" ? "recentes" : "peso");
+  const trocarOrdem = (s: Status) => (ordem: OrdemColuna) =>
+    setOrdens((atual) => ({ ...atual, [s]: ordem }));
   const toqueIni = useRef<{ x: number; y: number } | null>(null);
 
   const recarregar = useCallback(async () => {
@@ -291,15 +359,12 @@ export function KanbanLider({
 
   const porStatus = (s: Status) => {
     let itens = demandasFiltradas.filter((d) => d.status === s && !d.arquivado);
-    if (s === "concluida") {
-      if (!temBusca) {
-        itens = itens.filter((d) =>
-          concluidaNosUltimos7Dias(d.concluido_em, agora),
-        );
-      }
-      return ordenarPorConclusao(itens);
+    if (s === "concluida" && !temBusca) {
+      itens = itens.filter((d) =>
+        concluidaNosUltimos7Dias(d.concluido_em, agora),
+      );
     }
-    return ordenarFilaPorPeso(itens);
+    return ordenarColuna(itens, s === "concluida", ordemDe(s));
   };
   const arquivadas = ordenarFilaPorPeso(
     demandasFiltradas.filter((d) => Boolean(d.arquivado)),
@@ -564,6 +629,9 @@ export function KanbanLider({
             agora={agora}
             onAbrir={setDetalhe}
             onEditar={setEditando}
+            ordem={ordemDe(colunaCelAtual.status)}
+            ordens={ordensDaColuna(colunaCelAtual.status === "concluida")}
+            onOrdem={trocarOrdem(colunaCelAtual.status)}
           />
         </div>
 
@@ -585,6 +653,9 @@ export function KanbanLider({
                 agora={agora}
                 onAbrir={setDetalhe}
                 onEditar={setEditando}
+                ordem={ordemDe(col.status)}
+                ordens={ordensDaColuna(col.status === "concluida")}
+                onOrdem={trocarOrdem(col.status)}
               />
             );
           })}

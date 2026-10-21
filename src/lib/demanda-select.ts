@@ -155,6 +155,44 @@ export function ordenarPorConclusao<
   );
 }
 
+export type OrdemColuna = "peso" | "recentes" | "antigas";
+
+export const ORDEM_COLUNA_LABEL: Record<OrdemColuna, string> = {
+  peso: "Peso",
+  recentes: "Recentes",
+  antigas: "Antigas",
+};
+
+/** Concluídas não têm ordem por peso: vale a data de conclusão. */
+export function ordensDaColuna(concluida: boolean): OrdemColuna[] {
+  return concluida ? ["recentes", "antigas"] : ["peso", "recentes", "antigas"];
+}
+
+/**
+ * Ordem escolhida no cabeçalho da coluna. Abertas e em andamento usam a data
+ * de abertura; concluídas, a data de conclusão.
+ */
+export function ordenarColuna<
+  T extends {
+    peso?: number | null;
+    criado_em?: string | null;
+    concluido_em?: string | null;
+  },
+>(itens: T[], concluida: boolean, ordem: OrdemColuna): T[] {
+  if (concluida) {
+    const recentes = ordenarPorConclusao(itens);
+    if (ordem !== "antigas") return recentes;
+    return [...itens].sort(
+      (a, b) => instanteConclusao(a.concluido_em) - instanteConclusao(b.concluido_em),
+    );
+  }
+  if (ordem === "peso") return ordenarFilaPorPeso(itens);
+  const sinal = ordem === "recentes" ? -1 : 1;
+  return [...itens].sort(
+    (a, b) => sinal * (instanteConclusao(a.criado_em) - instanteConclusao(b.criado_em)),
+  );
+}
+
 export function concluidaNosUltimos7Dias(
   concluidoEm: string | null | undefined,
   agora: number,
