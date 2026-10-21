@@ -232,19 +232,34 @@ export function DetalheDemandaModal({
   }
 
   async function enviarPrintConclusao(arquivoOrigem: File) {
-    const arquivo = await comprimirImagem(arquivoOrigem);
-    const caminho = `conclusao/${idUnico()}.jpg`;
+    const ehPdf = arquivoOrigem.type === "application/pdf";
+    const arquivo = ehPdf ? arquivoOrigem : await comprimirImagem(arquivoOrigem);
+    const caminho = `conclusao/${idUnico()}.${ehPdf ? "pdf" : "jpg"}`;
     const tipo = arquivo.type && arquivo.type !== "" ? arquivo.type : "image/jpeg";
     const { error: upErro } = await uploadAnexo(supabase, caminho, arquivo, tipo);
-    if (upErro) throw new Error(upErro.message);
+    if (upErro) {
+      if (ehPdf && upErro.message.toLowerCase().includes("mime")) {
+        throw new Error(
+          "o armazenamento ainda não aceita PDF. Rode o SQL em supabase/migrations/20261021140100_anexo_documento.sql no Supabase.",
+        );
+      }
+      throw new Error(upErro.message);
+    }
     const url = supabase.storage.from("anexos").getPublicUrl(caminho).data.publicUrl;
     const { error: anxErro } = await supabase.from("demanda_anexos").insert({
       demanda_id: demanda.id,
-      tipo: "foto",
+      tipo: ehPdf ? "documento" : "foto",
       url,
       enviado_por: "colaborador",
     });
-    if (anxErro) throw new Error(anxErro.message);
+    if (anxErro) {
+      if (ehPdf && anxErro.message.includes("anexo_tipo")) {
+        throw new Error(
+          "o banco ainda não aceita PDF. Rode o SQL em supabase/migrations/20261021140000_anexo_documento_tipo.sql no Supabase.",
+        );
+      }
+      throw new Error(anxErro.message);
+    }
   }
 
   async function concluirComoAdmin() {
@@ -271,8 +286,8 @@ export function DetalheDemandaModal({
     } catch (err) {
       setErro(
         err instanceof Error && err.message
-          ? `Não deu para enviar a print: ${err.message}`
-          : "Não deu para enviar a print.",
+          ? `Não deu para enviar o arquivo: ${err.message}`
+          : "Não deu para enviar o arquivo.",
       );
       setOcupado(false);
     }
@@ -977,9 +992,10 @@ export function DetalheDemandaModal({
                   />
                   <EscolherMidia
                     multiple
+                    comPdf
                     arquivoNome={
                       printsConclusao.length > 0
-                        ? `${printsConclusao.length} print(s)`
+                        ? `${printsConclusao.length} arquivo(s)`
                         : null
                     }
                     onEscolheu={(files) =>
