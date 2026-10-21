@@ -80,6 +80,81 @@ export function destinoDoAviso(role: string) {
   return "/lider";
 }
 
+/** Ponto P-256 sem compressão, que é o formato que o navegador aceita. */
+export function chavePublicaEmBytes(base64: string): Uint8Array<ArrayBuffer> | null {
+  try {
+    const limpa = base64.trim();
+    if (!limpa) return null;
+    const pad = "=".repeat((4 - (limpa.length % 4)) % 4);
+    const normal = (limpa + pad).replace(/-/g, "+").replace(/_/g, "/");
+    const bruto = atob(normal);
+    const bytes = new Uint8Array(new ArrayBuffer(bruto.length));
+    for (let i = 0; i < bruto.length; i += 1) bytes[i] = bruto.charCodeAt(i);
+    if (bytes.length !== 65 || bytes[0] !== 4) return null;
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O navegador não conseguiu falar com o serviço de push (FCM, Mozilla ou Apple).
+ * A tela segue normal; a inscrição é tentada de novo no próximo acesso.
+ */
+export function falhaDoServicoPush(erro: unknown) {
+  const mensagem =
+    typeof erro === "string"
+      ? erro
+      : erro && typeof erro === "object"
+        ? `${"name" in erro ? String(erro.name) : ""}: ${"message" in erro ? String(erro.message) : ""}`
+        : "";
+  return /push service error|push service not available/i.test(mensagem);
+}
+
+type AssinaturaPush = {
+  toJSON(): {
+    endpoint?: string;
+    keys?: { p256dh?: string; auth?: string };
+  };
+};
+
+/** Reaproveita a inscrição atual. Se o serviço falhar, tenta uma vez mais. */
+export async function inscreverNoPush<T extends AssinaturaPush>(
+  push: {
+    getSubscription(): Promise<T | null>;
+    subscribe(opcoes: PushSubscriptionOptionsInit): Promise<T>;
+  },
+  chave: NonNullable<PushSubscriptionOptionsInit["applicationServerKey"]>,
+): Promise<T | null> {
+  const lerAtual = async () => {
+    try {
+      return await push.getSubscription();
+    } catch (erro) {
+      if (!falhaDoServicoPush(erro)) throw erro;
+      return null;
+    }
+  };
+  const atual = await lerAtual();
+  if (atual) return atual;
+  const opcoes: PushSubscriptionOptionsInit = {
+    userVisibleOnly: true,
+    applicationServerKey: chave,
+  };
+  try {
+    return await push.subscribe(opcoes);
+  } catch (erro) {
+    if (!falhaDoServicoPush(erro)) throw erro;
+  }
+  const depois = await lerAtual();
+  if (depois) return depois;
+  try {
+    return await push.subscribe(opcoes);
+  } catch (erro) {
+    if (!falhaDoServicoPush(erro)) throw erro;
+    return null;
+  }
+}
+
 export function textoResposta(titulo: string, texto: string) {
   const nome = titulo.trim().slice(0, 80) || "seu chamado";
   const recado = texto.trim().slice(0, 120) || "Nova resposta da equipe.";

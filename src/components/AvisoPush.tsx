@@ -1,30 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
+import { chavePublicaEmBytes, inscreverNoPush } from "@/lib/aviso-push";
 import { createClient } from "@/lib/supabase/client";
-
-function chavePublica(base64: string) {
-  const pad = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normal = (base64 + pad).replace(/-/g, "+").replace(/_/g, "/");
-  const bruto = atob(normal);
-  const bytes = new Uint8Array(bruto.length);
-  for (let i = 0; i < bruto.length; i += 1) bytes[i] = bruto.charCodeAt(i);
-  return bytes;
-}
 
 async function gravarInscricao() {
   const publica = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publica || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+  const chave = publica ? chavePublicaEmBytes(publica) : null;
+  if (!chave || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (publica && !chave) console.error("aviso push", "chave pública inválida");
     return;
   }
   const registro = await navigator.serviceWorker.ready;
-  let inscricao = await registro.pushManager.getSubscription();
-  if (!inscricao) {
-    inscricao = await registro.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: chavePublica(publica),
-    });
-  }
+  const inscricao = await inscreverNoPush(registro.pushManager, chave);
+  if (!inscricao) return;
   const json = inscricao.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) return;
   const supabase = createClient();

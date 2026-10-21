@@ -28,6 +28,19 @@ function eventoDoWebhook(event: ErrorEvent) {
   );
 }
 
+/** Falha do serviço de push do navegador. Não é defeito da tela. */
+function ruidoDePush(event: ErrorEvent) {
+  const textos = [
+    event.message,
+    ...(event.exception?.values ?? []).flatMap((item) => [item.type, item.value]),
+  ];
+  return textos.some(
+    (texto) =>
+      typeof texto === "string" &&
+      /push service error|push service not available/i.test(texto),
+  );
+}
+
 function stripUrlSearch(url: string | undefined) {
   if (!url) return url;
   const corte = url.search(/[?#]/);
@@ -50,7 +63,7 @@ export function opcoesSentry() {
       tags: { sistema: TAG_SISTEMA },
     },
     beforeSend(event: ErrorEvent, _hint: EventHint) {
-      if (eventoDoWebhook(event)) return null;
+      if (eventoDoWebhook(event) || ruidoDePush(event)) return null;
       const quadro =
         quadroDaRequisicao(event.request?.cookies) ??
         (typeof document !== "undefined"

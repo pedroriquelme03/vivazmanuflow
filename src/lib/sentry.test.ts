@@ -64,6 +64,25 @@ describe("Sentry", () => {
     ).toBeNull();
   });
 
+  it("descarta falha do serviço de push do navegador", () => {
+    process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";
+    expect(
+      opcoesSentry().beforeSend(
+        {
+          exception: {
+            values: [
+              {
+                type: "AbortError",
+                value: "Registration failed - push service error",
+              },
+            ],
+          },
+        } as never,
+        {} as never,
+      ),
+    ).toBeNull();
+  });
+
   it("usa 20% de traces em produção", () => {
     vi.stubEnv("NODE_ENV", "production");
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";

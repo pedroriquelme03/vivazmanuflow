@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   avisosEfetivos,
   chamadoDoWebhook,
+  chavePublicaEmBytes,
   destinoDoAviso,
   eventoDoWebhook,
+  falhaDoServicoPush,
+  inscreverNoPush,
   recebeAvisoChamado,
   recebeAvisoNovoChamado,
   rotuloAvisos,
@@ -150,6 +153,91 @@ describe("recebeAvisoChamado", () => {
         "ti",
       ),
     ).toBe(false);
+  });
+});
+
+function chaveDeTeste() {
+  const bytes = new Uint8Array(65);
+  bytes[0] = 4;
+  bytes[1] = 7;
+  let binario = "";
+  for (const byte of bytes) binario += String.fromCharCode(byte);
+  return btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+describe("inscrição no push", () => {
+  const chave = chaveDeTeste();
+
+  it("aceita a chave pública no formato do navegador", () => {
+    const bytes = chavePublicaEmBytes(`  ${chave}  `);
+    expect(bytes?.length).toBe(65);
+    expect(bytes?.[0]).toBe(4);
+    expect(chavePublicaEmBytes("abc")).toBeNull();
+    expect(chavePublicaEmBytes("")).toBeNull();
+  });
+
+  it("reconhece a falha do serviço de push", () => {
+    expect(
+      falhaDoServicoPush(
+        new DOMException("Registration failed - push service error", "AbortError"),
+      ),
+    ).toBe(true);
+    expect(falhaDoServicoPush(new Error("AbortError: The operation was aborted"))).toBe(
+      false,
+    );
+  });
+
+  it("tenta de novo quando o serviço de push falha e desiste na segunda", async () => {
+    let tentativas = 0;
+    const inscricao = {
+      toJSON: () => ({
+        endpoint: "https://push.example/1",
+        keys: { p256dh: "p", auth: "a" },
+      }),
+    };
+    const push = {
+      async getSubscription() {
+        return null;
+      },
+      async subscribe() {
+        tentativas += 1;
+        if (tentativas === 1) {
+          throw new DOMException(
+            "Registration failed - push service error",
+            "AbortError",
+          );
+        }
+        return inscricao;
+      },
+    };
+    const bytes = chavePublicaEmBytes(chave);
+    expect(bytes).not.toBeNull();
+    await expect(inscreverNoPush(push, bytes!)).resolves.toBe(inscricao);
+
+    tentativas = 0;
+    push.subscribe = async () => {
+      tentativas += 1;
+      throw new DOMException(
+        "Registration failed - push service error",
+        "AbortError",
+      );
+    };
+    await expect(inscreverNoPush(push, bytes!)).resolves.toBeNull();
+    expect(tentativas).toBe(2);
+  });
+
+  it("propaga erro que não é do serviço de push", async () => {
+    const push = {
+      async getSubscription() {
+        return null;
+      },
+      async subscribe() {
+        throw new Error("sem rede");
+      },
+    };
+    const bytes = chavePublicaEmBytes(chave);
+    expect(bytes).not.toBeNull();
+    await expect(inscreverNoPush(push, bytes!)).rejects.toThrow("sem rede");
   });
 });
 
