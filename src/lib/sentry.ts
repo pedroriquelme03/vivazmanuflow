@@ -41,6 +41,16 @@ function ruidoDePush(event: ErrorEvent) {
   );
 }
 
+/**
+ * O React corta a resposta da página no meio (rede caiu, aba em segundo plano,
+ * troca de versão). Só a mensagem exata, para não esconder outros erros.
+ */
+function conexaoInterrompida(event: ErrorEvent) {
+  return (event.exception?.values ?? []).some(
+    (item) => item.type === "Error" && item.value?.trim() === "Connection closed.",
+  );
+}
+
 function stripUrlSearch(url: string | undefined) {
   if (!url) return url;
   const corte = url.search(/[?#]/);
@@ -63,7 +73,9 @@ export function opcoesSentry() {
       tags: { sistema: TAG_SISTEMA },
     },
     beforeSend(event: ErrorEvent, _hint: EventHint) {
-      if (eventoDoWebhook(event) || ruidoDePush(event)) return null;
+      if (eventoDoWebhook(event) || ruidoDePush(event) || conexaoInterrompida(event)) {
+        return null;
+      }
       const quadro =
         quadroDaRequisicao(event.request?.cookies) ??
         (typeof document !== "undefined"

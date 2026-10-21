@@ -83,6 +83,16 @@ describe("Sentry", () => {
     ).toBeNull();
   });
 
+  it("descarta a resposta da página cortada no meio, só com a mensagem exata", () => {
+    process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";
+    const evento = (value: string) =>
+      ({ exception: { values: [{ type: "Error", value }] } }) as never;
+    expect(opcoesSentry().beforeSend(evento("Connection closed."), {} as never)).toBeNull();
+    expect(
+      opcoesSentry().beforeSend(evento("Connection closed while saving"), {} as never),
+    ).not.toBeNull();
+  });
+
   it("usa 20% de traces em produção", () => {
     vi.stubEnv("NODE_ENV", "production");
     process.env.NEXT_PUBLIC_SENTRY_DSN = "https://abc@o1.ingest.sentry.io/1";
