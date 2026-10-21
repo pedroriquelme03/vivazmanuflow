@@ -7,6 +7,8 @@ type Props = {
   accept?: string;
   multiple?: boolean;
   arquivoNome?: string | null;
+  /** Mostra o botão de escolher PDF. */
+  comPdf?: boolean;
   onEscolheu: (files: File[]) => void;
 };
 
@@ -15,10 +17,11 @@ const labelCls =
 
 function tipoDoArquivo(
   f: File,
-  origem: "foto" | "video" | "galeria",
+  origem: "foto" | "video" | "galeria" | "pdf",
 ): string {
   if (f.type) return f.type;
   const n = (f.name || "").toLowerCase();
+  if (n.endsWith(".pdf")) return "application/pdf";
   if (origem === "video" || /\.(mp4|mov|webm|m4v|3gp)$/.test(n)) {
     return "video/mp4";
   }
@@ -29,11 +32,12 @@ export function EscolherMidia({
   accept = "image/*",
   multiple = false,
   arquivoNome,
+  comPdf = false,
   onEscolheu,
 }: Props) {
   async function aoMudar(
     e: ChangeEvent<HTMLInputElement>,
-    origem: "foto" | "video" | "galeria",
+    origem: "foto" | "video" | "galeria" | "pdf",
   ) {
     const lista = e.target.files ? Array.from(e.target.files) : [];
     const copias: File[] = [];
@@ -95,6 +99,18 @@ export function EscolherMidia({
               capture="environment"
               className="hidden"
               onChange={(e) => aoMudar(e, "video")}
+            />
+          </label>
+        ) : null}
+        {comPdf ? (
+          <label className={`${labelCls} col-span-2`}>
+            📄 Arquivo PDF
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple={multiple}
+              className="hidden"
+              onChange={(e) => aoMudar(e, "pdf")}
             />
           </label>
         ) : null}

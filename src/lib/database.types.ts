@@ -1616,7 +1616,7 @@ export type Database = {
     }
     Enums: {
       anexo_autor: "solicitante" | "colaborador"
-      anexo_tipo: "foto" | "video"
+      anexo_tipo: "foto" | "video" | "documento"
       demanda_prioridade: "alta" | "media" | "baixa"
       demanda_status:
         | "aberta"
@@ -1755,7 +1755,7 @@ export const Constants = {
   public: {
     Enums: {
       anexo_autor: ["solicitante", "colaborador"],
-      anexo_tipo: ["foto", "video"],
+      anexo_tipo: ["foto", "video", "documento"],
       demanda_prioridade: ["alta", "media", "baixa"],
       demanda_status: [
         "aberta",

@@ -22,6 +22,7 @@ import {
   apagarDemandaGestor,
 } from "@/lib/demanda-gestor";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { DocumentoAnexo } from "@/components/DocumentoAnexo";
 import { VideoAnexo } from "@/components/VideoAnexo";
 import { ChatChamado } from "@/components/ChatChamado";
 import { EscolherMidia } from "@/components/EscolherMidia";
@@ -845,6 +846,8 @@ export function DetalheDemandaModal({
                         className="h-28 w-full rounded-lg object-cover"
                       />
                     </a>
+                  ) : a.tipo === "documento" ? (
+                    <DocumentoAnexo url={a.url} />
                   ) : (
                     <VideoAnexo url={a.url} />
                   )}

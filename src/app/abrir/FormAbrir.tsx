@@ -264,14 +264,18 @@ export function FormAbrir({
 
     setEnviando(true);
     try {
-      const anexos: { url: string; tipo: "foto" | "video" }[] = [];
+      const anexos: { url: string; tipo: "foto" | "video" | "documento" }[] = [];
       for (const original of arquivos) {
-        const arquivo = await comprimirImagem(original);
+        const ehPdf = original.type === "application/pdf";
+        const arquivo = ehPdf ? original : await comprimirImagem(original);
         const ehVideo = arquivo.type.startsWith("video/");
-        const tipo = ehVideo
-          ? arquivo.type || "video/mp4"
-          : "image/jpeg";
-        const caminho = `abertura/${idUnico()}.${ehVideo ? "mp4" : "jpg"}`;
+        const tipo = ehPdf
+          ? "application/pdf"
+          : ehVideo
+            ? arquivo.type || "video/mp4"
+            : "image/jpeg";
+        const extensao = ehPdf ? "pdf" : ehVideo ? "mp4" : "jpg";
+        const caminho = `abertura/${idUnico()}.${extensao}`;
         const { error: upErro } = await uploadAnexo(
           supabase,
           caminho,
@@ -279,11 +283,19 @@ export function FormAbrir({
           tipo,
         );
         if (upErro) {
+          if (ehPdf && upErro.message.toLowerCase().includes("mime")) {
+            throw new Error(
+              "O armazenamento ainda não aceita PDF. Rode o SQL em supabase/migrations/20261021140100_anexo_documento.sql no Supabase.",
+            );
+          }
           throw new Error(`Falha ao enviar o anexo: ${upErro.message}`);
         }
 
         const { data: pub } = supabase.storage.from("anexos").getPublicUrl(caminho);
-        anexos.push({ url: pub.publicUrl, tipo: ehVideo ? "video" : "foto" });
+        anexos.push({
+          url: pub.publicUrl,
+          tipo: ehPdf ? "documento" : ehVideo ? "video" : "foto",
+        });
       }
 
       let token: string | undefined;
@@ -709,11 +721,12 @@ export function FormAbrir({
         />
       </Campo>
 
-      <Campo label="Foto ou vídeo" opcional>
+      <Campo label={destinarConcluido ? "Foto, vídeo ou PDF" : "Foto ou vídeo"} opcional>
         <div className="grid gap-2">
           <EscolherMidia
             accept="image/*,video/*"
             multiple
+            comPdf={destinarConcluido}
             onEscolheu={adicionarArquivos}
           />
           <p className="text-xs text-slate-400">Até 5 arquivos. Pode misturar câmera e galeria.</p>

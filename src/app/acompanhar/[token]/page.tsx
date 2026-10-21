@@ -10,6 +10,7 @@ import {
   formatarData,
 } from "@/lib/demanda-ui";
 import { PrioridadeTag } from "@/components/PrioridadeTag";
+import { DocumentoAnexo } from "@/components/DocumentoAnexo";
 import { VideoAnexo } from "@/components/VideoAnexo";
 import { parseChatChamado, recursoChatAusente } from "@/lib/chamado-chat";
 import { ValidacaoSolicitante } from "./ValidacaoSolicitante";
@@ -34,7 +35,7 @@ type Detalhe = {
   local: string | null;
   colaborador: string | null;
   timeline: { status: Enums<"demanda_status">; em: string; obs: string | null }[];
-  anexos: { tipo: "foto" | "video"; url: string; por: string; em: string }[];
+  anexos: { tipo: "foto" | "video" | "documento"; url: string; por: string; em: string }[];
 };
 
 export default async function AcompanharToken({
@@ -173,6 +174,15 @@ export default async function AcompanharToken({
                   .filter((a) => a.tipo === "video")
                   .map((a, i) => (
                     <VideoAnexo key={i} url={a.url} />
+                  ))}
+              </div>
+            )}
+            {d.anexos.some((a) => a.tipo === "documento") && (
+              <div className="mt-2 grid gap-2">
+                {d.anexos
+                  .filter((a) => a.tipo === "documento")
+                  .map((a, i) => (
+                    <DocumentoAnexo key={i} url={a.url} />
                   ))}
               </div>
             )}

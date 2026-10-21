@@ -6,6 +6,7 @@ import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
 import { uploadAnexo } from "@/lib/upload-anexo";
 import { EscolherMidia } from "@/components/EscolherMidia";
+import { DocumentoAnexo } from "@/components/DocumentoAnexo";
 import { VideoAnexo } from "@/components/VideoAnexo";
 import {
   COLAB_SELECT,
@@ -1167,6 +1168,8 @@ function AnexosDoSolicitante({ anexos }: { anexos?: AnexoDemanda[] | null }) {
       {itens.map((a, i) =>
         a.tipo === "video" ? (
           <VideoAnexo key={`${a.url}-${i}`} url={a.url} />
+        ) : a.tipo === "documento" ? (
+          <DocumentoAnexo key={`${a.url}-${i}`} url={a.url} />
         ) : (
           <a
             key={`${a.url}-${i}`}
