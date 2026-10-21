@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
@@ -27,12 +27,6 @@ const FUNDO: Record<PainelEquipe, string> = {
   manutencao: "bg-[#063b45]",
   ti: "bg-[#1E293B]",
   checklist: "bg-[#064e3b]",
-};
-
-const ATIVO_MOBILE: Record<PainelEquipe, string> = {
-  manutencao: "bg-[#0891b2] text-white",
-  ti: "bg-white text-[#1E293B]",
-  checklist: "bg-[#059669] text-white",
 };
 
 type NavItem = {
@@ -215,10 +209,15 @@ export function AdminSidebar({
   perfil,
   ambiente = "manutencao",
   mostraTroca = false,
+  onFechar,
+  className = "",
 }: {
   perfil: Perfil;
   ambiente?: PainelEquipe;
   mostraTroca?: boolean;
+  /** No menu do celular: botão de fechar e fecha ao escolher um item. */
+  onFechar?: () => void;
+  className?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -247,16 +246,26 @@ export function AdminSidebar({
   }, [ambiente, ti, pathname, router]);
 
   return (
-    <aside className={`flex w-64 shrink-0 flex-col text-white ${FUNDO[ambiente]}`}>
+    <aside className={`flex w-64 shrink-0 flex-col text-white ${FUNDO[ambiente]} ${className}`}>
       <div className="px-5 pt-5">
         <div className="flex items-center gap-3">
           <BrandMark
             className="h-10 w-10 rounded-xl bg-[#06b6d4] shadow-inner"
           />
-          <div className="leading-tight">
+          <div className="min-w-0 flex-1 leading-tight">
             <p className="text-sm font-bold tracking-wide">VIVAZ CATARATAS</p>
             <p className="text-xs text-white/55">{ROTULO_PAINEL[ambiente]}</p>
           </div>
+          {onFechar && (
+            <button
+              type="button"
+              onClick={onFechar}
+              aria-label="Fechar menu"
+              className="-mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
         </div>
         {mostraTroca && (
           <div className="pb-4 pt-4">
@@ -276,6 +285,7 @@ export function AdminSidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onFechar}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                 ativo
                   ? "bg-white/15 text-white"
@@ -302,12 +312,7 @@ export function AdminSidebar({
         <span
           className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white ${claro ? "bg-white/20" : "bg-brand-500"}`}
         >
-          {ambiente === "checklist"
-            ? PAPEL_GOV_LABEL[
-                papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes) ??
-                  "camareira"
-              ].toUpperCase()
-            : ROLE_BADGE[perfil.role]}
+          {rotuloPapel(perfil, ambiente)}
         </span>
 
         <form action={logout} className="mt-4">
@@ -399,6 +404,14 @@ function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
   );
 }
 
+function rotuloPapel(perfil: Perfil, ambiente: PainelEquipe) {
+  if (ambiente !== "checklist") return ROLE_BADGE[perfil.role];
+  const papel =
+    papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes) ?? "camareira";
+  return PAPEL_GOV_LABEL[papel].toUpperCase();
+}
+
+/** Mobile: barra fina com a página atual; o ☰ abre o mesmo menu lateral do desktop. */
 function MobileBar({
   perfil,
   ambiente,
@@ -409,53 +422,65 @@ function MobileBar({
   mostraTroca: boolean;
 }) {
   const pathname = usePathname();
-  const itens = itensDoMenu(perfil, ambiente);
+  const [aberto, setAberto] = useState(false);
+  const atual = itensDoMenu(perfil, ambiente).find((item) => item.match(pathname));
+
+  useEffect(() => {
+    if (!aberto) return;
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key === "Escape") setAberto(false);
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, [aberto]);
 
   return (
-    <div className={`border-b border-slate-200 text-white md:hidden ${FUNDO[ambiente]}`}>
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="leading-tight">
-          <p className="text-sm font-bold">{ROTULO_PAINEL[ambiente]} Vivaz</p>
-          <p className="text-xs text-white/55">{perfil.nome}</p>
-        </div>
-        <form action={logout}>
+    <>
+      <div
+        className={`shrink-0 pt-[env(safe-area-inset-top)] text-white shadow-md md:hidden ${FUNDO[ambiente]}`}
+      >
+        <div className="flex h-20 items-center gap-3 px-3">
           <button
-            type="submit"
-            className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
+            type="button"
+            onClick={() => setAberto(true)}
+            aria-label="Abrir menu"
+            aria-expanded={aberto}
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white/15"
           >
-            Sair
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-7 w-7">
+              <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
           </button>
-        </form>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-lg font-bold">{atual?.rotulo ?? ROTULO_PAINEL[ambiente]}</p>
+            <p className="truncate text-xs text-white/60">{ROTULO_PAINEL[ambiente]} Vivaz</p>
+          </div>
+          <BrandMark className="h-14 w-14 shrink-0 rounded-2xl bg-[#06b6d4] shadow-inner" />
+        </div>
       </div>
-      {mostraTroca && (
-        <div className="px-4 pb-2">
-          <TrocaAmbiente
-            valor={ambiente}
-            opcoes={paineisDoUsuario(perfil.ambientes)}
-            role={perfil.role}
+
+      {aberto && (
+        <div
+          className="fixed inset-0 z-50 flex md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu"
+        >
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setAberto(false)}
+            className="absolute inset-0 cursor-default bg-slate-900/50"
+          />
+          <AdminSidebar
+            perfil={perfil}
+            ambiente={ambiente}
+            mostraTroca={mostraTroca}
+            onFechar={() => setAberto(false)}
+            className="relative h-full max-w-[85vw] overflow-y-auto shadow-2xl"
           />
         </div>
       )}
-      <nav
-        className={`mx-4 mb-3 grid gap-1 rounded-xl bg-white/15 p-1 ${
-          itens.length <= 2 ? "grid-cols-2" : "grid-cols-3"
-        }`}
-      >
-        {itens.map((item) => {
-          const ativo = item.match(pathname);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${
-                ativo ? ATIVO_MOBILE[ambiente] : "text-white/70"
-              }`}
-            >
-              {item.rotulo}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    </>
   );
 }
