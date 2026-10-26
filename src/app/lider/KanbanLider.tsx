@@ -6,7 +6,6 @@ import {
   type DemandaKanban,
   type OrdemColuna,
   ORDEM_COLUNA_LABEL,
-  concluidaNosUltimos7Dias,
   ordenarColuna,
   ordenarFilaPorPeso,
   ordensDaColuna,
@@ -26,7 +25,13 @@ import { GrupoFiltros } from "@/components/GrupoFiltros";
 import { AtribuirModal } from "./AtribuirModal";
 import { DetalheDemandaModal } from "./DetalheDemandaModal";
 import { NovaDemandaModal, type OpcoesNovaDemanda } from "./NovaDemandaModal";
-import { listarQuadro } from "@/lib/quadro-ambiente";
+import {
+  CONCLUIDAS_POR_PAGINA,
+  PERIODO_CONCLUIDAS_LABEL,
+  listarConcluidas,
+  listarQuadro,
+  type PeriodoConcluidas,
+} from "@/lib/quadro-ambiente";
 import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   colaboradoresDoFiltroProjeto,
@@ -130,10 +135,16 @@ function ColunaQuadro({
   ordem,
   ordens,
   onOrdem,
+  total,
+  extra,
 }: {
   titulo: string;
   subtitulo?: string;
   itens: DemandaKanban[];
+  /** Quantidade no cabeçalho quando a coluna mostra só uma página. */
+  total?: number;
+  /** Controles abaixo do cabeçalho (período e páginas das concluídas). */
+  extra?: React.ReactNode;
   agora: number;
   className?: string;
   onAbrir: (d: DemandaKanban) => void;
@@ -156,7 +167,7 @@ function ColunaQuadro({
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <h2 className="truncate text-sm font-semibold text-slate-700">{titulo}</h2>
             <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
-              {itens.length}
+              {total ?? itens.length}
             </span>
           </div>
           <OrdemSelect
@@ -170,6 +181,7 @@ function ColunaQuadro({
         {subtitulo && (
           <p className="mt-0.5 truncate text-[11px] text-slate-400">{subtitulo}</p>
         )}
+        {extra}
       </header>
       <div
         className={`flex flex-col gap-2 ${
@@ -251,7 +263,93 @@ export function KanbanLider({
     setOrdens((atual) => ({ ...atual, [s]: ordem }));
   const toqueIni = useRef<{ x: number; y: number } | null>(null);
 
+  // Concluídas: só o período escolhido, de 50 em 50, buscadas à parte.
+  const [periodoConcluidas, setPeriodoConcluidas] =
+    useState<PeriodoConcluidas>("hoje");
+  const [concluidas, setConcluidas] = useState<DemandaKanban[]>([]);
+  const [totalConcluidas, setTotalConcluidas] = useState(0);
+  const [concluidasDe, setConcluidasDe] = useState("");
+  const [buscaConcluidas, setBuscaConcluidas] = useState("");
+  const chaveConcluidas = JSON.stringify([
+    periodoConcluidas,
+    buscaConcluidas,
+    ordemDe("concluida"),
+    ehGestor ? visao : "",
+    ehGestor ? projetoFiltro : "",
+    colaboradorFiltro,
+    prioridadeFiltro,
+    sistemaFiltro,
+  ]);
+  // Mudou período ou filtro: volta para a primeira página.
+  const [paginaDe, setPaginaDe] = useState({ chave: "", pagina: 0 });
+  const paginaConcluidas =
+    paginaDe.chave === chaveConcluidas ? paginaDe.pagina : 0;
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(totalConcluidas / CONCLUIDAS_POR_PAGINA),
+  );
+  const pedidoConcluidas = useRef(0);
+  const chavePagina = `${chaveConcluidas}#${paginaConcluidas}`;
+  const carregandoConcluidas = concluidasDe !== chavePagina;
+
+  // Espera parar de digitar antes de buscar nas concluídas.
+  useEffect(() => {
+    const t = window.setTimeout(() => setBuscaConcluidas(busca.trim()), 400);
+    return () => window.clearTimeout(t);
+  }, [busca]);
+
+  // Cada recarregar() soma 1 e a coluna busca de novo.
+  const [versaoConcluidas, setVersaoConcluidas] = useState(0);
+
+  useEffect(() => {
+    const pedido = ++pedidoConcluidas.current;
+    listarConcluidas(supabase, ambiente, {
+      periodo: periodoConcluidas,
+      pagina: paginaConcluidas,
+      maisAntigasPrimeiro: (ordens.concluida ?? "recentes") === "antigas",
+      busca: buscaConcluidas,
+      visao: ehGestor ? visao : undefined,
+      projetoId: projetoFiltro || undefined,
+      colaboradorId: colaboradorFiltro || undefined,
+      prioridade: prioridadeFiltro || undefined,
+      sistemaId: sistemaFiltro || undefined,
+    }).then(({ itens, total, pagina }) => {
+      if (pedido !== pedidoConcluidas.current) return;
+      setConcluidas(itens);
+      setTotalConcluidas(total);
+      if (pagina !== paginaConcluidas) {
+        setPaginaDe({ chave: chaveConcluidas, pagina });
+        return;
+      }
+      setConcluidasDe(chavePagina);
+    });
+  }, [
+    versaoConcluidas,
+    chavePagina,
+    chaveConcluidas,
+    supabase,
+    ambiente,
+    periodoConcluidas,
+    paginaConcluidas,
+    ordens.concluida,
+    buscaConcluidas,
+    ehGestor,
+    visao,
+    projetoFiltro,
+    colaboradorFiltro,
+    prioridadeFiltro,
+    sistemaFiltro,
+  ]);
+
+  function irPaginaConcluidas(pagina: number) {
+    setPaginaDe({
+      chave: chaveConcluidas,
+      pagina: Math.min(Math.max(pagina, 0), totalPaginas - 1),
+    });
+  }
+
   const recarregar = useCallback(async () => {
+    setVersaoConcluidas((v) => v + 1);
     const data = await listarQuadro(supabase, ambiente);
     setDemandas(data);
   }, [supabase, ambiente]);
@@ -259,7 +357,7 @@ export function KanbanLider({
   useEffect(() => {
     setDetalhe((atual) => {
       if (!atual) return atual;
-      const fresco = demandas.find((d) => d.id === atual.id);
+      const fresco = [...demandas, ...concluidas].find((d) => d.id === atual.id);
       if (!fresco) return atual;
       if (
         fresco.status === atual.status &&
@@ -269,7 +367,7 @@ export function KanbanLider({
       }
       return fresco;
     });
-  }, [demandas]);
+  }, [demandas, concluidas]);
 
   // Realtime: qualquer mudança em demandas recarrega o quadro.
   useEffect(() => {
@@ -358,14 +456,67 @@ export function KanbanLider({
   }, [colaboradorFiltro, colaboradoresFiltro]);
 
   const porStatus = (s: Status) => {
-    let itens = demandasFiltradas.filter((d) => d.status === s && !d.arquivado);
-    if (s === "concluida" && !temBusca) {
-      itens = itens.filter((d) =>
-        concluidaNosUltimos7Dias(d.concluido_em, agora),
-      );
-    }
-    return ordenarColuna(itens, s === "concluida", ordemDe(s));
+    // Concluídas já vêm filtradas e ordenadas do banco.
+    if (s === "concluida") return concluidas;
+    const itens = demandasFiltradas.filter((d) => d.status === s && !d.arquivado);
+    return ordenarColuna(itens, false, ordemDe(s));
   };
+  const qtdColuna = (s: Status) =>
+    s === "concluida" ? totalConcluidas : porStatus(s).length;
+
+  const primeiraConcluida = paginaConcluidas * CONCLUIDAS_POR_PAGINA + 1;
+  const subtituloConcluidas = carregandoConcluidas
+    ? "Carregando…"
+    : totalConcluidas === 0
+      ? "Nenhuma no período"
+      : `${primeiraConcluida}–${primeiraConcluida + concluidas.length - 1} de ${totalConcluidas}`;
+  const controlesConcluidas = (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <select
+        value={periodoConcluidas}
+        onChange={(e) =>
+          setPeriodoConcluidas(e.target.value as PeriodoConcluidas)
+        }
+        aria-label="Período das concluídas"
+        className="min-w-0 flex-1 cursor-pointer rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm focus:border-brand-500 focus:outline-none"
+      >
+        {(Object.keys(PERIODO_CONCLUIDAS_LABEL) as PeriodoConcluidas[]).map(
+          (p) => (
+            <option key={p} value={p}>
+              {PERIODO_CONCLUIDAS_LABEL[p]}
+            </option>
+          ),
+        )}
+      </select>
+      {totalPaginas > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={() => irPaginaConcluidas(paginaConcluidas - 1)}
+            disabled={paginaConcluidas === 0 || carregandoConcluidas}
+            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+            aria-label="Concluídas anteriores"
+          >
+            ‹
+          </button>
+          <span className="shrink-0 text-[11px] text-slate-500">
+            {paginaConcluidas + 1}/{totalPaginas}
+          </span>
+          <button
+            type="button"
+            onClick={() => irPaginaConcluidas(paginaConcluidas + 1)}
+            disabled={
+              paginaConcluidas >= totalPaginas - 1 || carregandoConcluidas
+            }
+            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+            aria-label="Próximas concluídas"
+          >
+            ›
+          </button>
+        </>
+      )}
+    </div>
+  );
   const arquivadas = ordenarFilaPorPeso(
     demandasFiltradas.filter((d) => Boolean(d.arquivado)),
   );
@@ -575,7 +726,7 @@ export function KanbanLider({
       <div className="flex flex-col gap-2 md:min-h-0 md:min-w-0 md:flex-1">
         <div className="flex shrink-0 gap-1 overflow-x-auto pb-0.5 md:hidden">
           {COLUNAS.map((col) => {
-            const qtd = porStatus(col.status).length;
+            const qtd = qtdColuna(col.status);
             const ativo = colunaCel === col.status;
             return (
               <button
@@ -620,9 +771,15 @@ export function KanbanLider({
             titulo={colunaCelAtual.titulo}
             subtitulo={
               colunaCelAtual.status === "concluida"
-                ? temBusca
-                  ? "incluindo antigas na busca"
-                  : "últimos 7 dias"
+                ? subtituloConcluidas
+                : undefined
+            }
+            total={
+              colunaCelAtual.status === "concluida" ? totalConcluidas : undefined
+            }
+            extra={
+              colunaCelAtual.status === "concluida"
+                ? controlesConcluidas
                 : undefined
             }
             itens={porStatus(colunaCelAtual.status)}
@@ -643,11 +800,11 @@ export function KanbanLider({
                 key={col.status}
                 titulo={col.titulo}
                 subtitulo={
-                  col.status === "concluida"
-                    ? temBusca
-                      ? "incluindo antigas na busca"
-                      : "últimos 7 dias"
-                    : undefined
+                  col.status === "concluida" ? subtituloConcluidas : undefined
+                }
+                total={col.status === "concluida" ? totalConcluidas : undefined}
+                extra={
+                  col.status === "concluida" ? controlesConcluidas : undefined
                 }
                 itens={itens}
                 agora={agora}
