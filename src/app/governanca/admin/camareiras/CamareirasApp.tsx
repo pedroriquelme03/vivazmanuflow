@@ -32,6 +32,14 @@ export function CamareirasApp({ lista }: { lista: Camareira[] }) {
     router.refresh();
   }
 
+  async function renomear(c: Camareira) {
+    const novo = prompt("Nome da camareira", c.nome)?.trim();
+    if (!novo || novo === c.nome) return;
+    const { error } = await supabase.from("gov_camareiras").update({ nome: novo }).eq("id", c.id);
+    if (error) return setErro(error.message);
+    router.refresh();
+  }
+
   async function remover(c: Camareira) {
     if (!confirm(`Remover ${c.nome}?`)) return;
     const { error } = await supabase.from("gov_camareiras").delete().eq("id", c.id);
@@ -74,6 +82,13 @@ export function CamareirasApp({ lista }: { lista: Camareira[] }) {
               className={`text-xs font-medium ${c.ativo ? "text-brand-600" : "text-slate-400"}`}
             >
               {c.ativo ? "Ativa" : "Inativa"}
+            </button>
+            <button
+              type="button"
+              onClick={() => renomear(c)}
+              className="text-xs text-slate-400 hover:text-brand-600"
+            >
+              Editar
             </button>
             <button
               type="button"

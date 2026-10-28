@@ -19,11 +19,12 @@ describe("menuChecklist", () => {
     ]);
   });
 
-  it("líder acompanha as inspeções e o Kanban", () => {
+  it("líder acompanha as inspeções, cadastra camareiras e vê o Kanban", () => {
     expect(rotulos("lider")).toEqual([
       "Início",
       "Preencher checklist",
       "Inspeções",
+      "Camareiras",
       "Como funciona",
       "Kanban",
     ]);

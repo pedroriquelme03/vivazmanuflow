@@ -45,7 +45,7 @@ const ETAPAS: Etapa[] = [
         necessário para checklists que pedem a UH.
       </>,
       <>
-        Em <b>Camareiras</b>, cadastre a equipe de limpeza. O líder escolhe quem limpou o quarto, e
+        Em <b>Camareiras</b>, o administrador ou o líder cadastra a equipe de limpeza. O líder escolhe quem limpou o quarto, e
         os nomes aparecem como sugestão em &quot;Quem vai fazer?&quot; no plano de ação.
       </>,
       "Use Ativa/Inativa em vez de remover quem já tem inspeções, para não perder o histórico.",

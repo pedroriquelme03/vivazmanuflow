@@ -15,7 +15,7 @@ export const MENU_CHECKLIST: ItemChecklist[] = [
   { href: "/governanca/admin/inspecoes", rotulo: "Inspeções", acesso: "equipe" },
   { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", acesso: "admin" },
   { href: "/governanca/admin/acomodacoes", rotulo: "Acomodações", acesso: "admin" },
-  { href: "/governanca/admin/camareiras", rotulo: "Camareiras", acesso: "admin" },
+  { href: "/governanca/admin/camareiras", rotulo: "Camareiras", acesso: "equipe" },
   { href: "/governanca/como-funciona", rotulo: "Como funciona", acesso: "todos" },
   { href: "/governanca/admin/kanban", rotulo: "Kanban", acesso: "equipe" },
   { href: "/governanca/admin/relatorios", rotulo: "Relatórios", acesso: "admin" },
