@@ -590,6 +590,36 @@ export type Database = {
           },
         ]
       }
+      novidades_registros: {
+        Row: {
+          id: string
+          tipo: string
+          ref_id: string
+          dados: Json
+          atualizado_por: string | null
+          atualizado_em: string
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          tipo: string
+          ref_id?: string
+          dados?: Json
+          atualizado_por?: string | null
+          atualizado_em?: string
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          tipo?: string
+          ref_id?: string
+          dados?: Json
+          atualizado_por?: string | null
+          atualizado_em?: string
+          criado_em?: string
+        }
+        Relationships: []
+      }
       projetos: {
         Row: {
           id: string

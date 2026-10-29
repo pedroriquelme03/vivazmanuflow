@@ -182,3 +182,25 @@ nextjs-portal {
   animation: quadro-coluna-brilho 5.5s ease-in-out infinite;
   animation-delay: var(--brilho-delay, 0s);
 }
+
+/* Impressão das telas do painel (OS, relatório, PMOC): some o menu e a página
+   deixa de ter altura travada, para sair inteira no papel. */
+@media print {
+  [data-ambiente] {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  [data-ambiente] div {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  [data-ambiente] > div:first-child,
+  [data-ambiente] .md\:hidden {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}

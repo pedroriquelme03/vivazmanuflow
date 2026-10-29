@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/admin",
   "/solicitante",
   "/governanca",
+  "/novidades",
 ];
 
 /**

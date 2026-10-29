@@ -194,6 +194,21 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/novidades",
+    rotulo: "Novidades",
+    soManutencao: true,
+    match: (p) => p.startsWith("/novidades"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8L18 15z"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/lider/metricas",
     rotulo: "Métricas",
     match: (p) => p.startsWith("/lider/metricas"),
@@ -234,7 +249,8 @@ export function AdminSidebar({
         pathname.startsWith("/admin/projetos") ||
         pathname.startsWith("/admin/eventos") ||
         pathname.startsWith("/admin/areas") ||
-        pathname.startsWith("/lider/preventivas")
+        pathname.startsWith("/lider/preventivas") ||
+        pathname.startsWith("/novidades")
       ) {
         router.replace("/lider");
       }
