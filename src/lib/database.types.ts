@@ -1419,6 +1419,20 @@ export type Database = {
           token: string
         }[]
       }
+      abrir_demanda_com_chave: {
+        Args: {
+          p_chave: string
+          p_anexos?: Json
+          p_descricao?: string
+          p_prioridade?: Database["public"]["Enums"]["demanda_prioridade"]
+          p_solicitante_id: string
+          p_titulo: string
+        }
+        Returns: {
+          demanda_id: string
+          token: string
+        }[]
+      }
       aplicar_experiencia_hospede: {
         Args: { p_token: string; p_afeta?: boolean }
         Returns: undefined

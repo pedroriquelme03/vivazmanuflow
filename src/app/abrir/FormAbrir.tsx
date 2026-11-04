@@ -3,9 +3,15 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { comprimirImagem } from "@/lib/comprimir-imagem";
 import { idUnico } from "@/lib/id-unico";
-import { uploadAnexo } from "@/lib/upload-anexo";
+import {
+  type ChamadoPendente,
+  ehFalhaDeRede,
+  enviarChamado,
+  prepararArquivos,
+  registrarConcluido,
+} from "@/lib/envio-chamado";
+import { filaDisponivel, guardarNaFila } from "@/lib/fila-offline";
 import { EscolherMidia } from "@/components/EscolherMidia";
 import {
   decidirSolicitanteRegistro,
@@ -13,8 +19,6 @@ import {
   idSolicitantePorNome,
   solicitantesUnicos,
 } from "@/lib/solicitante-gestor";
-import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
-import type { Enums } from "@/lib/database.types";
 import type { ModoCampoProjeto } from "@/lib/projeto-regras";
 import {
   idProjetoParaVincular,
@@ -35,7 +39,6 @@ type ProjetoOpcao = {
   nome: string;
   propriedade_id: string | null;
 };
-type Prioridade = Enums<"demanda_prioridade">;
 
 function semAquamania(lista: Opcao[]) {
   return lista.filter((p) => !p.nome.toLowerCase().includes("aquamania"));
@@ -70,8 +73,9 @@ export type FormAbrirProps = {
   /**
    * Se informado, é chamado após criar a demanda (com o token) em vez de
    * redirecionar para o acompanhamento. Usado no modal "Nova demanda" do quadro.
+   * `null` = sem internet: o chamado ficou na fila e sobe quando o sinal voltar.
    */
-  onSucesso?: (token: string) => void;
+  onSucesso?: (token: string | null) => void;
   /** Kanban: grava já em Concluídas, sem entrar na fila. */
   destinarConcluido?: boolean;
   /** Campo "É demanda de evento?". Só o quadro (líder/admin) usa. */
@@ -126,6 +130,7 @@ export function FormAbrir({
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [naFila, setNaFila] = useState(false);
 
   const solicitantesFiltrados = useMemo(
     () =>
@@ -188,6 +193,7 @@ export function FormAbrir({
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    setNaFila(false);
 
     if (!comSistema && !sublocal.trim()) return setErro("Informe o local.");
     let quemSolicita = "";
@@ -265,197 +271,73 @@ export function FormAbrir({
       return setErro("Descreva o que foi feito.");
     }
 
+    const item: ChamadoPendente = {
+      chave: idUnico(),
+      criadoEm: new Date().toISOString(),
+      ambiente,
+      quemSolicita,
+      titulo: titulo.trim(),
+      descricao,
+      sublocal: comSistema ? "" : sublocal.trim(),
+      sistemaId: comSistema ? sistemaId : "",
+      eventoId,
+      projetoId: destinarConcluido
+        ? ""
+        : (idProjetoParaVincular(modoProjeto, projetoId) ?? ""),
+      afetaExperiencia,
+      arquivos: [],
+      anexos: [],
+      passosFeitos: [],
+    };
+
     setEnviando(true);
     try {
-      const anexos: { url: string; tipo: "foto" | "video" | "documento" }[] = [];
-      for (const original of arquivos) {
-        const ehPdf = original.type === "application/pdf";
-        const arquivo = ehPdf ? original : await comprimirImagem(original);
-        const ehVideo = arquivo.type.startsWith("video/");
-        const tipo = ehPdf
-          ? "application/pdf"
-          : ehVideo
-            ? arquivo.type || "video/mp4"
-            : "image/jpeg";
-        const extensao = ehPdf ? "pdf" : ehVideo ? "mp4" : "jpg";
-        const caminho = `abertura/${idUnico()}.${extensao}`;
-        const { error: upErro } = await uploadAnexo(
-          supabase,
-          caminho,
-          arquivo,
-          tipo,
-        );
-        if (upErro) {
-          if (ehPdf && upErro.message.toLowerCase().includes("mime")) {
-            throw new Error(
-              "O armazenamento ainda não aceita PDF. Rode o SQL em supabase/migrations/20261021140100_anexo_documento.sql no Supabase.",
-            );
-          }
-          throw new Error(`Falha ao enviar o anexo: ${upErro.message}`);
-        }
-
-        const { data: pub } = supabase.storage.from("anexos").getPublicUrl(caminho);
-        anexos.push({
-          url: pub.publicUrl,
-          tipo: ehPdf ? "documento" : ehVideo ? "video" : "foto",
-        });
-      }
-
-      let token: string | undefined;
-      let demandaId: string | undefined;
-
-      if (destinarConcluido) {
-        const { data, error } = await supabase.rpc(
-          "registrar_chamado_concluido",
-          {
-            p_solicitante_id: quemSolicita,
-            p_titulo: titulo.trim(),
-            p_sublocal: comSistema ? "" : sublocal.trim(),
-            p_descricao: descricao.trim(),
-            p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
-            p_ambiente: ambiente,
-            p_anexos: anexos,
-            p_observacao: descricao.trim(),
-            p_sistema_id: comSistema ? sistemaId : undefined,
-          },
-        );
-        if (error) {
-          if (
-            error.message.includes("schema cache") ||
-            error.message.includes("Could not find") ||
-            error.message.includes("p_sistema_id")
-          ) {
-            throw new Error(
-              "Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase e tente de novo.",
-            );
-          }
-          throw new Error(error.message);
-        }
-        token = data?.[0]?.token;
-        demandaId = data?.[0]?.demanda_id;
-      } else {
-        const { data, error } = await supabase.rpc("abrir_demanda", {
-          p_solicitante_id: quemSolicita,
-          p_titulo: titulo.trim(),
-          p_descricao: descricao || undefined,
-          p_prioridade: (afetaExperiencia ? "alta" : "media") as Prioridade,
-          p_anexos: anexos,
-        });
-        if (error) throw new Error(error.message);
-        token = data?.[0]?.token;
-        demandaId = data?.[0]?.demanda_id;
-      }
-      if (!token) throw new Error("Não foi possível gerar o acompanhamento.");
-
-      if (!destinarConcluido) {
-        if (demandaId && ambiente === "ti") {
-          const { error: ambErro } = await supabase.rpc(
-            "marcar_ambiente_demanda",
-            { p_demanda_id: demandaId, p_ambiente: "ti" },
-          );
-          if (ambErro && !recursoAmbienteAusente(ambErro.message)) {
-            throw new Error(ambErro.message);
-          }
-          if (ambErro) {
-            const { error: updErro } = await supabase
-              .from("demandas")
-              .update({
-                ambiente: "ti",
-                colaborador_id: null,
-                status: "aberta",
-                atribuido_em: null,
-              })
-              .eq("id", demandaId);
-            if (updErro) {
-              throw new Error(
-                "Chamado criado, mas não foi para o quadro de TI. Rode o SQL marcar_ambiente_demanda no Supabase e tente de novo.",
-              );
-            }
-          }
-        }
-
-        {
-          if (comSistema) {
-            const { error: sisErro } = await supabase.rpc(
-              "definir_sistema_demanda",
-              { p_token: String(token), p_sistema_id: sistemaId },
-            );
-            if (sisErro) {
-              throw new Error(
-                sisErro.message.includes("schema cache") ||
-                  sisErro.message.includes("Could not find")
-                  ? "Chamado criado, mas o sistema não gravou. Rode o SQL em supabase/migrations/20261009140000_sistemas_ti.sql no Supabase."
-                  : sisErro.message,
-              );
-            }
-          } else {
-            const { error: subErro } = await supabase.rpc("definir_sublocal", {
-              p_token: String(token),
-              p_sublocal: sublocal.trim(),
-            });
-            if (subErro) {
-              throw new Error(
-                "Chamado criado, mas o local não gravou. Rode o SQL do sublocal no Supabase (definir_sublocal) e tente de novo.",
-              );
-            }
-          }
-        }
-
-        if (afetaExperiencia) {
-          const { error: pesoErro } = await supabase.rpc(
-            "aplicar_experiencia_hospede",
-            { p_token: token, p_afeta: true },
-          );
-          if (pesoErro) {
-            console.warn(
-              "Falha ao aplicar peso de experiência:",
-              pesoErro.message,
-            );
-          }
-        }
-
-        if (eventoId) {
-          const { error: evErro } = await supabase.rpc(
-            "vincular_evento_demanda",
-            {
-              p_token: token,
-              p_evento_id: eventoId,
-            },
-          );
-          if (evErro) {
-            console.warn("Falha ao vincular evento:", evErro.message);
-          }
-        }
-
-        const projetoVincular = idProjetoParaVincular(modoProjeto, projetoId);
-        if (projetoVincular) {
-          const { error: prErro } = await supabase.rpc(
-            "vincular_projeto_demanda",
-            {
-              p_token: token,
-              p_projeto_id: projetoVincular,
-            },
-          );
-          if (prErro) {
-            throw new Error(
-              `Demanda criada, mas o projeto não gravou: ${prErro.message}`,
-            );
-          }
-        }
-      }
-
-      if (onSucesso) {
-        onSucesso(token);
+      item.arquivos = await prepararArquivos(arquivos);
+      const token = destinarConcluido
+        ? await registrarConcluido(supabase, item)
+        : await enviarChamado(supabase, item);
+      concluir(token);
+    } catch (err) {
+      if (
+        ehFalhaDeRede(err) &&
+        !destinarConcluido &&
+        (await guardarParaDepois(item))
+      ) {
         return;
       }
-
-      const q = new URLSearchParams({ nova: "1" });
-      if (sublocal.trim()) q.set("sublocal", sublocal.trim());
-      router.push(`/acompanhar/${token}?${q.toString()}`);
-    } catch (err) {
       setErro(err instanceof Error ? err.message : "Erro inesperado.");
       setEnviando(false);
     }
+  }
+
+  /** Sem internet: o chamado vai para a fila e sobe quando o sinal voltar. */
+  async function guardarParaDepois(item: ChamadoPendente) {
+    if (!filaDisponivel()) return false;
+    try {
+      await guardarNaFila(item);
+    } catch {
+      return false;
+    }
+    setTitulo("");
+    setDescricao("");
+    setSublocal("");
+    setArquivos([]);
+    setEventoId("");
+    setAfetaExperiencia(false);
+    setEnviando(false);
+    setNaFila(true);
+    onSucesso?.(null);
+    return true;
+  }
+
+  function concluir(token: string) {
+    if (onSucesso) {
+      onSucesso(token);
+      return;
+    }
+    const q = new URLSearchParams({ nova: "1" });
+    if (sublocal.trim()) q.set("sublocal", sublocal.trim());
+    router.push(`/acompanhar/${token}?${q.toString()}`);
   }
 
   const inputCls =
@@ -759,6 +641,12 @@ export function FormAbrir({
 
       {erro && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>
+      )}
+      {naFila && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Sem conexão. O chamado ficou na fila deste aparelho e será enviado
+          sozinho quando a internet voltar.
+        </p>
       )}
 
       <button

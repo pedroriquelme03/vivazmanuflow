@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import { FilaEnvio } from "@/components/FilaEnvio";
 import { NavigationLoader } from "@/components/NavigationLoader";
 import { Observabilidade } from "@/components/Observabilidade";
 import { RegistrarPwa } from "@/components/RegistrarPwa";
@@ -49,6 +50,7 @@ export default function RootLayout({
           <NavigationLoader />
         </Suspense>
         {children}
+        <FilaEnvio />
       </body>
     </html>
   );

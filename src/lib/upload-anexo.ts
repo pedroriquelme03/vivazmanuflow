@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export async function uploadAnexo(
   supabase: SupabaseClient,
   caminho: string,
-  arquivo: File,
+  arquivo: Blob,
   contentType: string,
 ) {
   const bytes = await arquivo.arrayBuffer();

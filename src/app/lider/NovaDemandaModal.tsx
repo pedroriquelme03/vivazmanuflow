@@ -11,7 +11,7 @@ export function NovaDemandaModal({
 }: {
   opcoes: OpcoesNovaDemanda;
   onFechar: () => void;
-  onSucesso: (token: string) => void;
+  onSucesso: (token: string | null) => void;
 }) {
   return (
     <div

@@ -935,15 +935,17 @@ export function KanbanLider({
             destinarConcluido: criando === "concluido",
           }}
           onFechar={() => setCriando(null)}
-          onSucesso={() => {
+          onSucesso={(token) => {
             const jaConcluido = criando === "concluido";
             setCriando(null);
             setSucesso(
               jaConcluido
                 ? "Registrado em Concluídas, sem entrar na fila."
-                : "Demanda criada com sucesso!",
+                : token === null
+                  ? "Sem conexão. A demanda ficou na fila e será enviada quando a internet voltar."
+                  : "Demanda criada com sucesso!",
             );
-            recarregar();
+            if (token !== null) recarregar();
             window.setTimeout(() => setSucesso(null), 5000);
           }}
         />

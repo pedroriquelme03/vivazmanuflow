@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import { AvisoPush } from "@/components/AvisoPush";
+import { ChamadosNaFila } from "@/components/FilaEnvio";
 import { listaAmbientes, type AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   STATUS_BADGE,
@@ -216,6 +217,8 @@ export function AbaChamados({
           Histórico
         </button>
       </div>
+
+      {!historico && <ChamadosNaFila ambiente={filtro} />}
 
       {lista.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">
