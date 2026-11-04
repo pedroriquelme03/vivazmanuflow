@@ -67,10 +67,6 @@ export function SolicitantePainel({
 }) {
   const aba = lerAba(abaInicial);
   const permitidos = listaAmbientes(perfil.ambientes);
-  const [filtro, setFiltro] = useState<AmbienteEquipe>(
-    permitidos.includes("ti") ? "ti" : "manutencao",
-  );
-  const [historico, setHistorico] = useState(false);
   const primeiroNome = perfil.nome.split(" ")[0];
   const abertos = useMemo(
     () =>
@@ -78,10 +74,6 @@ export function SolicitantePainel({
         (c) => c.status !== "concluida" && c.status !== "cancelada",
       ).length,
     [chamados],
-  );
-  const lista = useMemo(
-    () => chamadosVisiveis(chamados, filtro, historico),
-    [chamados, filtro, historico],
   );
 
   return (
@@ -93,12 +85,9 @@ export function SolicitantePainel({
         )}
         {aba === "chamados" && (
           <AbaChamados
-            filtro={filtro}
-            onFiltro={setFiltro}
+            chamados={chamados}
             ambientes={permitidos}
-            historico={historico}
-            onHistorico={setHistorico}
-            lista={lista}
+            filtroInicial={permitidos.includes("ti") ? "ti" : "manutencao"}
           />
         )}
         {aba === "perfil" && <AbaPerfil perfil={perfil} />}
@@ -149,21 +138,22 @@ function AbaAbrir({
   );
 }
 
-function AbaChamados({
-  filtro,
-  onFiltro,
-  historico,
-  onHistorico,
-  lista,
+/** Lista "Meus chamados" com filtro TI/Manutenção e aberto/histórico. */
+export function AbaChamados({
+  chamados,
   ambientes,
+  filtroInicial,
 }: {
-  filtro: AmbienteEquipe;
-  onFiltro: (valor: AmbienteEquipe) => void;
-  historico: boolean;
-  onHistorico: (valor: boolean) => void;
-  lista: ChamadoSolicitante[];
-  ambientes: AmbienteEquipe[];
+  chamados: ChamadoSolicitante[];
+  ambientes: readonly AmbienteEquipe[];
+  filtroInicial: AmbienteEquipe;
 }) {
+  const [filtro, onFiltro] = useState<AmbienteEquipe>(filtroInicial);
+  const [historico, onHistorico] = useState(false);
+  const lista = useMemo(
+    () => chamadosVisiveis(chamados, filtro, historico),
+    [chamados, filtro, historico],
+  );
   const nomeAmbiente = filtro === "ti" ? "TI" : "Manutenção";
   const dois = ambientes.includes("ti") && ambientes.includes("manutencao");
   return (

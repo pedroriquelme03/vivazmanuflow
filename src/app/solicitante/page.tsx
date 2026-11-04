@@ -4,23 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { idsSolicitanteDoNome } from "@/lib/solicitante-gestor";
 import { recursoAmbienteAusente } from "@/lib/ambiente-equipe";
 import {
+  CHAMADO_LISTA_SELECT as CHAMADO_SELECT,
+  CHAMADO_LISTA_SELECT_SISTEMA as CHAMADO_SELECT_SISTEMA,
+} from "@/lib/demanda-select";
+import {
   SolicitantePainel,
   type ChamadoSolicitante,
 } from "./SolicitantePainel";
 
 export const dynamic = "force-dynamic";
-
-const CHAMADO_SELECT = `
-  id, titulo, status, prioridade, criado_em, ambiente, sublocal,
-  token_acompanhamento,
-  local:locais(nome),
-  propriedade:propriedades(nome)
-`;
-
-const CHAMADO_SELECT_SISTEMA = `
-  ${CHAMADO_SELECT},
-  sistema:sistemas(nome)
-`;
 
 export default async function SolicitanteHome({
   searchParams,

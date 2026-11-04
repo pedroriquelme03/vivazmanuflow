@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
@@ -738,6 +739,21 @@ function PerfilColab({ perfil }: { perfil: Perfil }) {
             </dd>
           </div>
         </dl>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Link
+          href="/chamados/abrir"
+          className="rounded-xl bg-brand-600 px-4 py-3.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+        >
+          Abrir chamado
+        </Link>
+        <Link
+          href="/chamados"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Meus chamados
+        </Link>
       </div>
 
       <form action={logout} className="mt-4">

@@ -1,5 +1,10 @@
 import type { Tables } from "@/lib/database.types";
-import { painelEscolhido, paineisDoUsuario } from "@/lib/ambiente-equipe";
+import {
+  ROTULO_PAINEL,
+  painelEscolhido,
+  paineisDoUsuario,
+  type AmbienteEquipe,
+} from "@/lib/ambiente-equipe";
 
 type Papel = Tables<"usuarios">["role"];
 
@@ -21,6 +26,31 @@ export function rotaInicial(
   }
   if (role === "colaborador") return "/colaborador";
   return "/lider";
+}
+
+/**
+ * Telas de chamado (/chamados): o "voltar" leva ao painel que estava aberto
+ * (cookie do seletor), e a área sugerida do chamado é a desse painel.
+ */
+export function voltarAoPainel(
+  role: Papel,
+  ambientes: readonly string[] | null | undefined,
+  painelCookie?: string,
+): { href: string; rotulo: string; ambiente: AmbienteEquipe } {
+  const painel = painelEscolhido(paineisDoUsuario(ambientes), painelCookie);
+  const href =
+    role === "solicitante"
+      ? "/solicitante"
+      : painel === "checklist"
+        ? ROTA_CHECKLIST
+        : role === "colaborador"
+          ? "/colaborador"
+          : "/lider";
+  return {
+    href,
+    rotulo: painel ? `Voltar para ${ROTULO_PAINEL[painel]}` : "Voltar ao painel",
+    ambiente: painel === "ti" ? "ti" : "manutencao",
+  };
 }
 
 const TELAS_DE_ENTRADA = new Set(["/", "/login"]);

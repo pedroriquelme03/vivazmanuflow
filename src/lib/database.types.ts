@@ -156,6 +156,7 @@ export type Database = {
           preventiva_id: string | null
           sistema_id: string | null
           arquivado: boolean
+          aberto_por: string | null
           sublocal: string | null
           mensagem_devolucao: string | null
           ambiente: Database["public"]["Enums"]["ambiente_equipe"]
@@ -194,6 +195,7 @@ export type Database = {
           preventiva_id?: string | null
           sistema_id?: string | null
           arquivado?: boolean
+          aberto_por?: string | null
           sublocal?: string | null
           mensagem_devolucao?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
@@ -232,6 +234,7 @@ export type Database = {
           preventiva_id?: string | null
           sistema_id?: string | null
           arquivado?: boolean
+          aberto_por?: string | null
           sublocal?: string | null
           mensagem_devolucao?: string | null
           ambiente?: Database["public"]["Enums"]["ambiente_equipe"]
@@ -1562,6 +1565,10 @@ export type Database = {
           p_ambiente: Database["public"]["Enums"]["ambiente_equipe"]
         }
         Returns: undefined
+      }
+      meus_chamados: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["demandas"]["Row"][]
       }
       admin_criar_usuario: {
         Args: {

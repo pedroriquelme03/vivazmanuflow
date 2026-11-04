@@ -74,6 +74,8 @@ export type FormAbrirProps = {
   onSucesso?: (token: string) => void;
   /** Kanban: grava já em Concluídas, sem entrar na fila. */
   destinarConcluido?: boolean;
+  /** Campo "É demanda de evento?". Só o quadro (líder/admin) usa. */
+  mostrarEvento?: boolean;
 };
 
 export function FormAbrir({
@@ -89,6 +91,7 @@ export function FormAbrir({
   sistemas = [],
   onSucesso,
   destinarConcluido = false,
+  mostrarEvento = true,
 }: FormAbrirProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -663,7 +666,7 @@ export function FormAbrir({
         </Campo>
       )}
 
-      {!ehTi && !destinarConcluido && (
+      {mostrarEvento && !ehTi && !destinarConcluido && (
       <Campo label="É demanda de evento?" opcional>
         <select
           value={eventoId}

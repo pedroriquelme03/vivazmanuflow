@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { destinoAutenticado, rotaInicial } from "./rotas";
+import { destinoAutenticado, rotaInicial, voltarAoPainel } from "./rotas";
 
 const lider = { role: "lider" as const, ativo: true };
 
@@ -59,5 +59,55 @@ describe("destinoAutenticado", () => {
     expect(destinoAutenticado("/", { role: "lider", ativo: false })).toBeNull();
     expect(destinoAutenticado("/lider", lider)).toBeNull();
     expect(destinoAutenticado("/solicitar-login", lider)).toBeNull();
+  });
+});
+
+describe("voltarAoPainel", () => {
+  const tres = ["manutencao", "ti", "checklist"];
+
+  it("volta para o painel que estava aberto", () => {
+    expect(voltarAoPainel("admin", tres, "ti")).toMatchObject({
+      href: "/lider",
+      rotulo: "Voltar para TI",
+    });
+    expect(voltarAoPainel("admin", tres, "checklist")).toMatchObject({
+      href: "/governanca",
+      rotulo: "Voltar para Checklist",
+    });
+    expect(voltarAoPainel("admin", tres, "manutencao")).toMatchObject({
+      href: "/lider",
+      rotulo: "Voltar para Manutenção",
+    });
+  });
+
+  it("líder só da manutenção sempre volta para a manutenção", () => {
+    for (const cookie of [undefined, "ti", "checklist"]) {
+      expect(voltarAoPainel("lider", ["manutencao"], cookie)).toMatchObject({
+        href: "/lider",
+        rotulo: "Voltar para Manutenção",
+      });
+    }
+  });
+
+  it("quem só tem checklist volta para o checklist", () => {
+    expect(voltarAoPainel("colaborador", ["checklist"], undefined)).toMatchObject({
+      href: "/governanca",
+      rotulo: "Voltar para Checklist",
+    });
+  });
+
+  it("colaborador volta para a fila dele", () => {
+    expect(voltarAoPainel("colaborador", ["ti"], "ti")).toMatchObject({
+      href: "/colaborador",
+      ambiente: "ti",
+    });
+  });
+});
+
+describe("voltarAoPainel: área sugerida", () => {
+  it("checklist sugere manutenção", () => {
+    expect(voltarAoPainel("admin", ["manutencao", "ti", "checklist"], "checklist").ambiente).toBe(
+      "manutencao",
+    );
   });
 });

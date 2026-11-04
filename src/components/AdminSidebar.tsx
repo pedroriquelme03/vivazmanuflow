@@ -220,6 +220,31 @@ const NAV: NavItem[] = [
   },
 ];
 
+/** Aparecem em qualquer área: todo mundo abre chamado de Manutenção ou de TI. */
+const NAV_CHAMADOS: NavItem[] = [
+  {
+    href: "/chamados/abrir",
+    rotulo: "Abrir chamado",
+    match: (p) => p.startsWith("/chamados/abrir"),
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <circle cx="12" cy="12" r="9" />
+        <path strokeLinecap="round" d="M12 8v8M8 12h8" />
+      </svg>
+    ),
+  },
+  {
+    href: "/chamados",
+    rotulo: "Meus chamados",
+    match: (p) => p === "/chamados",
+    icone: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+      </svg>
+    ),
+  },
+];
+
 export function AdminSidebar({
   perfil,
   ambiente = "manutencao",
@@ -403,21 +428,23 @@ export function PainelShell({
 function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
   if (ambiente === "checklist") {
     const papel = papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes);
-    return menuChecklist(papel).map((item) => ({
+    const checklist: NavItem[] = menuChecklist(papel).map((item) => ({
       href: item.href,
       rotulo: item.rotulo,
       match: (p: string) => itemChecklistAtivo(item.href, p),
       icone: ICONE_CHECKLIST[item.href],
     }));
+    return [...checklist, ...NAV_CHAMADOS];
   }
   const ehAdmin = perfil.role === "admin";
   const ti = ambiente === "ti";
-  return NAV.filter(
+  const daArea = NAV.filter(
     (item) =>
       (!item.soAdmin || ehAdmin) &&
       (!item.soManutencao || !ti) &&
       (!item.soTi || ti),
   );
+  return [...daArea, ...NAV_CHAMADOS];
 }
 
 function rotuloPapel(perfil: Perfil, ambiente: PainelEquipe) {

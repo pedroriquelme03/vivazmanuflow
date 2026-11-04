@@ -8,7 +8,8 @@ import {
   paineisDoUsuario,
   type PainelEquipe,
 } from "@/lib/ambiente-equipe";
-import { ROTA_CHECKLIST } from "@/lib/rotas";
+import { ROTA_CHECKLIST, voltarAoPainel } from "@/lib/rotas";
+import type { Perfil } from "@/lib/auth";
 
 /** Ambiente de chamado da tela. Quem só tem Checklist vai para os checklists. */
 export async function resolverAmbiente(
@@ -19,6 +20,16 @@ export async function resolverAmbiente(
   if (lista.length === 0) redirect(ROTA_CHECKLIST);
   const jar = await cookies();
   return ambienteEscolhido(lista, jar.get(COOKIE_AMBIENTE)?.value);
+}
+
+/** "Voltar" e área sugerida das telas de chamado, pelo painel aberto no seletor. */
+export async function resolverVoltar(perfil: Pick<Perfil, "role" | "ambientes">) {
+  const jar = await cookies();
+  return voltarAoPainel(
+    perfil.role,
+    perfil.ambientes,
+    jar.get(COOKIE_AMBIENTE)?.value,
+  );
 }
 
 /** Painel do menu lateral (chamado ou checklist), pelo cookie do seletor. */

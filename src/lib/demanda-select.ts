@@ -1,5 +1,19 @@
 import type { Enums } from "@/lib/database.types";
 
+/** Lista "Meus chamados" (solicitante e /chamados). Sem a tabela sistemas. */
+export const CHAMADO_LISTA_SELECT = `
+  id, titulo, status, prioridade, criado_em, ambiente, sublocal,
+  token_acompanhamento,
+  local:locais(nome),
+  propriedade:propriedades(nome)
+`;
+
+/** Mesma lista, com o sistema de TI. */
+export const CHAMADO_LISTA_SELECT_SISTEMA = `
+  ${CHAMADO_LISTA_SELECT},
+  sistema:sistemas(nome)
+`;
+
 /** Colunas + embeds usados no kanban do líder (server e client). */
 export const DEMANDA_SELECT = `
   id, titulo, descricao, prioridade, status, criado_em, atribuido_em,

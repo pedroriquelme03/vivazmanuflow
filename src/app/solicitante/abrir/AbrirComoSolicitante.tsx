@@ -11,6 +11,7 @@ export function AbrirComoSolicitante({
   nomeSolicitantePadrao,
   propriedadePadrao,
   sistemas = [],
+  destino = "/solicitante?aba=chamados",
 }: {
   ambiente: AmbienteEquipe;
   propriedades: { id: string; nome: string }[];
@@ -18,6 +19,8 @@ export function AbrirComoSolicitante({
   nomeSolicitantePadrao: string;
   propriedadePadrao: string | null;
   sistemas?: { id: string; nome: string }[];
+  /** Para onde ir depois de abrir o chamado. */
+  destino?: string;
 }) {
   const router = useRouter();
   return (
@@ -26,10 +29,13 @@ export function AbrirComoSolicitante({
       propriedades={propriedades}
       solicitantes={solicitantes}
       eventos={[]}
+      // Projeto e evento são do quadro (líder/admin): aqui não há o que escolher.
+      modoProjeto="oculto"
+      mostrarEvento={false}
       nomeSolicitantePadrao={nomeSolicitantePadrao}
       propriedadePadrao={propriedadePadrao}
       sistemas={sistemas}
-      onSucesso={() => router.push("/solicitante?aba=chamados")}
+      onSucesso={() => router.push(destino)}
     />
   );
 }

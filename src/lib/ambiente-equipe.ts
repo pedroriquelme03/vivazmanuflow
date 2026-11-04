@@ -6,6 +6,11 @@ export type PainelEquipe = AmbienteEquipe | "checklist";
 
 export const COOKIE_AMBIENTE = "vivaz-ambiente";
 
+/** Lê "manutencao" | "ti" de um texto qualquer (ex.: ?tipo= da URL). */
+export function lerAmbiente(valor: string | null | undefined): AmbienteEquipe | null {
+  return valor === "manutencao" || valor === "ti" ? valor : null;
+}
+
 export const ROTULO_PAINEL: Record<PainelEquipe, string> = {
   manutencao: "Manutenção",
   ti: "TI",
