@@ -9,6 +9,7 @@ import {
   aoEnviarDaFila,
   aoMudarFila,
   chaveEnviandoAgora,
+  donoAtual,
   listarFila,
   processarFila,
   removerDaFila,
@@ -16,15 +17,19 @@ import {
 
 const INTERVALO_MS = 30_000;
 
-/** Chamados guardados neste aparelho, atualizados quando a fila muda. */
-function useFila() {
+/**
+ * Chamados guardados neste aparelho por quem está logado, atualizados quando
+ * a fila muda ou alguém entra/sai da conta.
+ */
+function useFila(supabase: ReturnType<typeof createClient>) {
   const [itens, setItens] = useState<ChamadoPendente[]>([]);
   const [enviando, setEnviando] = useState<string | null>(null);
 
   useEffect(() => {
     let ativo = true;
     const ler = () =>
-      listarFila()
+      donoAtual(supabase)
+        .then(listarFila)
         .then((lista) => {
           if (!ativo) return;
           setItens(lista);
@@ -33,11 +38,13 @@ function useFila() {
         .catch(() => {});
     ler();
     const parar = aoMudarFila(ler);
+    const { data } = supabase.auth.onAuthStateChange(() => ler());
     return () => {
       ativo = false;
       parar();
+      data.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
 
   return { itens, enviando };
 }
@@ -49,7 +56,7 @@ function useFila() {
 export function FilaEnvio() {
   const router = useRouter();
   const [supabase] = useState(createClient);
-  const { itens, enviando } = useFila();
+  const { itens, enviando } = useFila(supabase);
   const [aberto, setAberto] = useState(false);
   const [enviado, setEnviado] = useState<string | null>(null);
 
@@ -160,7 +167,8 @@ export function FilaEnvio() {
 
 /** Cards "Aguardando conexão" no topo de Meus chamados. */
 export function ChamadosNaFila({ ambiente }: { ambiente: "manutencao" | "ti" }) {
-  const { itens, enviando } = useFila();
+  const [supabase] = useState(createClient);
+  const { itens, enviando } = useFila(supabase);
   const daLista = itens.filter((item) => item.ambiente === ambiente);
   if (daLista.length === 0) return null;
 

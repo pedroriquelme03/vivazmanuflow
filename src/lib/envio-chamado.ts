@@ -24,6 +24,11 @@ type Passo = "ambiente" | "local" | "experiencia" | "evento" | "projeto";
 export type ChamadoPendente = {
   chave: string;
   criadoEm: string;
+  /**
+   * Usuário que abriu (auth.uid). No celular compartilhado, só ele envia e vê
+   * o chamado. Vazio só em itens guardados antes deste campo existir.
+   */
+  donoId?: string;
   ambiente: "manutencao" | "ti";
   quemSolicita: string;
   titulo: string;

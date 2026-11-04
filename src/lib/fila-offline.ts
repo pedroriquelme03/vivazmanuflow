@@ -83,12 +83,36 @@ export function chaveEnviandoAgora() {
   return enviandoAgora;
 }
 
-export async function listarFila(): Promise<ChamadoPendente[]> {
+/** Usuário logado neste aparelho. Lê a sessão salva, funciona sem internet. */
+export async function donoAtual(
+  supabase: SupabaseClient<Database>,
+): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
+/**
+ * Só os chamados de quem está logado: no celular compartilhado, o chamado de
+ * uma pessoa não sobe no nome de outra. Sem ninguém logado, nenhum.
+ * Itens antigos, sem dono gravado, seguem com quem estiver logado.
+ */
+export function itensDaPessoa(
+  itens: ChamadoPendente[],
+  dono: string | null,
+): ChamadoPendente[] {
+  if (!dono) return [];
+  return itens.filter((item) => !item.donoId || item.donoId === dono);
+}
+
+/** Fila do usuário `dono`, do mais antigo para o mais novo. */
+export async function listarFila(dono: string | null): Promise<ChamadoPendente[]> {
   if (!filaDisponivel()) return [];
   const itens = await usarTabela("readonly", (t) =>
     t.getAll() as IDBRequest<ChamadoPendente[]>,
   );
-  return itens.sort((a, b) => a.criadoEm.localeCompare(b.criadoEm));
+  return itensDaPessoa(itens, dono).sort((a, b) =>
+    a.criadoEm.localeCompare(b.criadoEm),
+  );
 }
 
 export async function guardarNaFila(item: ChamadoPendente) {
@@ -108,7 +132,7 @@ export async function removerDaFila(chave: string) {
 
 async function enviarTudo(supabase: SupabaseClient<Database>) {
   let enviados = 0;
-  for (const item of await listarFila()) {
+  for (const item of await listarFila(await donoAtual(supabase))) {
     enviandoAgora = item.chave;
     avisarMudanca();
     try {

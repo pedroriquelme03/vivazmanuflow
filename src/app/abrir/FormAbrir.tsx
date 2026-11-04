@@ -11,7 +11,7 @@ import {
   prepararArquivos,
   registrarConcluido,
 } from "@/lib/envio-chamado";
-import { filaDisponivel, guardarNaFila } from "@/lib/fila-offline";
+import { donoAtual, filaDisponivel, guardarNaFila } from "@/lib/fila-offline";
 import { EscolherMidia } from "@/components/EscolherMidia";
 import {
   decidirSolicitanteRegistro,
@@ -314,7 +314,10 @@ export function FormAbrir({
   async function guardarParaDepois(item: ChamadoPendente) {
     if (!filaDisponivel()) return false;
     try {
-      await guardarNaFila(item);
+      // Dono do chamado: no celular compartilhado, só ele envia e vê.
+      const dono = await donoAtual(supabase);
+      if (!dono) return false;
+      await guardarNaFila({ ...item, donoId: dono });
     } catch {
       return false;
     }
