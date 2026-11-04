@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { ChamadoPendente } from "@/lib/envio-chamado";
-import { donoAtual, itensDaPessoa } from "@/lib/fila-offline";
+import { donoAtual, itensDaPessoa, itensParaEnviar } from "@/lib/fila-offline";
 
 function item(chave: string, donoId?: string): ChamadoPendente {
   return {
@@ -50,5 +50,18 @@ describe("donoAtual", () => {
 
   it("sem sessão, ninguém", async () => {
     expect(await donoAtual(cliente(null))).toBeNull();
+  });
+});
+
+describe("itensParaEnviar", () => {
+  const ok = item("ok", "ana");
+  const comErro = { ...item("erro", "ana"), ultimoErro: "O local não gravou." };
+
+  it("sozinho (a cada 30 s ou quando a internet volta) pula quem parou por erro", () => {
+    expect(itensParaEnviar([ok, comErro], false).map((i) => i.chave)).toEqual(["ok"]);
+  });
+
+  it("no botão Tentar agora, tenta todos", () => {
+    expect(itensParaEnviar([ok, comErro], true).map((i) => i.chave)).toEqual(["ok", "erro"]);
   });
 });

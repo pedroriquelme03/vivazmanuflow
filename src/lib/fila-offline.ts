@@ -16,7 +16,7 @@ const TABELA = "chamados";
 const eventos = new EventTarget();
 
 let enviandoAgora: string | null = null;
-let rodando: Promise<number> | null = null;
+let rodando: Promise<ResultadoFila> | null = null;
 let banco: Promise<IDBDatabase> | null = null;
 
 export function filaDisponivel() {
@@ -130,9 +130,28 @@ export async function removerDaFila(chave: string) {
   avisarMudanca();
 }
 
-async function enviarTudo(supabase: SupabaseClient<Database>) {
+export type ResultadoFila = {
+  enviados: number;
+  /** Parou porque a internet caiu (ou nem havia sinal). */
+  semConexao: boolean;
+};
+
+/**
+ * Quem a rodada tenta enviar. Chamado que parou por erro que não é de rede
+ * (ex.: o local não gravou) só volta quando alguém toca em "Tentar agora":
+ * tentar sozinho a cada 30 s só repetiria o mesmo erro.
+ */
+export function itensParaEnviar(itens: ChamadoPendente[], manual: boolean) {
+  return manual ? itens : itens.filter((item) => !item.ultimoErro);
+}
+
+async function enviarTudo(
+  supabase: SupabaseClient<Database>,
+  manual: boolean,
+): Promise<ResultadoFila> {
   let enviados = 0;
-  for (const item of await listarFila(await donoAtual(supabase))) {
+  const fila = await listarFila(await donoAtual(supabase));
+  for (const item of itensParaEnviar(fila, manual)) {
     enviandoAgora = item.chave;
     avisarMudanca();
     try {
@@ -141,26 +160,38 @@ async function enviarTudo(supabase: SupabaseClient<Database>) {
       eventos.dispatchEvent(new CustomEvent("enviado", { detail: item.titulo }));
       enviados++;
     } catch (erro) {
-      if (erro instanceof SemConexao) break;
+      if (erro instanceof SemConexao) return { enviados, semConexao: true };
       item.ultimoErro = erro instanceof Error ? erro.message : "Erro inesperado.";
       await guardarNaFila(item);
     }
   }
-  return enviados;
+  return { enviados, semConexao: false };
 }
 
 /**
  * Envia a fila, um chamado por vez. Chamadas ao mesmo tempo esperam a mesma
  * rodada; entre abas, o Web Locks evita duas rodadas juntas.
+ * `manual` (botão "Tentar agora") inclui os chamados que pararam por erro.
  */
-export function processarFila(supabase: SupabaseClient<Database>) {
-  if (!filaDisponivel() || navigator.onLine === false) return Promise.resolve(0);
+export function processarFila(
+  supabase: SupabaseClient<Database>,
+  { manual = false }: { manual?: boolean } = {},
+): Promise<ResultadoFila> {
+  if (!filaDisponivel()) return Promise.resolve({ enviados: 0, semConexao: false });
+  if (navigator.onLine === false) {
+    return Promise.resolve({ enviados: 0, semConexao: true });
+  }
+  // Rodada automática em andamento pula os itens com erro: o toque no botão
+  // espera ela acabar e faz a sua, com todos.
+  if (manual && rodando) {
+    return rodando.then(() => processarFila(supabase, { manual }));
+  }
   rodando ??= (async () => {
     try {
       if (typeof navigator !== "undefined" && navigator.locks) {
-        return await navigator.locks.request(BANCO, () => enviarTudo(supabase));
+        return await navigator.locks.request(BANCO, () => enviarTudo(supabase, manual));
       }
-      return await enviarTudo(supabase);
+      return await enviarTudo(supabase, manual);
     } finally {
       enviandoAgora = null;
       rodando = null;

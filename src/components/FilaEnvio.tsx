@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatarData } from "@/lib/demanda-ui";
 import type { ChamadoPendente } from "@/lib/envio-chamado";
@@ -57,11 +57,27 @@ export function FilaEnvio() {
   const router = useRouter();
   const [supabase] = useState(createClient);
   const { itens, enviando } = useFila(supabase);
+  const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   const [enviado, setEnviado] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
+  /** Automático: só os chamados que não pararam por erro. */
   const tentar = useCallback(() => {
     processarFila(supabase).catch(() => {});
+  }, [supabase]);
+
+  /** Botão "Tentar agora": inclui os com erro e sempre dá um retorno. */
+  const tentarAgora = useCallback(async () => {
+    setAviso(null);
+    const { enviados, semConexao } = await processarFila(supabase, {
+      manual: true,
+    }).catch(() => ({ enviados: 0, semConexao: false }));
+    if (semConexao) {
+      setAviso("Sem internet agora. O chamado sobe sozinho quando o sinal voltar.");
+    } else if (enviados === 0) {
+      setAviso("Não deu para enviar. Veja o erro no chamado.");
+    }
   }, [supabase]);
 
   useEffect(() => {
@@ -70,11 +86,31 @@ export function FilaEnvio() {
     return () => window.removeEventListener("online", tentar);
   }, [tentar]);
 
+  // Repete a cada 30 s só enquanto há chamado esperando sinal; os que pararam
+  // por erro esperam alguém tocar em "Tentar agora".
+  const esperandoSinal = itens.filter((item) => !item.ultimoErro).length;
   useEffect(() => {
-    if (itens.length === 0) return;
+    if (esperandoSinal === 0) return;
     const timer = window.setInterval(tentar, INTERVALO_MS);
     return () => window.clearInterval(timer);
-  }, [itens.length, tentar]);
+  }, [esperandoSinal, tentar]);
+
+  useEffect(() => {
+    if (!aviso) return;
+    const timer = window.setTimeout(() => setAviso(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [aviso]);
+
+  // Telas com a pílula: as listas ganham espaço no fim (classe reserva-fila)
+  // para o último card não ficar escondido embaixo dela.
+  const visivel = itens.length > 0 || Boolean(enviado);
+  useEffect(() => {
+    if (!visivel) return;
+    document.body.dataset.fila = "1";
+    return () => {
+      delete document.body.dataset.fila;
+    };
+  }, [visivel]);
 
   useEffect(
     () =>
@@ -98,21 +134,41 @@ export function FilaEnvio() {
     await removerDaFila(item.chave).catch(() => {});
   }
 
-  if (itens.length === 0 && !enviado) return null;
+  if (!visivel) return null;
 
   const total = itens.length;
+  const comErro = total - esperandoSinal;
   const resumo = enviando
     ? "Enviando chamado…"
-    : `${total} ${total === 1 ? "chamado aguardando" : "chamados aguardando"} conexão`;
+    : esperandoSinal === 0
+      ? `${comErro} ${comErro === 1 ? "chamado parou" : "chamados pararam"} por erro`
+      : `${total} ${total === 1 ? "chamado aguardando" : "chamados aguardando"} conexão`;
+  // Solicitante e colaborador têm barra de abas embaixo: a pílula fica acima.
+  const temAbasEmbaixo =
+    pathname.startsWith("/solicitante") || pathname.startsWith("/colaborador");
 
   return (
-    <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 flex justify-center px-4">
-      <div className="w-full max-w-md">
+    <div
+      className={`pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4 ${
+        temAbasEmbaixo
+          ? "bottom-[calc(5rem+env(safe-area-inset-bottom))]"
+          : "bottom-[calc(1rem+env(safe-area-inset-bottom))] md:justify-end md:px-6"
+      }`}
+    >
+      <div className={`pointer-events-auto w-full max-w-md ${temAbasEmbaixo ? "" : "md:w-80"}`}>
         {aberto && total > 0 && (
           <div className="mb-2 max-h-[50dvh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
             <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
               Ficam neste aparelho e sobem sozinhos quando a internet voltar.
             </p>
+            {aviso && (
+              <p
+                role="status"
+                className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"
+              >
+                {aviso}
+              </p>
+            )}
             <ul className="grid gap-2">
               {itens.map((item) => (
                 <li key={item.chave} className="rounded-xl bg-slate-50 p-3 text-sm">
@@ -121,12 +177,15 @@ export function FilaEnvio() {
                     {item.chave === enviando ? "Enviando…" : `Guardado em ${formatarData(item.criadoEm)}`}
                   </p>
                   {item.ultimoErro && (
-                    <p className="mt-1 text-xs text-red-600">{item.ultimoErro}</p>
+                    <p className="mt-1 text-xs text-red-600">
+                      {item.ultimoErro} Não tenta mais sozinho: corrija e toque em
+                      “Tentar agora”, ou descarte.
+                    </p>
                   )}
                   <div className="mt-2 flex gap-2">
                     <button
                       type="button"
-                      onClick={tentar}
+                      onClick={tentarAgora}
                       disabled={Boolean(enviando)}
                       className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                     >
@@ -150,9 +209,11 @@ export function FilaEnvio() {
           <button
             type="button"
             onClick={() => setAberto((v) => !v)}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg"
+            className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg ${
+              esperandoSinal === 0 && !enviando ? "bg-red-600" : "bg-amber-500"
+            }`}
           >
-            <span aria-hidden>{enviando ? "↻" : "⏳"}</span>
+            <span aria-hidden>{enviando ? "↻" : esperandoSinal === 0 ? "⚠" : "⏳"}</span>
             {resumo}
           </button>
         ) : (

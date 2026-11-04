@@ -204,3 +204,11 @@ nextjs-portal {
     background: #fff !important;
   }
 }
+
+/*
+ * Pílula da fila offline (FilaEnvio) visível: listas com rolagem ganham
+ * espaço no fim para o último card não ficar escondido embaixo dela.
+ */
+body[data-fila] .reserva-fila {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}

@@ -537,7 +537,7 @@ export function KanbanLider({
   }
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 py-3 md:overflow-hidden md:p-4">
+    <main className="reserva-fila flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-3 py-3 md:overflow-hidden md:p-4">
       <div className="mb-3 flex shrink-0 flex-col gap-2">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
