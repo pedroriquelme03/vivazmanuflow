@@ -132,6 +132,7 @@ export function NovaInspecao({
   const [salvandoSecao, setSalvandoSecao] = useState(false);
   const criando = useRef<Promise<string> | null>(null);
   const [inspecaoIdFinal, setInspecaoIdFinal] = useState<string | null>(null);
+  const [chamadosAbertos, setChamadosAbertos] = useState<{ abertos: number; total: number } | null>(null);
   const [buscaProcesso, setBuscaProcesso] = useState("");
   const [busca, setBusca] = useState("");
   const [prefixoAndar, setPrefixoAndar] = useState<string | null>(null);
@@ -455,6 +456,16 @@ export function NovaInspecao({
         .update({ status: "finalizada", finalizada_em: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
+      // Os planos de ação viram chamados na Manutenção ao finalizar (gatilho no banco).
+      const { data: planos } = await supabase
+        .from("gov_respostas")
+        .select("gov_planos_acao(chamado_token)")
+        .eq("inspecao_id", id)
+        .eq("resposta", "nao");
+      const todos = (planos ?? []).flatMap((r) => r.gov_planos_acao ?? []);
+      setChamadosAbertos(
+        todos.length ? { abertos: todos.filter((p) => p.chamado_token).length, total: todos.length } : null,
+      );
       setInspecaoIdFinal(id);
       setFase("concluido");
     } catch (err) {
@@ -795,6 +806,19 @@ export function NovaInspecao({
                   : `${contagemFinal.nao} ${contagemFinal.nao === 1 ? "item marcado" : "itens marcados"} como Não de ${contagemFinal.sim + contagemFinal.nao}.`}
               </p>
             </div>
+          )}
+          {chamadosAbertos && (
+            <p
+              className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+                chamadosAbertos.abertos === chamadosAbertos.total
+                  ? "bg-brand-50 text-brand-800"
+                  : "bg-amber-50 text-amber-800"
+              }`}
+            >
+              {chamadosAbertos.abertos === chamadosAbertos.total
+                ? `🔧 ${chamadosAbertos.abertos} ${chamadosAbertos.abertos === 1 ? "plano de ação virou chamado" : "planos de ação viraram chamados"} no quadro da Manutenção.`
+                : `${chamadosAbertos.abertos} de ${chamadosAbertos.total} planos de ação viraram chamado na Manutenção. Abra o resumo para conferir.`}
+            </p>
           )}
           <div className="mt-6 grid gap-2">
             {inspecaoIdFinal && (

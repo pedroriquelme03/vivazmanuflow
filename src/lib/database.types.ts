@@ -1433,6 +1433,8 @@ export type Database = {
           criado_em: string
           resolvido_em: string | null
           resolvido_por: string | null
+          demanda_id: string | null
+          chamado_token: string | null
         }
         Insert: {
           id?: string
@@ -1445,6 +1447,8 @@ export type Database = {
           criado_em?: string
           resolvido_em?: string | null
           resolvido_por?: string | null
+          demanda_id?: string | null
+          chamado_token?: string | null
         }
         Update: {
           id?: string
@@ -1457,6 +1461,8 @@ export type Database = {
           criado_em?: string
           resolvido_em?: string | null
           resolvido_por?: string | null
+          demanda_id?: string | null
+          chamado_token?: string | null
         }
         Relationships: [
           {

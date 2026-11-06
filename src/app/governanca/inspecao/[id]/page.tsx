@@ -171,6 +171,20 @@ export default async function InspecaoDetalhePage({
                               {p.quem_pediu && <>Solicitante: {p.quem_pediu}.</>}
                             </p>
                             {p.observacao && <p className="mt-1 text-xs text-slate-500">Obs.: {p.observacao}</p>}
+                            {p.chamado_token ? (
+                              <Link
+                                href={`/acompanhar/${p.chamado_token}`}
+                                className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
+                              >
+                                🔧 Chamado aberto na Manutenção · acompanhar
+                              </Link>
+                            ) : (
+                              insp.status === "em_andamento" && (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  O chamado na Manutenção é aberto quando o checklist for finalizado.
+                                </p>
+                              )
+                            )}
                             {insp.status === "finalizada" && (
                               <ResolverPlano
                                 planoId={p.id}
