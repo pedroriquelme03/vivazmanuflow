@@ -30,22 +30,26 @@ const textos: TextoPdf[] = [
   ...linha(236, [[310.5, "[ ] Inspeção"]]),
   // UH de outra página, com número menor.
   ...linha(123, [[18.3, "1000"], [69.7, "GDF"], [104.6, "Ocupada"], [208.5, "20/10/26"], [250.5, "22/10/26"], [299.2, "3"]], 2),
+  // Em manutenção, mas com Limpeza agendada: entra.
+  ...linha(136, [[18.3, "1100"], [69.7, "LXF"], [104.6, "Manutenção"], [299.2, "0"], [310.5, "[ ] Limpeza"]], 2),
+  // Suja com chegada hoje.
+  ...linha(148, [[18.3, "1210"], [69.7, "LXF"], [104.6, "Suja"], [208.5, "21/10/26"], [250.5, "22/10/26"], [299.2, "2"], [310.5, "[ ] Limpeza"], [408.8, "Sim(2)"]], 2),
 ];
 
 describe("relatório diário de governança", () => {
   it("lê a data e as UHs do PDF", () => {
     const r = lerRelatorioUhs(textos);
     expect(r.data).toBe("21/10/2026");
-    expect(r.uhs.map((u) => u.numero)).toEqual(["1254", "1252", "1257", "1230", "1270", "1123", "1000"]);
+    expect(r.uhs.map((u) => u.numero)).toEqual(["1254", "1252", "1257", "1230", "1270", "1123", "1000", "1100", "1210"]);
     expect(r.uhs.find((u) => u.numero === "1257")?.servicos).toEqual(["Limpeza", "Retoque"]);
   });
 
-  it("lista só as UHs para limpar hoje, do menor para o maior número", () => {
+  it("lista só as UHs Sujas ou com Limpeza agendada, do menor para o maior número", () => {
     const lista = uhsParaLimpar(lerRelatorioUhs(textos));
-    expect(lista.map((u) => u.numero)).toEqual(["1000", "1123", "1230", "1254", "1257"]);
-    expect(lista.find((u) => u.numero === "1254")?.tarefa).toBe("Arrumação + troca de enxoval");
-    expect(lista.find((u) => u.numero === "1230")?.tarefa).toBe("Limpeza de saída (aguardando check-out)");
-    expect(lista.find((u) => u.numero === "1123")?.tarefa).toBe("Retoque");
+    // Ocupadas sem serviço (1000, 1254), saída sem limpeza (1230) e só Retoque (1123) ficam fora.
+    expect(lista.map((u) => u.numero)).toEqual(["1100", "1210", "1257"]);
+    expect(lista.find((u) => u.numero === "1210")?.tarefa).toBe("Limpar antes da chegada");
+    expect(lista.find((u) => u.numero === "1100")?.tarefa).toBe("Limpeza");
   });
 
   it("recusa um PDF que não é o relatório", () => {

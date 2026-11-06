@@ -15,7 +15,8 @@ export default async function NovaInspecaoPage({
   const { continuar } = await searchParams;
 
   const supabase = await createClient();
-  const [{ data: acomodacoes }, { data: camareiras }, { data: processos }, rascunhoRes] =
+  const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const [{ data: acomodacoes }, { data: camareiras }, { data: processos }, rascunhoRes, { data: doRelatorio }] =
     await Promise.all([
       supabase.from("gov_acomodacoes").select("*").eq("ativo", true).order("numero"),
       supabase.from("gov_camareiras").select("*").eq("ativo", true).order("nome"),
@@ -36,6 +37,8 @@ export default async function NovaInspecaoPage({
             .eq("status", "em_andamento")
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      // UHs do relatório diário de hoje, que aparecem primeiro na escolha da acomodação.
+      supabase.from("gov_relatorio_uhs").select("numero, tarefa, feita_em").eq("data", hoje),
     ]);
 
   const linha = rascunhoRes.data;
@@ -69,6 +72,11 @@ export default async function NovaInspecaoPage({
           itens: (gov_secoes ?? []).reduce((n, s) => n + (s.gov_perguntas?.length ?? 0), 0),
         }))}
         rascunho={rascunho}
+        relatorioDoDia={(doRelatorio ?? []).map((u) => ({
+          numero: u.numero,
+          tarefa: u.tarefa,
+          feita: Boolean(u.feita_em),
+        }))}
       />
     </GovernancaShell>
   );

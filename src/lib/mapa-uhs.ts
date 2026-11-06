@@ -328,12 +328,17 @@ export function compararNumeroUh(a: string, b: string) {
   return a.localeCompare(b, "pt-BR", { numeric: true });
 }
 
-/** UHs que precisam ser limpas no dia do relatório, do menor para o maior número. */
+/** A UH entra na lista do dia: situação Suja ou serviço de Limpeza agendado. */
+export function marcadaParaLimpeza(uh: Pick<UhRelatorio, "situacao" | "servicos">) {
+  return ehSuja(uh.situacao) || uh.servicos.some((s) => /limpeza/i.test(s));
+}
+
+/** UHs para limpar no dia do relatório (Suja ou com Limpeza agendada), do menor para o maior número. */
 export function uhsParaLimpar(relatorio: Pick<RelatorioUhs, "data" | "uhs">): UhDoDia[] {
   const vistas = new Set<string>();
   return uhsDoDia(relatorio)
     .filter((u) => {
-      if (!u.precisaLimpar || vistas.has(u.numero)) return false;
+      if (!marcadaParaLimpeza(u) || vistas.has(u.numero)) return false;
       vistas.add(u.numero);
       return true;
     })

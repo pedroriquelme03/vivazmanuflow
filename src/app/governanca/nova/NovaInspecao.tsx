@@ -26,6 +26,7 @@ import {
   type Processo,
   type SecaoComPerguntas,
 } from "@/lib/governanca";
+import { compararNumeroUh } from "@/lib/mapa-uhs";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
 import { Erro, Vazio, btnPrimario, btnSecundario, cardCls, inputCls } from "../ui";
 
@@ -55,6 +56,9 @@ export type RascunhoInspecao = {
 };
 
 const PREFIXOS_ANDAR = ["10", "11", "12"] as const;
+
+/** UH que veio no relatório diário de hoje (Suja ou com Limpeza agendada). */
+export type UhDoRelatorio = { numero: string; tarefa: string; feita: boolean };
 
 function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaLocal {
   const base = respostaVazia();
@@ -96,7 +100,9 @@ export function NovaInspecao({
   camareiras,
   processos,
   rascunho,
+  relatorioDoDia = [],
 }: {
+  relatorioDoDia?: UhDoRelatorio[];
   eu: { id: string; nome: string };
   ehAdmin: boolean;
   escolheCamareira: boolean;
@@ -155,6 +161,12 @@ export function NovaInspecao({
       a.tipo !== "setor" && (!processo || processo.tipo === "ambos" || a.tipo === processo.tipo),
   );
   const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, prefixoAndar);
+  // As do relatório de hoje vêm primeiro (do menor para o maior número); as outras continuam abaixo.
+  const relatorioPorNumero = new Map(relatorioDoDia.map((u) => [u.numero, u]));
+  const filtradasDoRelatorio = filtradas
+    .filter((a) => relatorioPorNumero.has(a.numero))
+    .sort((a, b) => compararNumeroUh(a.numero, b.numero));
+  const filtradasOutras = filtradas.filter((a) => !relatorioPorNumero.has(a.numero));
   const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas) : false;
   const nomesCamareiras = camareiras.map((c) => c.nome);
   const usaUh = processo?.usa_acomodacao ?? false;
@@ -570,20 +582,65 @@ export function NovaInspecao({
               {filtradas.length === 0 ? (
                 <Vazio texto="Nenhuma acomodação encontrada." />
               ) : (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-                  {filtradas.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => escolherAcomodacao(a)}
-                      className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white py-4 shadow-sm transition hover:border-brand-400"
-                    >
-                      <span className="text-[10px] font-medium uppercase text-slate-400">UH</span>
-                      <span className="text-xl font-bold text-slate-800">{a.numero}</span>
-                      <span className="mt-1 text-[11px] text-slate-500">{rotuloTipo(a.tipo, true)}</span>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  {filtradasDoRelatorio.length > 0 && (
+                    <section className="mb-6">
+                      <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-brand-700">
+                        Para limpar hoje · relatório diário ({filtradasDoRelatorio.length})
+                      </h3>
+                      <p className="mb-3 text-xs text-slate-500">UHs Sujas ou com Limpeza agendada no relatório do dia.</p>
+                      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+                        {filtradasDoRelatorio.map((a) => {
+                          const doDia = relatorioPorNumero.get(a.numero);
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => escolherAcomodacao(a)}
+                              className={`relative flex flex-col items-center rounded-2xl border-2 bg-brand-50 px-1 py-4 shadow-sm transition hover:border-brand-500 ${
+                                doDia?.feita ? "border-brand-200 opacity-60" : "border-brand-300"
+                              }`}
+                            >
+                              {doDia?.feita && (
+                                <span className="absolute right-2 top-1.5 text-xs font-bold text-brand-600" title="Marcada como feita">
+                                  ✓
+                                </span>
+                              )}
+                              <span className="text-[10px] font-medium uppercase text-brand-500">UH</span>
+                              <span className="text-xl font-bold text-slate-800">{a.numero}</span>
+                              <span className="mt-1 line-clamp-2 text-center text-[11px] leading-tight text-brand-700">
+                                {doDia?.tarefa || rotuloTipo(a.tipo, true)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+                  {filtradasOutras.length > 0 && (
+                    <section>
+                      {filtradasDoRelatorio.length > 0 && (
+                        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                          Outras acomodações ({filtradasOutras.length})
+                        </h3>
+                      )}
+                      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+                        {filtradasOutras.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => escolherAcomodacao(a)}
+                            className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white py-4 shadow-sm transition hover:border-brand-400"
+                          >
+                            <span className="text-[10px] font-medium uppercase text-slate-400">UH</span>
+                            <span className="text-xl font-bold text-slate-800">{a.numero}</span>
+                            <span className="mt-1 text-[11px] text-slate-500">{rotuloTipo(a.tipo, true)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
               )}
             </>
           )}
