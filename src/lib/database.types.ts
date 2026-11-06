@@ -1154,6 +1154,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "gov_relatorio_uhs_data_fkey"
+            columns: ["data"]
+            isOneToOne: false
+            referencedRelation: "gov_relatorios_diarios"
+            referencedColumns: ["data"]
+          },
+          {
             foreignKeyName: "gov_relatorio_uhs_feita_por_fkey"
             columns: ["feita_por"]
             isOneToOne: false

@@ -37,8 +37,15 @@ export default async function NovaInspecaoPage({
             .eq("status", "em_andamento")
             .maybeSingle()
         : Promise.resolve({ data: null }),
-      // UHs do relatório diário de hoje, que aparecem primeiro na escolha da acomodação.
-      supabase.from("gov_relatorio_uhs").select("numero, tarefa, feita_em").eq("data", hoje),
+      // UHs do último relatório diário enviado (o de hoje ou, sem ele, o mais recente),
+      // que aparecem primeiro na escolha da acomodação. Mesmo critério da página Relatório diário.
+      supabase
+        .from("gov_relatorios_diarios")
+        .select("data, gov_relatorio_uhs(numero, tarefa, feita_em)")
+        .lte("data", hoje)
+        .order("data", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
   const linha = rascunhoRes.data;
@@ -72,7 +79,8 @@ export default async function NovaInspecaoPage({
           itens: (gov_secoes ?? []).reduce((n, s) => n + (s.gov_perguntas?.length ?? 0), 0),
         }))}
         rascunho={rascunho}
-        relatorioDoDia={(doRelatorio ?? []).map((u) => ({
+        dataRelatorio={doRelatorio && doRelatorio.data !== hoje ? doRelatorio.data : null}
+        relatorioDoDia={(doRelatorio?.gov_relatorio_uhs ?? []).map((u) => ({
           numero: u.numero,
           tarefa: u.tarefa,
           feita: Boolean(u.feita_em),

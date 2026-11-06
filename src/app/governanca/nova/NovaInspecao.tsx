@@ -101,8 +101,11 @@ export function NovaInspecao({
   processos,
   rascunho,
   relatorioDoDia = [],
+  dataRelatorio = null,
 }: {
   relatorioDoDia?: UhDoRelatorio[];
+  /** Data (aaaa-mm-dd) do relatório usado, quando não é o de hoje. */
+  dataRelatorio?: string | null;
   eu: { id: string; nome: string };
   ehAdmin: boolean;
   escolheCamareira: boolean;
@@ -586,9 +589,14 @@ export function NovaInspecao({
                   {filtradasDoRelatorio.length > 0 && (
                     <section className="mb-6">
                       <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-brand-700">
-                        Para limpar hoje · relatório diário ({filtradasDoRelatorio.length})
+                        {dataRelatorio ? "Para limpar" : "Para limpar hoje"} · relatório diário ({filtradasDoRelatorio.length})
                       </h3>
-                      <p className="mb-3 text-xs text-slate-500">UHs Sujas ou com Limpeza agendada no relatório do dia.</p>
+                      <p className="mb-3 text-xs text-slate-500">
+                        UHs Sujas ou com Limpeza agendada
+                        {dataRelatorio
+                          ? ` no relatório de ${dataRelatorio.split("-").reverse().join("/")} (o de hoje ainda não foi enviado).`
+                          : " no relatório do dia."}
+                      </p>
                       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
                         {filtradasDoRelatorio.map((a) => {
                           const doDia = relatorioPorNumero.get(a.numero);
