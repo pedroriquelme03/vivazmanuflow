@@ -9,9 +9,11 @@ import {
   MIGRATION_HINT_GOV,
   agruparPorCategoria,
   agruparPorGrupo,
+  corNota,
   erroSchemaGov,
   filtrarAcomodacoes,
   normalizarBusca,
+  notaInspecao,
   ordenarSecoes,
   rotuloAplicacao,
   rotuloTipo,
@@ -124,6 +126,19 @@ export function NovaInspecao({
   const [buscaProcesso, setBuscaProcesso] = useState("");
   const [busca, setBusca] = useState("");
   const [prefixoAndar, setPrefixoAndar] = useState<string | null>(null);
+
+  // Nota da vistoria: só os itens de sim/não do checklist atual contam.
+  const idsPerguntas = new Set((processo?.secoes ?? []).flatMap((s) => s.gov_perguntas.map((p) => p.id)));
+  const contagemFinal = Object.entries(respostas).reduce(
+    (c, [id, r]) => {
+      if (!idsPerguntas.has(id)) return c;
+      if (r.resposta === "sim") c.sim += 1;
+      if (r.resposta === "nao") c.nao += 1;
+      return c;
+    },
+    { sim: 0, nao: 0 },
+  );
+  const notaFinal = notaInspecao(contagemFinal.sim, contagemFinal.nao);
 
   const comItens = processos.filter((p) => p.itens > 0);
   const gruposProcesso = agruparPorCategoria(
@@ -702,6 +717,20 @@ export function NovaInspecao({
               ? `A inspeção da UH ${acomodacao.numero} foi registrada com sucesso.`
               : `"${processo?.nome}" foi registrado com sucesso.`}
           </p>
+          {notaFinal !== null && (
+            <div className="mt-5 rounded-xl bg-slate-50 px-4 py-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Nota da vistoria</p>
+              <p className={`mt-1 text-5xl font-bold ${corNota(notaFinal)}`}>
+                {notaFinal}
+                <span className="text-lg font-medium text-slate-400"> / 100</span>
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {contagemFinal.nao === 0
+                  ? "Nenhum item marcado como Não."
+                  : `${contagemFinal.nao} ${contagemFinal.nao === 1 ? "item marcado" : "itens marcados"} como Não de ${contagemFinal.sim + contagemFinal.nao}.`}
+              </p>
+            </div>
+          )}
           <div className="mt-6 grid gap-2">
             {inspecaoIdFinal && (
               <Link href={`/governanca/inspecao/${inspecaoIdFinal}`} className={btnSecundario}>

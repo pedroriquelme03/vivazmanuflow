@@ -356,6 +356,72 @@ export function conformidade(sim: number, nao: number) {
   return total > 0 ? Math.round((sim / total) * 100) : 0;
 }
 
+/**
+ * Nota da vistoria, de 100 a 0: começa em 100 e cada item respondido "Não"
+ * tira o mesmo tanto (100 dividido pelos itens de sim/não respondidos).
+ * Itens "N/A" e de outros tipos não contam. Sem itens de sim/não, não há nota.
+ */
+export function notaInspecao(sim: number, nao: number): number | null {
+  const total = sim + nao;
+  if (total === 0) return null;
+  return Math.round(100 - (nao / total) * 100);
+}
+
+/** Cor da nota: verde a partir de 90, amarelo a partir de 70, vermelho abaixo. */
+export function corNota(nota: number) {
+  if (nota >= 90) return "text-emerald-600";
+  if (nota >= 70) return "text-amber-600";
+  return "text-red-600";
+}
+
+/**
+ * Nota de produtividade do mês, de 100 a 300, para a planilha do RH:
+ * média 0 vira 100 e média 100 vira 300.
+ */
+export function notaProdutividade(media: number) {
+  return Math.round(100 + (Math.min(100, Math.max(0, media)) / 100) * 200);
+}
+
+export type FechamentoCamareira = {
+  nome: string;
+  vistorias: number;
+  sim: number;
+  nao: number;
+  /** Média das notas das vistorias do mês (0 a 100). */
+  media: number;
+  /** Nota de produtividade (100 a 300). */
+  produtividade: number;
+};
+
+/** Fechamento do mês: uma linha por camareira, com a média das vistorias e a nota de produtividade. */
+export function fechamentoMensal(
+  vistorias: { camareira: string; sim: number; nao: number }[],
+): FechamentoCamareira[] {
+  const mapa = new Map<string, { nome: string; notas: number[]; sim: number; nao: number }>();
+  for (const v of vistorias) {
+    const nota = notaInspecao(v.sim, v.nao);
+    if (nota === null) continue;
+    const linha = mapa.get(v.camareira) ?? { nome: v.camareira, notas: [], sim: 0, nao: 0 };
+    linha.notas.push(nota);
+    linha.sim += v.sim;
+    linha.nao += v.nao;
+    mapa.set(v.camareira, linha);
+  }
+  return [...mapa.values()]
+    .map((l) => {
+      const media = Math.round((l.notas.reduce((s, n) => s + n, 0) / l.notas.length) * 10) / 10;
+      return {
+        nome: l.nome,
+        vistorias: l.notas.length,
+        sim: l.sim,
+        nao: l.nao,
+        media,
+        produtividade: notaProdutividade(media),
+      };
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
 type InspecaoRel = { id: string; camareira: string | null };
 type RespostaRel = {
   inspecao_id: string;

@@ -8,10 +8,11 @@ export type ItemChecklist = {
   acesso: AcessoChecklist;
 };
 
-/** Menu lateral do ambiente Checklist: Kanban é o penúltimo e Relatórios o último. */
+/** Menu lateral do ambiente Checklist: Kanban, Relatórios e Fechamento do mês no fim. */
 export const MENU_CHECKLIST: ItemChecklist[] = [
   { href: "/governanca", rotulo: "Início", acesso: "todos" },
   { href: "/governanca/nova", rotulo: "Preencher checklist", acesso: "todos" },
+  { href: "/governanca/relatorio-diario", rotulo: "Relatório diário", acesso: "todos" },
   { href: "/governanca/admin/inspecoes", rotulo: "Inspeções", acesso: "equipe" },
   { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", acesso: "admin" },
   { href: "/governanca/admin/acomodacoes", rotulo: "Acomodações", acesso: "admin" },
@@ -19,6 +20,7 @@ export const MENU_CHECKLIST: ItemChecklist[] = [
   { href: "/governanca/como-funciona", rotulo: "Como funciona", acesso: "todos" },
   { href: "/governanca/admin/kanban", rotulo: "Kanban", acesso: "equipe" },
   { href: "/governanca/admin/relatorios", rotulo: "Relatórios", acesso: "admin" },
+  { href: "/governanca/admin/fechamento", rotulo: "Fechamento do mês", acesso: "admin" },
 ];
 
 export function podeAcessar(papel: GovPapel, acesso: AcessoChecklist) {

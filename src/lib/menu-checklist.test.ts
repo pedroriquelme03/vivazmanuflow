@@ -5,10 +5,11 @@ const rotulos = (papel: Parameters<typeof menuChecklist>[0]) =>
   menuChecklist(papel).map((i) => i.rotulo);
 
 describe("menuChecklist", () => {
-  it("admin vê tudo, com Kanban penúltimo e Relatórios por último", () => {
+  it("admin vê tudo, com Kanban, Relatórios e Fechamento do mês no fim", () => {
     expect(rotulos("admin")).toEqual([
       "Início",
       "Preencher checklist",
+      "Relatório diário",
       "Inspeções",
       "Gerenciar checklists",
       "Acomodações",
@@ -16,6 +17,7 @@ describe("menuChecklist", () => {
       "Como funciona",
       "Kanban",
       "Relatórios",
+    "Fechamento do mês",
     ]);
   });
 
@@ -23,6 +25,7 @@ describe("menuChecklist", () => {
     expect(rotulos("lider")).toEqual([
       "Início",
       "Preencher checklist",
+      "Relatório diário",
       "Inspeções",
       "Camareiras",
       "Como funciona",
@@ -30,8 +33,8 @@ describe("menuChecklist", () => {
     ]);
   });
 
-  it("aplicador só preenche", () => {
-    expect(rotulos("camareira")).toEqual(["Início", "Preencher checklist", "Como funciona"]);
+  it("aplicador preenche e vê o relatório diário", () => {
+    expect(rotulos("camareira")).toEqual(["Início", "Preencher checklist", "Relatório diário", "Como funciona"]);
     expect(rotulos(null)).toEqual([]);
   });
 

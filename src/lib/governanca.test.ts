@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  fechamentoMensal,
+  notaInspecao,
+  notaProdutividade,
   agruparPorCategoria,
   agruparPorGrupo,
   agruparPorSecao,
@@ -301,5 +304,33 @@ describe("agrupamentos", () => {
 
   it("busca ignora acento", () => {
     expect(normalizarBusca(" Manutenção ")).toBe("manutencao");
+  });
+});
+
+describe("nota da vistoria e fechamento do mês", () => {
+  it("começa em 100 e cada Não tira o mesmo tanto", () => {
+    expect(notaInspecao(10, 0)).toBe(100);
+    expect(notaInspecao(8, 2)).toBe(80);
+    expect(notaInspecao(0, 4)).toBe(0);
+    expect(notaInspecao(0, 0)).toBeNull();
+  });
+
+  it("converte a média do mês para a escala de produtividade de 100 a 300", () => {
+    expect(notaProdutividade(0)).toBe(100);
+    expect(notaProdutividade(50)).toBe(200);
+    expect(notaProdutividade(100)).toBe(300);
+  });
+
+  it("faz a média das vistorias de cada camareira", () => {
+    const linhas = fechamentoMensal([
+      { camareira: "Maria", sim: 10, nao: 0 },
+      { camareira: "Maria", sim: 8, nao: 2 },
+      { camareira: "Ana", sim: 5, nao: 5 },
+      { camareira: "Ana", sim: 0, nao: 0 },
+    ]);
+    expect(linhas).toEqual([
+      { nome: "Ana", vistorias: 1, sim: 5, nao: 5, media: 50, produtividade: 200 },
+      { nome: "Maria", vistorias: 2, sim: 18, nao: 2, media: 90, produtividade: 280 },
+    ]);
   });
 });

@@ -1097,6 +1097,71 @@ export type Database = {
         }
         Relationships: []
       }
+      gov_relatorios_diarios: {
+        Row: {
+          data: string
+          emitido_em: string | null
+          enviado_por: string | null
+          enviado_em: string
+        }
+        Insert: {
+          data: string
+          emitido_em?: string | null
+          enviado_por?: string | null
+          enviado_em?: string
+        }
+        Update: {
+          data?: string
+          emitido_em?: string | null
+          enviado_por?: string | null
+          enviado_em?: string
+        }
+        Relationships: []
+      }
+      gov_relatorio_uhs: {
+        Row: {
+          id: string
+          data: string
+          numero: string
+          tipo: string
+          situacao: string
+          movimentos: string[]
+          tarefa: string
+          feita_em: string | null
+          feita_por: string | null
+        }
+        Insert: {
+          id?: string
+          data: string
+          numero: string
+          tipo?: string
+          situacao?: string
+          movimentos?: string[]
+          tarefa?: string
+          feita_em?: string | null
+          feita_por?: string | null
+        }
+        Update: {
+          id?: string
+          data?: string
+          numero?: string
+          tipo?: string
+          situacao?: string
+          movimentos?: string[]
+          tarefa?: string
+          feita_em?: string | null
+          feita_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_relatorio_uhs_feita_por_fkey"
+            columns: ["feita_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gov_processos: {
         Row: {
           codigo_origem: string | null
@@ -1401,6 +1466,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gov_marcar_uh_relatorio: {
+        Args: { p_id: string; p_feita: boolean }
+        Returns: undefined
+      }
       abrir_preventivas_vencidas: {
         Args: Record<string, never>
         Returns: number

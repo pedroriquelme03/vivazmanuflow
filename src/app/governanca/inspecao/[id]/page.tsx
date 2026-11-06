@@ -4,9 +4,11 @@ import { exigirGovernanca } from "@/lib/governanca-acesso";
 import {
   agruparPorGrupo,
   agruparPorSecao,
+  corNota,
   formatDataHora,
   formatarValor,
   inspecionaEquipe,
+  notaInspecao,
   rotuloTipo,
 } from "@/lib/governanca";
 import { GovernancaShell } from "../../GovernancaShell";
@@ -42,6 +44,7 @@ export default async function InspecaoDetalhePage({
   const grupos = agruparPorSecao(lista.map((r) => ({ ...r, grupo: r.pergunta_grupo })));
   const totalSim = lista.filter((r) => r.resposta === "sim").length;
   const totalNao = lista.filter((r) => r.resposta === "nao").length;
+  const nota = notaInspecao(totalSim, totalNao);
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
@@ -90,6 +93,15 @@ export default async function InspecaoDetalhePage({
                 <Info rotulo="Conformidade" valor={`${totalSim} sim · ${totalNao} não`} />
               )}
             </dl>
+            {nota !== null && insp.status === "finalizada" && (
+              <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <span className="text-sm text-slate-600">Nota da vistoria</span>
+                <span className={`text-3xl font-bold ${corNota(nota)}`}>
+                  {nota}
+                  <span className="text-base font-medium text-slate-400"> / 100</span>
+                </span>
+              </div>
+            )}
           </div>
 
           {grupos.map((g) => (
