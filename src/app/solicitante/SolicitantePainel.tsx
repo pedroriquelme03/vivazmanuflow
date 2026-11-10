@@ -6,6 +6,7 @@ import { logout } from "@/lib/logout";
 import type { Perfil } from "@/lib/auth";
 import { AvisoPush } from "@/components/AvisoPush";
 import { ChamadosNaFila } from "@/components/FilaEnvio";
+import { EscolherArea } from "@/components/EscolherArea";
 import { listaAmbientes, type AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   STATUS_BADGE,
@@ -82,7 +83,12 @@ export function SolicitantePainel({
       <AvisoPush />
       <main className="mx-auto w-full max-w-md flex-1 px-4 pt-6 pb-28">
         {aba === "abrir" && (
-          <AbaAbrir nome={primeiroNome} ambientes={permitidos} />
+          <EscolherArea
+            nome={primeiroNome}
+            ambientes={permitidos}
+            rota="/solicitante/abrir"
+            className="min-h-[calc(100dvh-8.5rem)]"
+          />
         )}
         {aba === "chamados" && (
           <AbaChamados
@@ -94,47 +100,6 @@ export function SolicitantePainel({
         {aba === "perfil" && <AbaPerfil perfil={perfil} />}
       </main>
       <SolicitanteNav badgeChamados={abertos} />
-    </div>
-  );
-}
-
-function AbaAbrir({
-  nome,
-  ambientes,
-}: {
-  nome: string;
-  ambientes: AmbienteEquipe[];
-}) {
-  const temTi = ambientes.includes("ti");
-  const temManutencao = ambientes.includes("manutencao");
-  const texto =
-    temTi && temManutencao
-      ? "Abra um chamado de TI ou de Manutenção."
-      : temTi
-        ? "Abra um chamado de TI."
-        : "Abra um chamado de Manutenção.";
-  return (
-    <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col items-center justify-center text-center">
-      <h1 className="text-xl font-bold">Olá, {nome}</h1>
-      <p className="mt-0.5 text-sm text-slate-500">{texto}</p>
-      <div className="mt-6 grid w-full max-w-xs gap-3">
-        {temTi && (
-          <Link
-            href="/solicitante/abrir?tipo=ti"
-            className="block rounded-2xl bg-[#1E293B] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#0f172a]"
-          >
-            Abrir chamado de TI
-          </Link>
-        )}
-        {temManutencao && (
-          <Link
-            href="/solicitante/abrir?tipo=manutencao"
-            className="block rounded-2xl bg-[#0891b2] px-5 py-4 text-center text-base font-semibold text-white shadow-lg shadow-cyan-600/25 transition hover:bg-[#0e7490]"
-          >
-            Abrir chamado de Manutenção
-          </Link>
-        )}
-      </div>
     </div>
   );
 }

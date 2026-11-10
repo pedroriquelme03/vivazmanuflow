@@ -30,7 +30,8 @@ export function rotaInicial(
 
 /**
  * Telas de chamado (/chamados): o "voltar" leva ao painel que estava aberto
- * (cookie do seletor), e a área sugerida do chamado é a desse painel.
+ * (cookie do seletor). `ambiente` é só o filtro inicial da lista "Meus
+ * chamados"; ao ABRIR chamado nada vem marcado (a pessoa escolhe a área).
  */
 export function voltarAoPainel(
   role: Papel,

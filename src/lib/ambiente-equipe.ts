@@ -6,6 +6,9 @@ export type PainelEquipe = AmbienteEquipe | "checklist";
 
 export const COOKIE_AMBIENTE = "vivaz-ambiente";
 
+/** As duas áreas que recebem chamado, na ordem dos botões (TI primeiro). */
+export const AMBIENTES_CHAMADO: readonly AmbienteEquipe[] = ["ti", "manutencao"];
+
 /** Lê "manutencao" | "ti" de um texto qualquer (ex.: ?tipo= da URL). */
 export function lerAmbiente(valor: string | null | undefined): AmbienteEquipe | null {
   return valor === "manutencao" || valor === "ti" ? valor : null;

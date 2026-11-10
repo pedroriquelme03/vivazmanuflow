@@ -104,8 +104,8 @@ describe("voltarAoPainel", () => {
   });
 });
 
-describe("voltarAoPainel: área sugerida", () => {
-  it("checklist sugere manutenção", () => {
+describe("voltarAoPainel: filtro inicial de Meus chamados", () => {
+  it("vindo do checklist, a lista começa em manutenção", () => {
     expect(voltarAoPainel("admin", ["manutencao", "ti", "checklist"], "checklist").ambiente).toBe(
       "manutencao",
     );

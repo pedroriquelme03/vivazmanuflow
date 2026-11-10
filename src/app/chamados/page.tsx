@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getPerfil } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { lerAmbiente } from "@/lib/ambiente-equipe";
+import { AMBIENTES_CHAMADO, lerAmbiente } from "@/lib/ambiente-equipe";
 import { CHAMADO_LISTA_SELECT_SISTEMA } from "@/lib/demanda-select";
 import { resolverVoltar } from "@/lib/resolver-ambiente";
 import {
@@ -45,7 +45,7 @@ export default async function MeusChamadosPage({
           ) : (
             <AbaChamados
               chamados={(data ?? []) as unknown as ChamadoSolicitante[]}
-              ambientes={["ti", "manutencao"]}
+              ambientes={AMBIENTES_CHAMADO}
               filtroInicial={lerAmbiente(tipo) ?? voltar.ambiente}
             />
           )}

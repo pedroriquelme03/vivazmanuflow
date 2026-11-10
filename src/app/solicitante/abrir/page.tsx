@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { listaAmbientes } from "@/lib/ambiente-equipe";
 import { getPerfil, rotaInicial } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { BrandMark } from "@/components/BrandMark";
-import { AbrirComoSolicitante } from "./AbrirComoSolicitante";
+import { CartaoAbrirChamado } from "./CartaoAbrirChamado";
 import { SolicitanteNav } from "../SolicitanteNav";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +20,9 @@ export default async function SolicitanteAbrirPage({
   const { tipo } = await searchParams;
   const permitidos = listaAmbientes(perfil.ambientes);
   const pedido = tipo === "manutencao" || tipo === "ti" ? tipo : null;
-  if (!pedido || !permitidos.includes(pedido)) {
-    redirect(`/solicitante/abrir?tipo=${permitidos[0]}`);
-  }
+  // Sem área escolhida (ou uma que a pessoa não tem): volta para a escolha.
+  // Nunca marca uma área sozinho.
+  if (!pedido || !permitidos.includes(pedido)) redirect("/solicitante");
   const ambiente = pedido;
 
   const supabase = await createClient();
@@ -56,27 +55,15 @@ export default async function SolicitanteAbrirPage({
         >
           ← Voltar
         </Link>
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 text-center">
-            <BrandMark className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-brand-600 shadow-lg shadow-brand-600/30" />
-            <h1 className="text-xl font-bold">
-              {ambiente === "ti"
-                ? "Abrir chamado de TI"
-                : "Abrir chamado de Manutenção"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              O chamado fica no seu nome.
-            </p>
-          </div>
-          <AbrirComoSolicitante
-            ambiente={ambiente}
-            propriedades={propriedades ?? []}
-            solicitantes={solicitantes ?? []}
-            nomeSolicitantePadrao={perfil.nome}
-            propriedadePadrao={perfil.propriedade_id}
-            sistemas={sistemasRes.data ?? []}
-          />
-        </div>
+        <CartaoAbrirChamado
+          className="mt-4"
+          ambiente={ambiente}
+          nome={perfil.nome}
+          propriedadePadrao={perfil.propriedade_id}
+          propriedades={propriedades ?? []}
+          solicitantes={solicitantes ?? []}
+          sistemas={sistemasRes.data ?? []}
+        />
       </main>
       <SolicitanteNav />
     </div>
