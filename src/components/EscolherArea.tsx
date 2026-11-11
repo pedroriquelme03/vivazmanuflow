@@ -15,23 +15,22 @@ const BOTAO: Record<AmbienteEquipe, { rotulo: string; classe: string }> = {
 /**
  * Primeiro passo de abrir chamado: escolher a área. Nada vem marcado, para
  * ninguém mandar chamado de TI como Manutenção (e vice-versa) sem perceber.
- * Com `rota`, cada botão é um link para `rota?tipo=ti|manutencao` (telas);
- * com `onEscolher`, é um botão que avisa a escolha (janela do quadro).
+ * Cada botão leva para `rota?tipo=ti|manutencao`, a tela do formulário.
+ * (O "+ Novo chamado" do quadro não passa por aqui: abre direto na área do
+ * próprio quadro.)
  */
 export function EscolherArea({
   nome,
   ambientes,
   rota,
-  onEscolher,
   className = "",
 }: {
   nome: string;
   ambientes: readonly AmbienteEquipe[];
+  rota: string;
+  /** Altura/espaçamento do bloco, que depende da tela em volta. */
   className?: string;
-} & (
-  | { rota: string; onEscolher?: never }
-  | { onEscolher: (ambiente: AmbienteEquipe) => void; rota?: never }
-)) {
+}) {
   const ordem = (["ti", "manutencao"] as const).filter((a) => ambientes.includes(a));
   const texto =
     ordem.length === 2
@@ -44,18 +43,12 @@ export function EscolherArea({
       <div className="mt-6 grid w-full max-w-xs gap-3">
         {ordem.map((ambiente) => {
           const { rotulo, classe } = BOTAO[ambiente];
-          const estilo = `block w-full cursor-pointer rounded-2xl px-5 py-4 text-center text-base font-semibold text-white shadow-lg transition ${classe}`;
-          return onEscolher ? (
-            <button
+          return (
+            <Link
               key={ambiente}
-              type="button"
-              onClick={() => onEscolher(ambiente)}
-              className={estilo}
+              href={`${rota}?tipo=${ambiente}`}
+              className={`block w-full rounded-2xl px-5 py-4 text-center text-base font-semibold text-white shadow-lg transition ${classe}`}
             >
-              {rotulo}
-            </button>
-          ) : (
-            <Link key={ambiente} href={`${rota}?tipo=${ambiente}`} className={estilo}>
               {rotulo}
             </Link>
           );

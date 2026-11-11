@@ -32,7 +32,7 @@ import {
   listarQuadro,
   type PeriodoConcluidas,
 } from "@/lib/quadro-ambiente";
-import { ROTULO_PAINEL, type AmbienteEquipe } from "@/lib/ambiente-equipe";
+import type { AmbienteEquipe } from "@/lib/ambiente-equipe";
 import {
   colaboradoresDoFiltroProjeto,
   filtrarQuadroProjetos,
@@ -935,7 +935,7 @@ export function KanbanLider({
             destinarConcluido: criando === "concluido",
           }}
           onFechar={() => setCriando(null)}
-          onSucesso={(token, areaDoChamado) => {
+          onSucesso={(token) => {
             const jaConcluido = criando === "concluido";
             setCriando(null);
             setSucesso(
@@ -943,11 +943,9 @@ export function KanbanLider({
                 ? "Registrado em Concluídas, sem entrar na fila."
                 : token === null
                   ? "Sem conexão. A demanda ficou na fila e será enviada quando a internet voltar."
-                  : areaDoChamado !== ambiente
-                    ? `Chamado criado no quadro de ${ROTULO_PAINEL[areaDoChamado]}.`
-                    : "Demanda criada com sucesso!",
+                  : "Demanda criada com sucesso!",
             );
-            if (token !== null && areaDoChamado === ambiente) recarregar();
+            if (token !== null) recarregar();
             window.setTimeout(() => setSucesso(null), 5000);
           }}
         />
