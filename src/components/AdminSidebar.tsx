@@ -61,12 +61,21 @@ const ICONE_CHECKLIST: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" />
     </svg>
   ),
-  "/governanca/admin/acomodacoes": (
+  "/governanca/admin/setores": (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6M3 18h18M3 14h18M7 10V7h4v3" />
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
-  "/governanca/admin/camareiras": (
+  "/governanca/admin/locais": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  ),
+  "/governanca/admin/colaboradores": (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <circle cx="12" cy="8" r="3.5" />
       <path strokeLinecap="round" d="M5 20a7 7 0 0 1 14 0" />

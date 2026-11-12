@@ -7,18 +7,16 @@ import { comprimirImagem } from "@/lib/comprimir-imagem";
 import {
   BUCKET_GOVERNANCA,
   MIGRATION_HINT_GOV,
-  agruparPorCategoria,
   agruparPorGrupo,
   corNota,
   erroSchemaGov,
   filtrarAcomodacoes,
-  normalizarBusca,
-  notaInspecao,
+  localServeAoChecklist,
   ordenarSecoes,
-  rotuloAplicacao,
   rotuloTipo,
   secaoCompleta,
   secaoParaRetomar,
+  temItemVisivel,
   tipoItem,
   type Acomodacao,
   type Camareira,
@@ -26,20 +24,33 @@ import {
   type Processo,
   type SecaoComPerguntas,
 } from "@/lib/governanca";
+import type { PropriedadeRef, SetorChecklist } from "@/lib/checklist-setores";
+import { formatarDataCurta } from "@/lib/checklist-inspecao";
+import { notaPonderada, ocultos, type Dependencia } from "@/lib/checklist-regras";
 import { compararNumeroUh } from "@/lib/mapa-uhs";
+import { EscolhaChecklist } from "./EscolhaChecklist";
+import { PassoDados } from "./PassoDados";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
 import { Erro, Vazio, btnPrimario, btnSecundario, cardCls, inputCls } from "../ui";
 
-type Fase = "processo" | "acomodacao" | "camareira" | "perguntas" | "salvando" | "concluido";
+type Fase = "processo" | "acomodacao" | "dados" | "perguntas" | "salvando" | "concluido";
 type ProcessoResumo = Processo & { itens: number };
-type ProcessoCompleto = ProcessoResumo & { secoes: SecaoComPerguntas[] };
+type ProcessoCompleto = ProcessoResumo & { secoes: SecaoComPerguntas[]; dependencias: Dependencia[] };
 
-/** Checklist em andamento que a pessoa reabriu pelo Início. */
+const NADA_ESCONDIDO = { perguntas: new Set<string>(), secoes: new Set<string>() };
+
+/** Pergunta → tipo e seção, para as condicionais. */
+function mapaPerguntas(secoes: SecaoComPerguntas[]) {
+  return new Map(secoes.flatMap((s) => s.gov_perguntas.map((q) => [q.id, { tipo: q.tipo, secao_id: s.id }] as const)));
+}
+
+/** Checklist em andamento (ou pausado) que a pessoa reabriu para continuar. */
 export type RascunhoInspecao = {
   id: string;
   processoId: string;
   acomodacaoId: string | null;
   camareiraId: string | null;
+  dataReferencia: string;
   respostas: {
     pergunta_id: string | null;
     resposta: string | null;
@@ -94,24 +105,31 @@ function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaL
 
 export function NovaInspecao({
   eu,
-  ehAdmin,
-  escolheCamareira,
+  equipe,
   acomodacoes,
   camareiras,
   processos,
+  setores,
+  propriedades,
   rascunho,
+  hoje,
   relatorioDoDia = [],
   dataRelatorio = null,
 }: {
+  /** Hoje (aaaa-mm-dd, Brasília), calculado no servidor. */
+  hoje: string;
   relatorioDoDia?: UhDoRelatorio[];
   /** Data (aaaa-mm-dd) do relatório usado, quando não é o de hoje. */
   dataRelatorio?: string | null;
   eu: { id: string; nome: string };
-  ehAdmin: boolean;
-  escolheCamareira: boolean;
+  /** Líder ou admin: escolhe o colaborador avaliado e pode criar checklists. */
+  equipe: boolean;
   acomodacoes: Acomodacao[];
+  /** Colaboradores (tabela gov_camareiras). */
   camareiras: Camareira[];
   processos: ProcessoResumo[];
+  setores: SetorChecklist[];
+  propriedades: PropriedadeRef[];
   rascunho?: RascunhoInspecao | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -124,6 +142,9 @@ export function NovaInspecao({
   const [processo, setProcesso] = useState<ProcessoCompleto | null>(null);
   const [acomodacao, setAcomodacao] = useState<Acomodacao | null>(null);
   const [camareira, setCamareira] = useState<Camareira | null>(null);
+  // Colaborador do rascunho que a pessoa não enxerga (outro setor): mantido ao salvar.
+  const [camareiraOculta, setCamareiraOculta] = useState<string | null>(null);
+  const [dataReferencia, setDataReferencia] = useState(rascunho?.dataReferencia ?? hoje);
 
   const [secaoIndex, setSecaoIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, RespostaLocal>>({});
@@ -133,46 +154,52 @@ export function NovaInspecao({
   const criando = useRef<Promise<string> | null>(null);
   const [inspecaoIdFinal, setInspecaoIdFinal] = useState<string | null>(null);
   const [chamadosAbertos, setChamadosAbertos] = useState<{ abertos: number; total: number } | null>(null);
-  const [buscaProcesso, setBuscaProcesso] = useState("");
   const [busca, setBusca] = useState("");
   const [prefixoAndar, setPrefixoAndar] = useState<string | null>(null);
 
-  // Nota da vistoria: só os itens de sim/não do checklist atual contam.
-  const idsPerguntas = new Set((processo?.secoes ?? []).flatMap((s) => s.gov_perguntas.map((p) => p.id)));
-  const contagemFinal = Object.entries(respostas).reduce(
-    (c, [id, r]) => {
-      if (!idsPerguntas.has(id)) return c;
-      if (r.resposta === "sim") c.sim += 1;
-      if (r.resposta === "nao") c.nao += 1;
+  const comItens = useMemo(() => processos.filter((p) => p.itens > 0), [processos]);
+
+  const secoes = processo?.secoes ?? [];
+  // Condicionais: o que a resposta atual esconde (pergunta ou seção inteira).
+  const escondidos = useMemo(
+    () => (processo ? ocultos(processo.dependencias, respostas, mapaPerguntas(processo.secoes)) : NADA_ESCONDIDO),
+    [processo, respostas],
+  );
+  const perguntasVisiveis = secoes.flatMap((s) =>
+    escondidos.secoes.has(s.id) ? [] : s.gov_perguntas.filter((q) => !escondidos.perguntas.has(q.id)),
+  );
+
+  // Nota da vistoria: Sim/Não visíveis, cada um com o seu peso.
+  const contagemFinal = perguntasVisiveis.reduce(
+    (c, q) => {
+      if (respostas[q.id]?.resposta === "sim") c.sim += 1;
+      if (respostas[q.id]?.resposta === "nao") c.nao += 1;
       return c;
     },
     { sim: 0, nao: 0 },
   );
-  const notaFinal = notaInspecao(contagemFinal.sim, contagemFinal.nao);
-
-  const comItens = processos.filter((p) => p.itens > 0);
-  const gruposProcesso = agruparPorCategoria(
-    comItens.filter((p) => {
-      const q = normalizarBusca(buscaProcesso);
-      return !q || normalizarBusca(`${p.categoria ?? ""} ${p.nome}`).includes(q);
-    }),
+  const notaFinal = notaPonderada(
+    perguntasVisiveis.map((q) => ({ resposta: respostas[q.id]?.resposta ?? null, peso: Number(q.peso) })),
   );
 
-  const secoes = processo?.secoes ?? [];
   const secaoAtual = secoes[secaoIndex];
-  const acomodacoesDoProcesso = acomodacoes.filter(
-    (a) =>
-      a.tipo !== "setor" && (!processo || processo.tipo === "ambos" || a.tipo === processo.tipo),
-  );
-  const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, prefixoAndar);
+  // Locais da propriedade do checklist: as áreas, ou as UHs do tipo dele.
+  const propriedadeDoProcesso = setores.find((s) => s.id === processo?.setor_id)?.propriedade_id;
+  const acomodacoesDoProcesso = processo
+    ? acomodacoes.filter((a) => a.propriedade_id === propriedadeDoProcesso && localServeAoChecklist(a, processo))
+    : [];
+  const ehArea = processo?.tipo === "area";
+  const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, ehArea ? null : prefixoAndar);
   // As do relatório de hoje vêm primeiro (do menor para o maior número); as outras continuam abaixo.
   const relatorioPorNumero = new Map(relatorioDoDia.map((u) => [u.numero, u]));
   const filtradasDoRelatorio = filtradas
     .filter((a) => relatorioPorNumero.has(a.numero))
     .sort((a, b) => compararNumeroUh(a.numero, b.numero));
   const filtradasOutras = filtradas.filter((a) => !relatorioPorNumero.has(a.numero));
-  const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas) : false;
-  const nomesCamareiras = camareiras.map((c) => c.nome);
+  const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas, escondidos.perguntas) : false;
+  // Só os colaboradores do setor do checklist (o banco também confere ao salvar).
+  const colaboradores = camareiras.filter((c) => c.setor_id === processo?.setor_id);
+  const nomesCamareiras = colaboradores.map((c) => c.nome);
   const usaUh = processo?.usa_acomodacao ?? false;
 
   function subir() {
@@ -186,12 +213,17 @@ export function NovaInspecao({
       .from("gov_secoes")
       .select("*, gov_perguntas(*)")
       .eq("processo_id", resumo.id);
+    const secoes = ordenarSecoes((data ?? []) as SecaoComPerguntas[]);
+    const ids = secoes.flatMap((s) => s.gov_perguntas.map((q) => q.id));
+    const { data: dependencias, error: eDep } = ids.length
+      ? await supabase.from("gov_dependencias").select("*").in("pergunta_id", ids)
+      : { data: [], error: null };
     setCarregando(false);
-    if (error) {
+    if (error || eDep) {
       setErro("Não foi possível abrir o checklist. Tente de novo.");
       return null;
     }
-    const p: ProcessoCompleto = { ...resumo, secoes: ordenarSecoes((data ?? []) as SecaoComPerguntas[]) };
+    const p: ProcessoCompleto = { ...resumo, secoes, dependencias: dependencias ?? [] };
     if (!p.secoes.some((s) => s.gov_perguntas.length > 0)) {
       setErro("Este checklist ainda não tem perguntas.");
       return null;
@@ -223,9 +255,11 @@ export function NovaInspecao({
       );
       setProcesso(p);
       setAcomodacao(acomodacoes.find((a) => a.id === rascunho.acomodacaoId) ?? null);
-      setCamareira(camareiras.find((c) => c.id === rascunho.camareiraId) ?? null);
+      const doRascunho = camareiras.find((c) => c.id === rascunho.camareiraId) ?? null;
+      setCamareira(doRascunho);
+      setCamareiraOculta(doRascunho ? null : rascunho.camareiraId);
       setRespostas(init);
-      setSecaoIndex(secaoParaRetomar(p.secoes, init));
+      setSecaoIndex(secaoParaRetomar(p.secoes, init, ocultos(p.dependencias, init, mapaPerguntas(p.secoes))));
       setFase("perguntas");
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,23 +279,25 @@ export function NovaInspecao({
     setProcesso(p);
     setAcomodacao(null);
     setCamareira(null);
+    setCamareiraOculta(null);
     const init: Record<string, RespostaLocal> = {};
     p.secoes.forEach((s) => s.gov_perguntas.forEach((q) => (init[q.id] = respostaVazia())));
     setRespostas(init);
-    setSecaoIndex(p.secoes.findIndex((s) => s.gov_perguntas.length > 0));
-    setFase(p.usa_acomodacao ? "acomodacao" : "perguntas");
+    const inicio = ocultos(p.dependencias, init, mapaPerguntas(p.secoes));
+    setSecaoIndex(Math.max(0, p.secoes.findIndex((s) => temItemVisivel(s, inicio))));
+    setFase(p.usa_acomodacao ? "acomodacao" : "dados");
     subir();
   }
 
   function escolherAcomodacao(a: Acomodacao) {
     setAcomodacao(a);
     setErro(null);
-    setFase(escolheCamareira ? "camareira" : "perguntas");
+    setFase("dados");
   }
 
   async function irParaSecao(delta: 1 | -1) {
     let i = secaoIndex + delta;
-    while (i >= 0 && i < secoes.length && secoes[i].gov_perguntas.length === 0) i += delta;
+    while (i >= 0 && i < secoes.length && !temItemVisivel(secoes[i], escondidos)) i += delta;
     if (i < 0) return;
     if (delta === 1 && secaoAtual) {
       const salvou = await salvarSecao(secaoAtual);
@@ -272,14 +308,14 @@ export function NovaInspecao({
     subir();
   }
 
-  const ultimaSecao = !secoes.slice(secaoIndex + 1).some((s) => s.gov_perguntas.length > 0);
-  const temAnterior = secoes.slice(0, secaoIndex).some((s) => s.gov_perguntas.length > 0);
+  const ultimaSecao = !secoes.slice(secaoIndex + 1).some((s) => temItemVisivel(s, escondidos));
+  const temAnterior = secoes.slice(0, secaoIndex).some((s) => temItemVisivel(s, escondidos));
 
   function voltar() {
     setErro(null);
     if (fase === "perguntas" && temAnterior) return irParaSecao(-1);
-    if (fase === "perguntas" && usaUh) return setFase(escolheCamareira ? "camareira" : "acomodacao");
-    if (fase === "camareira") return setFase("acomodacao");
+    if (fase === "perguntas") return setFase("dados");
+    if (fase === "dados" && usaUh) return setFase("acomodacao");
     setFase("processo");
   }
 
@@ -300,8 +336,10 @@ export function NovaInspecao({
   function cabecalho() {
     return {
       acomodacao_id: acomodacao?.id ?? null,
-      tipo: acomodacao ? (acomodacao.tipo === "suite" ? "suite" : "apartamento") : null,
-      camareira_id: camareira?.id ?? null,
+      // O tipo da inspeção é só de UH; área não tem.
+      tipo: acomodacao?.tipo === "suite" || acomodacao?.tipo === "apartamento" ? acomodacao.tipo : null,
+      camareira_id: camareira?.id ?? camareiraOculta,
+      data_referencia: dataReferencia,
     };
   }
 
@@ -354,12 +392,17 @@ export function NovaInspecao({
     setSalvandoSecao(true);
     try {
       const id = await garantirInspecao();
-      const { error: e0 } = await supabase.from("gov_inspecoes").update(cabecalho()).eq("id", id);
+      // Continuar um checklist pausado o coloca em andamento de novo.
+      const { error: e0 } = await supabase
+        .from("gov_inspecoes")
+        .update({ ...cabecalho(), status: "em_andamento" })
+        .eq("id", id);
       if (e0) throw e0;
 
       const fotos: Record<string, string | null> = {};
       const linhas = [];
-      for (const q of secao.gov_perguntas) {
+      // Só as visíveis são gravadas; a resposta de quem ficou escondido sai (apagada abaixo).
+      for (const q of secao.gov_perguntas.filter((p) => !escondidos.perguntas.has(p.id))) {
         const r = respostas[q.id] ?? respostaVazia();
         const tipo = tipoItem(q.tipo);
         const anexoUrl = r.anexoFile
@@ -383,6 +426,7 @@ export function NovaInspecao({
           pergunta_texto: q.texto,
           pergunta_ordem: q.ordem,
           pergunta_tipo: tipo,
+          pergunta_peso: Number(q.peso),
           pergunta_grupo: q.grupo,
           secao_nome: secao.nome,
           secao_ordem: secao.ordem,
@@ -451,6 +495,18 @@ export function NovaInspecao({
     setFase("salvando");
     try {
       const id = await garantirInspecao();
+      // Resposta salva antes de uma condicional esconder a pergunta (ou a seção) não vale.
+      const idsEscondidos = secoes.flatMap((s) =>
+        s.gov_perguntas.filter((q) => escondidos.secoes.has(s.id) || escondidos.perguntas.has(q.id)).map((q) => q.id),
+      );
+      if (idsEscondidos.length) {
+        const { error: eLimpa } = await supabase
+          .from("gov_respostas")
+          .delete()
+          .eq("inspecao_id", id)
+          .in("pergunta_id", idsEscondidos);
+        if (eLimpa) throw eLimpa;
+      }
       const { error } = await supabase
         .from("gov_inspecoes")
         .update({ status: "finalizada", finalizada_em: new Date().toISOString() })
@@ -487,10 +543,17 @@ export function NovaInspecao({
           <Chip>{processo.nome}</Chip>
           {acomodacao && (
             <Chip>
-              UH {acomodacao.numero} · {rotuloTipo(acomodacao.tipo)}
+              {acomodacao.tipo === "area"
+                ? acomodacao.numero
+                : `UH ${acomodacao.numero} · ${rotuloTipo(acomodacao.tipo)}`}
             </Chip>
           )}
-          {camareira && fase === "perguntas" && <Chip>{camareira.nome}</Chip>}
+          {fase === "perguntas" && (
+            <>
+              {camareira && <Chip>{camareira.nome}</Chip>}
+              {dataReferencia !== hoje && <Chip>{formatarDataCurta(dataReferencia)}</Chip>}
+            </>
+          )}
         </div>
       )}
 
@@ -502,11 +565,11 @@ export function NovaInspecao({
             <div>
               <h1 className="text-xl font-bold text-slate-800">Preencher checklist</h1>
               <p className="mt-0.5 text-sm text-slate-500">
-                Escolha qual checklist você vai preencher agora.
-                {ehAdmin ? " Para criar ou alterar um checklist, use Criar checklist." : ""}
+                Escolha a propriedade, o setor e o checklist que você vai preencher agora.
+                {equipe ? " Para criar ou alterar um checklist, use Criar checklist." : ""}
               </p>
             </div>
-            {ehAdmin && (
+            {equipe && (
               <Link href="/governanca/admin/processos?novo=1" className={`${btnSecundario} shrink-0`}>
                 + Criar checklist
               </Link>
@@ -515,62 +578,35 @@ export function NovaInspecao({
           {comItens.length === 0 ? (
             <Vazio
               texto={
-                ehAdmin
-                  ? "Nenhum checklist ativo com perguntas. Use Criar checklist para montar o primeiro."
-                  : "Nenhum checklist disponível ainda. Peça ao administrador para cadastrar."
+                equipe
+                  ? "Nenhum checklist ativo com perguntas nos seus setores. Use Criar checklist para montar o primeiro."
+                  : "Nenhum checklist disponível nos seus setores. Peça ao líder ou ao administrador."
               }
             />
           ) : (
-            <>
-              <input
-                className={`${inputCls} mb-4`}
-                type="search"
-                value={buscaProcesso}
-                onChange={(e) => setBuscaProcesso(e.target.value)}
-                placeholder="Buscar checklist…"
-              />
-              {gruposProcesso.length === 0 && <Vazio texto="Nenhum checklist encontrado." />}
-              {gruposProcesso.map((g) => (
-                <section key={g.categoria} className="mb-5">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {g.categoria}
-                  </h3>
-                  <div className="space-y-2">
-                    {g.itens.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        disabled={carregando}
-                        onClick={() => escolherProcesso(p)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-400"
-                      >
-                        <span className="text-xl">📋</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-semibold text-slate-800">{p.nome}</span>
-                          <span className="block text-xs text-slate-500">
-                            {p.itens} itens ·{" "}
-                            {rotuloAplicacao(p)}
-                            {p.descricao ? ` · ${p.descricao}` : ""}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </>
+            <EscolhaChecklist
+              processos={comItens}
+              setores={setores}
+              propriedades={propriedades}
+              carregando={carregando}
+              onEscolher={escolherProcesso}
+            />
           )}
         </>
       )}
 
       {fase === "acomodacao" && (
         <>
-          <h2 className="mb-3 text-lg font-semibold text-slate-800">Escolha a acomodação</h2>
+          <h2 className="mb-3 text-lg font-semibold text-slate-800">
+            {ehArea ? "Escolha a área" : "Escolha a acomodação"}
+          </h2>
           {acomodacoesDoProcesso.length === 0 ? (
-            <Vazio texto="Nenhuma acomodação cadastrada para este checklist." />
+            <Vazio
+              texto={`Nenhum${ehArea ? "a área" : "a UH"} desta propriedade cadastrada. O administrador cadastra em Locais.`}
+            />
           ) : (
             <>
-              <div className="mb-3 grid grid-cols-3 gap-2">
+              <div className={`mb-3 grid grid-cols-3 gap-2 ${ehArea ? "hidden" : ""}`}>
                 {PREFIXOS_ANDAR.map((prefixo) => (
                   <button
                     key={prefixo}
@@ -591,7 +627,7 @@ export function NovaInspecao({
                 type="search"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar por número ou tipo…"
+                placeholder={ehArea ? "Buscar área…" : "Buscar por número ou tipo…"}
               />
               {filtradas.length === 0 ? (
                 <Vazio texto="Nenhuma acomodação encontrada." />
@@ -649,11 +685,17 @@ export function NovaInspecao({
                             key={a.id}
                             type="button"
                             onClick={() => escolherAcomodacao(a)}
-                            className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white py-4 shadow-sm transition hover:border-brand-400"
+                            className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-2 py-4 shadow-sm transition hover:border-brand-400"
                           >
-                            <span className="text-[10px] font-medium uppercase text-slate-400">UH</span>
-                            <span className="text-xl font-bold text-slate-800">{a.numero}</span>
-                            <span className="mt-1 text-[11px] text-slate-500">{rotuloTipo(a.tipo, true)}</span>
+                            <span className="text-[10px] font-medium uppercase text-slate-400">
+                              {ehArea ? "Área" : "UH"}
+                            </span>
+                            <span
+                              className={`text-center font-bold text-slate-800 ${ehArea ? "text-sm leading-tight" : "text-xl"}`}
+                            >
+                              {a.numero}
+                            </span>
+                            {!ehArea && <span className="mt-1 text-[11px] text-slate-500">{rotuloTipo(a.tipo, true)}</span>}
                           </button>
                         ))}
                       </div>
@@ -666,43 +708,17 @@ export function NovaInspecao({
         </>
       )}
 
-      {fase === "camareira" && (
-        <>
-          <h2 className="mb-1 text-lg font-semibold text-slate-800">Quem limpou o quarto?</h2>
-          <p className="mb-3 text-sm text-slate-500">Selecione a camareira responsável pela limpeza.</p>
-          {camareiras.length === 0 ? (
-            <Vazio texto="Nenhuma camareira cadastrada." />
-          ) : (
-            <div className="space-y-2">
-              {camareiras.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCamareira(c)}
-                  className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left shadow-sm transition ${
-                    camareira?.id === c.id
-                      ? "border-brand-400 bg-brand-50"
-                      : "border-slate-200 bg-white hover:border-brand-300"
-                  }`}
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700">
-                    {c.nome.charAt(0)}
-                  </span>
-                  <span className="font-medium text-slate-800">{c.nome}</span>
-                  {camareira?.id === c.id && <span className="ml-auto text-brand-600">✓</span>}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setFase("perguntas")}
-            className={`${btnPrimario} mt-6 w-full`}
-            disabled={!camareira && camareiras.length > 0}
-          >
-            Continuar
-          </button>
-        </>
+      {fase === "dados" && (
+        <PassoDados
+          escolheColaborador={equipe}
+          colaboradores={colaboradores}
+          colaborador={camareira}
+          onColaborador={setCamareira}
+          data={dataReferencia}
+          hoje={hoje}
+          onData={setDataReferencia}
+          onContinuar={() => setFase("perguntas")}
+        />
       )}
 
       {fase === "perguntas" && secaoAtual && (
@@ -712,7 +728,9 @@ export function NovaInspecao({
               <span>
                 Seção {secaoIndex + 1} de {secoes.length}
               </span>
-              <span>{secaoAtual.gov_perguntas.length} itens</span>
+              <span>
+                {secaoAtual.gov_perguntas.filter((q) => !escondidos.perguntas.has(q.id)).length} itens
+              </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
               <div
@@ -730,7 +748,7 @@ export function NovaInspecao({
                 {g.grupo && (
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-brand-700">{g.grupo}</h3>
                 )}
-                {g.itens.map((q) => (
+                {g.itens.filter((q) => !escondidos.perguntas.has(q.id)).map((q) => (
                   <PerguntaItem
                     key={q.id}
                     pergunta={q}

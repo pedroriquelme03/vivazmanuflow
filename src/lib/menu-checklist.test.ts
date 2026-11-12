@@ -12,22 +12,24 @@ describe("menuChecklist", () => {
       "Relatório diário",
       "Inspeções",
       "Gerenciar checklists",
-      "Acomodações",
-      "Camareiras",
+      "Setores",
+      "Locais",
+      "Colaboradores",
       "Como funciona",
       "Kanban",
       "Relatórios",
-    "Fechamento do mês",
+      "Fechamento do mês",
     ]);
   });
 
-  it("líder acompanha as inspeções, cadastra camareiras e vê o Kanban", () => {
+  it("líder acompanha as inspeções, edita os checklists e colaboradores do setor e vê o Kanban", () => {
     expect(rotulos("lider")).toEqual([
       "Início",
       "Preencher checklist",
       "Relatório diário",
       "Inspeções",
-      "Camareiras",
+      "Gerenciar checklists",
+      "Colaboradores",
       "Como funciona",
       "Kanban",
     ]);

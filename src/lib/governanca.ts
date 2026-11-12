@@ -1,8 +1,11 @@
 import type { Tables } from "@/lib/database.types";
+import { complementosFaltando } from "@/lib/checklist-regras";
 
 export type GovPapel = "admin" | "lider" | "camareira";
-export type TipoAcomodacao = "suite" | "apartamento" | "setor";
-export type TipoProcesso = "suite" | "apartamento" | "ambos";
+/** Tipo do local do checklist: UH (suíte ou apartamento) ou área (casa de máquinas, bilheteria…). */
+export type TipoAcomodacao = "suite" | "apartamento" | "area";
+/** Onde o checklist é aplicado: UH (suíte, apartamento ou ambos) ou área. */
+export type TipoProcesso = "suite" | "apartamento" | "ambos" | "area";
 export type Prioridade = "baixa" | "media" | "alta";
 export type RespostaValor = "sim" | "nao";
 
@@ -53,18 +56,26 @@ export function inspecionaEquipe(papel: GovPapel | null) {
 
 export function rotuloTipo(tipo: string, curto = false) {
   if (tipo === "suite") return "Suíte";
-  if (tipo === "setor") return "Setor";
+  if (tipo === "area") return "Área";
   return curto ? "Apto" : "Apartamento";
 }
 
 export function rotuloTipoProcesso(tipo: string) {
   if (tipo === "ambos") return "Ambos";
+  if (tipo === "area") return "Áreas";
   return tipo === "suite" ? "Suítes" : "Apartamentos";
 }
 
-/** Onde o checklist se aplica: tipo de UH ou nenhum. */
+/** Onde o checklist se aplica: tipo de UH, área ou nenhum local. */
 export function rotuloAplicacao(p: { usa_acomodacao: boolean; tipo: string }) {
-  return p.usa_acomodacao ? rotuloTipoProcesso(p.tipo) : "Sem UH";
+  return p.usa_acomodacao ? rotuloTipoProcesso(p.tipo) : "Sem local";
+}
+
+/** Locais que o checklist oferece: as áreas, ou as UHs do tipo dele. */
+export function localServeAoChecklist(local: { tipo: string }, processo: { tipo: string }) {
+  if (processo.tipo === "area") return local.tipo === "area";
+  if (local.tipo === "area") return false;
+  return processo.tipo === "ambos" || local.tipo === processo.tipo;
 }
 
 export function formatDataHora(iso: string | null | undefined): string {
@@ -166,6 +177,9 @@ export type RespostaParcial = {
   resposta: RespostaValor | "na" | null;
   valor?: string;
   selecionadas?: string[];
+  comentario?: string;
+  anexoPreview?: string | null;
+  anexoFile?: unknown;
   plano: { o_que_fazer: string } | null;
 };
 
@@ -174,16 +188,19 @@ type ItemRegra = {
   tipo?: string;
   obrigatoria?: boolean;
   plano_acao?: boolean;
+  exige?: unknown;
 };
 
 /**
  * Item pronto para seguir. Obrigatório precisa de resposta (ou N/A);
- * "Não" com plano de ação precisa do que fazer, mesmo se o item for opcional.
+ * "Não" com plano de ação precisa do que fazer, mesmo se o item for opcional;
+ * e a resposta dada precisa dos complementos que ela exige (foto, comentário).
  */
 export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) {
   const obrigatoria = item.obrigatoria ?? true;
   const tipo = tipoItem(item.tipo);
   if (r?.resposta === "na") return true;
+  if (complementosFaltando({ tipo, exige: item.exige }, r).length > 0) return false;
   if (tipo === "sim_nao") {
     if (!r || r.resposta === null) return !obrigatoria;
     if (r.resposta === "nao" && (item.plano_acao ?? true) && !r.plano?.o_que_fazer.trim()) {
@@ -198,12 +215,13 @@ export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) 
   return preenchido || !obrigatoria;
 }
 
-/** Seção pronta: todos os itens prontos para seguir. */
+/** Seção pronta: todos os itens visíveis prontos para seguir (os escondidos por condicional não contam). */
 export function secaoCompleta(
   perguntas: ItemRegra[],
   respostas: Record<string, RespostaParcial | undefined>,
+  escondidas: ReadonlySet<string> = new Set(),
 ) {
-  return perguntas.every((q) => itemRespondido(q, respostas[q.id]));
+  return perguntas.every((q) => escondidas.has(q.id) || itemRespondido(q, respostas[q.id]));
 }
 
 // ---- Kanban ----
@@ -225,6 +243,7 @@ export function colunaKanban(inspecao: {
   status: string;
   planos: { resolvido_em: string | null }[];
 }): ColunaKanban {
+  // Pausada fica em andamento (com aviso no cartão); cancelada nem entra no Kanban.
   if (inspecao.status !== "finalizada") return "andamento";
   if (inspecao.planos.length === 0) return "ok";
   return inspecao.planos.some((p) => !p.resolvido_em) ? "pendencia" : "resolvida";
@@ -243,15 +262,30 @@ export function tempoDesde(iso: string, agora: number) {
 
 /** Ao continuar um checklist em andamento, volta na primeira seção com item pendente. */
 export function secaoParaRetomar(
-  secoes: { gov_perguntas: ItemRegra[] }[],
+  secoes: { id?: string; gov_perguntas: ItemRegra[] }[],
   respostas: Record<string, RespostaParcial | undefined>,
+  escondidos: { perguntas: ReadonlySet<string>; secoes: ReadonlySet<string> } = {
+    perguntas: new Set(),
+    secoes: new Set(),
+  },
 ) {
   const comItens = secoes
     .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.gov_perguntas.length > 0);
+    .filter(({ s }) => temItemVisivel(s, escondidos));
   if (comItens.length === 0) return 0;
-  const pendente = comItens.find(({ s }) => !secaoCompleta(s.gov_perguntas, respostas));
+  const pendente = comItens.find(({ s }) => !secaoCompleta(s.gov_perguntas, respostas, escondidos.perguntas));
   return (pendente ?? comItens[comItens.length - 1]).i;
+}
+
+/** A seção aparece no preenchimento: não está escondida e tem pergunta visível. */
+export function temItemVisivel(
+  secao: { id?: string; gov_perguntas: { id: string }[] },
+  escondidos: { perguntas: ReadonlySet<string>; secoes: ReadonlySet<string> },
+) {
+  return (
+    !(secao.id && escondidos.secoes.has(secao.id)) &&
+    secao.gov_perguntas.some((q) => !escondidos.perguntas.has(q.id))
+  );
 }
 
 /** Valor gravado de um item que não é Sim/Não, do jeito que a pessoa lê. */
@@ -295,23 +329,6 @@ export function agruparPorGrupo<T extends { grupo: string | null }>(itens: T[]) 
     else grupos.push({ grupo: item.grupo, itens: [item] });
   }
   return grupos;
-}
-
-/** Checklists agrupados pela categoria (sem categoria fica por último). */
-export function agruparPorCategoria<T extends { categoria: string | null; nome: string }>(
-  lista: T[],
-) {
-  const mapa = new Map<string, T[]>();
-  for (const p of lista) {
-    const c = p.categoria?.trim() || "Outros";
-    mapa.set(c, [...(mapa.get(c) ?? []), p]);
-  }
-  return [...mapa.entries()]
-    .sort(([a], [b]) => (a === "Outros" ? 1 : b === "Outros" ? -1 : a.localeCompare(b, "pt-BR")))
-    .map(([categoria, itens]) => ({
-      categoria,
-      itens: [...itens].sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR")),
-    }));
 }
 
 /** Busca sem diferenciar acento nem maiúscula. */
@@ -486,12 +503,15 @@ export function indicadoresAndamento(
   planos: PlanoRel[],
   agora = Date.now(),
 ) {
-  const emAndamento = inspecoes.filter((i) => i.status !== "finalizada");
+  // Pausada conta como aberta, mas não como parada (alguém pausou de propósito).
+  const emAndamento = inspecoes.filter((i) => i.status === "em_andamento" || i.status === "pausada");
   const finalizadas = inspecoes.filter((i) => i.status === "finalizada" && i.finalizada_em);
   const resolvidos = planos.filter((p) => p.resolvido_em);
   return {
     emAndamento: emAndamento.length,
-    parados: emAndamento.filter((i) => minutosEntre(i.criado_em, agora) > MINUTOS_PARADO).length,
+    parados: emAndamento.filter(
+      (i) => i.status === "em_andamento" && minutosEntre(i.criado_em, agora) > MINUTOS_PARADO,
+    ).length,
     tempoPreenchimento: media(finalizadas.map((i) => minutosEntre(i.criado_em, i.finalizada_em!))),
     planosAbertos: planos.length - resolvidos.length,
     planosResolvidos: resolvidos.length,
@@ -508,6 +528,7 @@ export function resumoPorAplicador(inspecoes: InspecaoAndamento[], respostas: Re
   >();
   const nomePorInspecao = new Map<string, string>();
   for (const i of inspecoes) {
+    if (i.status === "cancelada") continue;
     const nome = i.aplicador ?? SEM;
     nomePorInspecao.set(i.id, nome);
     const linha =

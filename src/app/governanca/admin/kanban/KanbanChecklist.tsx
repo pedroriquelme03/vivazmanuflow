@@ -16,8 +16,9 @@ import { inputCls } from "../../ui";
 export type CartaoKanban = {
   id: string;
   coluna: ColunaKanban;
+  pausada: boolean;
   checklist: string;
-  categoria: string | null;
+  setor: string | null;
   uh: string | null;
   camareira: string | null;
   aplicador: string | null;
@@ -75,7 +76,7 @@ export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
     if (!q) return cartoes;
     return cartoes.filter((c) =>
       normalizarBusca(
-        [c.checklist, c.categoria, c.uh, c.camareira, c.aplicador].filter(Boolean).join(" "),
+        [c.checklist, c.setor, c.uh, c.camareira, c.aplicador].filter(Boolean).join(" "),
       ).includes(q),
     );
   }, [cartoes, busca]);
@@ -87,7 +88,7 @@ export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
         type="search"
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar por checklist, UH, camareira ou aplicador…"
+        placeholder="Buscar por checklist, setor, local, colaborador ou aplicador…"
       />
       <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-4">
         {COLUNAS_KANBAN.map((col) => {
@@ -118,15 +119,15 @@ export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
                     href={`/governanca/inspecao/${c.id}`}
                     className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand-300"
                   >
-                    {c.categoria && (
+                    {c.setor && (
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                        {c.categoria}
+                        {c.setor}
                       </p>
                     )}
                     <p className="text-sm font-semibold text-slate-800">{c.checklist}</p>
                     {(c.uh || c.camareira) && (
                       <p className="text-xs text-slate-500">
-                        {[c.uh ? `UH ${c.uh}` : null, c.camareira].filter(Boolean).join(" · ")}
+                        {[c.uh, c.camareira].filter(Boolean).join(" · ")}
                       </p>
                     )}
                     <p className="mt-1 text-xs text-slate-500">
@@ -138,6 +139,7 @@ export function KanbanChecklist({ cartoes }: { cartoes: CartaoKanban[] }) {
                         : formatDataHora(c.fim ?? c.inicio)}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                      {c.pausada && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700">Pausada</span>}
                       {c.coluna === "andamento" && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">
                           {c.respondidos} {c.respondidos === 1 ? "item salvo" : "itens salvos"}

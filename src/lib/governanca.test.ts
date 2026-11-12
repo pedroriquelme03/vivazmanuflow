@@ -3,7 +3,6 @@ import {
   fechamentoMensal,
   notaInspecao,
   notaProdutividade,
-  agruparPorCategoria,
   agruparPorGrupo,
   agruparPorSecao,
   formatarValor,
@@ -11,6 +10,7 @@ import {
   normalizarBusca,
   conformidade,
   filtrarAcomodacoes,
+  localServeAoChecklist,
   inicioPeriodo,
   itensMaisReprovados,
   papelGovernanca,
@@ -79,6 +79,21 @@ describe("andamento nos relatórios", () => {
     expect(r.tempoResolucao).toBe(120);
   });
 
+  it("pausada conta como aberta mas não como parada; cancelada fica de fora", () => {
+    const velha = { criado_em: "2026-10-19T08:00:00Z", finalizada_em: null, aplicador: "Ana" };
+    const r = indicadoresAndamento(
+      [
+        { id: "p", status: "pausada", ...velha },
+        { id: "x", status: "cancelada", ...velha },
+      ],
+      [],
+      agora,
+    );
+    expect(r.emAndamento).toBe(1);
+    expect(r.parados).toBe(0);
+    expect(resumoPorAplicador([{ id: "x", status: "cancelada", ...velha }], [])).toEqual([]);
+  });
+
   it("resume por aplicador", () => {
     const r = resumoPorAplicador(inspecoes, [
       { inspecao_id: "c", resposta: "sim", pergunta_texto: "x" },
@@ -117,6 +132,7 @@ const uh = (numero: string, tipo: string): Acomodacao => ({
   id: numero,
   numero,
   tipo,
+  propriedade_id: "p-vivaz",
   ativo: true,
   criado_em: "",
 });
@@ -137,6 +153,21 @@ describe("papelGovernanca", () => {
     expect(papelGovernanca("admin", null, ["manutencao", "ti"])).toBeNull();
     expect(papelGovernanca("lider", "lider", ["manutencao"])).toBeNull();
     expect(papelGovernanca("solicitante", null, ["checklist"])).toBeNull();
+  });
+});
+
+describe("localServeAoChecklist", () => {
+  const suite = { tipo: "suite" };
+  const apto = { tipo: "apartamento" };
+  const area = { tipo: "area" };
+
+  it("checklist de área mostra só áreas", () => {
+    expect([suite, apto, area].filter((l) => localServeAoChecklist(l, { tipo: "area" }))).toEqual([area]);
+  });
+
+  it("checklist de UH mostra só as UHs do tipo dele", () => {
+    expect([suite, apto, area].filter((l) => localServeAoChecklist(l, { tipo: "ambos" }))).toEqual([suite, apto]);
+    expect([suite, apto, area].filter((l) => localServeAoChecklist(l, { tipo: "suite" }))).toEqual([suite]);
   });
 });
 
@@ -232,6 +263,29 @@ describe("proximaOrdem", () => {
   });
 });
 
+describe("complementos obrigatórios e condicionais no preenchimento", () => {
+  const comFoto = { id: "q", tipo: "sim_nao", plano_acao: false, exige: { nao: ["foto"] } };
+
+  it("Não com foto obrigatória só segue com a foto", () => {
+    expect(itemRespondido(comFoto, { resposta: "nao", plano: null })).toBe(false);
+    expect(itemRespondido(comFoto, { resposta: "nao", plano: null, anexoPreview: "blob:x" })).toBe(true);
+    expect(itemRespondido(comFoto, { resposta: "sim", plano: null })).toBe(true);
+  });
+
+  it("pergunta escondida não trava a seção, e seção escondida é pulada ao retomar", () => {
+    const secoes = [
+      { id: "s1", gov_perguntas: [{ id: "a" }, { id: "b" }] },
+      { id: "s2", gov_perguntas: [{ id: "c" }] },
+    ];
+    const respostas = { a: { resposta: "sim" as const, plano: null } };
+    expect(secaoCompleta(secoes[0].gov_perguntas, respostas, new Set(["b"]))).toBe(true);
+    expect(
+      secaoParaRetomar(secoes, respostas, { perguntas: new Set(["b"]), secoes: new Set(["s2"]) }),
+    ).toBe(0);
+    expect(secaoParaRetomar(secoes, respostas, { perguntas: new Set(["b"]), secoes: new Set() })).toBe(1);
+  });
+});
+
 describe("itemRespondido", () => {
   const vazio = { resposta: null, plano: null };
 
@@ -291,15 +345,6 @@ describe("agrupamentos", () => {
       ["Bomba 1", 2],
       ["Bomba 2", 1],
     ]);
-  });
-
-  it("ordena categorias e deixa Outros por último", () => {
-    const g = agruparPorCategoria([
-      { categoria: null, nome: "Avaliação" },
-      { categoria: "MANUTENÇÃO", nome: "B" },
-      { categoria: "AQUAMANIA", nome: "A" },
-    ]);
-    expect(g.map((x) => x.categoria)).toEqual(["AQUAMANIA", "MANUTENÇÃO", "Outros"]);
   });
 
   it("busca ignora acento", () => {

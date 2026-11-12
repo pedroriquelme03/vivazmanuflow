@@ -8,6 +8,7 @@ import {
   type Prioridade,
   type RespostaValor,
 } from "@/lib/governanca";
+import { complementosExigidos, complementosFaltando } from "@/lib/checklist-regras";
 import { inputCls, labelCls } from "../ui";
 
 const MAX_ANEXO_BYTES = 10 * 1024 * 1024;
@@ -71,6 +72,10 @@ export function PerguntaItem({
   const [anexoErro, setAnexoErro] = useState<string | null>(null);
   const tipo = tipoItem(pergunta.tipo);
   const na = valor.resposta === "na";
+  // O que a resposta escolhida exige (configurado no checklist) e o que ainda falta.
+  const exigidos = complementosExigidos({ tipo, exige: pergunta.exige }, valor);
+  const faltando = complementosFaltando({ tipo, exige: pergunta.exige }, valor);
+  const comentarioObrigatorio = exigidos.includes("comentario");
 
   function setSimNao(r: RespostaValor) {
     if (r === "nao" && pergunta.plano_acao) {
@@ -302,12 +307,18 @@ export function PerguntaItem({
         </label>
       </div>
       {anexoErro && <p className="mt-1 text-xs text-red-600">{anexoErro}</p>}
+      {faltando.length > 0 && (
+        <p className="mt-2 text-xs font-medium text-red-600">
+          Para esta resposta, {faltando.map((c) => (c === "foto" ? "a foto" : "o comentário")).join(" e ")}{" "}
+          {faltando.length > 1 ? "são obrigatórios" : "é obrigatório"}.
+        </p>
+      )}
 
-      {(valor.mostrarComentario || valor.comentario) && (
+      {(valor.mostrarComentario || valor.comentario || comentarioObrigatorio) && (
         <textarea
           className={`${inputCls} mt-3`}
           rows={2}
-          placeholder="Comentário (opcional)"
+          placeholder={comentarioObrigatorio ? "Comentário (obrigatório)" : "Comentário (opcional)"}
           value={valor.comentario}
           onChange={(e) => onChange({ ...valor, comentario: e.target.value })}
         />

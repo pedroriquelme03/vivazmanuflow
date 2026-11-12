@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { GovernancaShell } from "../../GovernancaShell";
+import { carregarSetoresDaPessoa } from "../../setores-dados";
 import { ProcessosApp } from "./ProcessosApp";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +11,13 @@ export default async function ProcessosPage({
 }: {
   searchParams: Promise<{ novo?: string }>;
 }) {
-  const { perfil, papel } = await exigirGovernanca("/governanca/admin/processos", true);
+  const { perfil, papel } = await exigirGovernanca("/governanca/admin/processos", "equipe");
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("gov_processos")
-    .select("*, gov_secoes(gov_perguntas(id))")
-    .order("criado_em", { ascending: false });
+  // O banco devolve só os checklists dos setores da pessoa (o admin vê todos).
+  const [{ data }, { setores, propriedades, meusSetores }] = await Promise.all([
+    supabase.from("gov_processos").select("*, gov_secoes(gov_perguntas(id))"),
+    carregarSetoresDaPessoa(supabase, perfil.id, papel),
+  ]);
 
   const lista = (data ?? []).map(({ gov_secoes, ...p }) => ({
     ...p,
@@ -24,7 +26,13 @@ export default async function ProcessosPage({
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
-      <ProcessosApp lista={lista} abrirNovo={(await searchParams).novo === "1"} />
+      <ProcessosApp
+        lista={lista}
+        setores={setores}
+        propriedades={propriedades}
+        meusSetores={meusSetores}
+        abrirNovo={(await searchParams).novo === "1"}
+      />
     </GovernancaShell>
   );
 }

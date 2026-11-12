@@ -8,6 +8,7 @@ import {
   inspecionaEquipe,
   rotuloTipo,
 } from "@/lib/governanca";
+import { emAberto } from "@/lib/checklist-inspecao";
 import { GovernancaShell } from "./GovernancaShell";
 import { Erro, StatusBadge, Vazio } from "./ui";
 
@@ -18,16 +19,15 @@ export default async function GovernancaHome() {
   const equipe = inspecionaEquipe(papel);
 
   const supabase = await createClient();
-  let query = supabase
+  // O banco devolve as próprias e, para líder e admin, as dos setores deles.
+  const { data, error } = await supabase
     .from("gov_inspecoes")
     .select(
-      "id, tipo, status, criado_em, finalizada_em, inspetor_id, gov_acomodacoes(numero), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
+      "id, tipo, status, criado_em, finalizada_em, inspetor_id, gov_acomodacoes(numero, tipo), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
     )
+    .neq("status", "cancelada")
     .order("criado_em", { ascending: false })
     .limit(20);
-  // Camareira vê só as próprias; líder e admin veem todas.
-  if (!equipe) query = query.eq("inspetor_id", perfil.id);
-  const { data, error } = await query;
   const inspecoes = data ?? [];
 
   return (
@@ -57,14 +57,14 @@ export default async function GovernancaHome() {
             <li key={i.id}>
               <Link
                 href={
-                  i.status === "em_andamento" && i.inspetor_id === perfil.id
+                  emAberto(i.status) && i.inspetor_id === perfil.id
                     ? `/governanca/nova?continuar=${i.id}`
                     : `/governanca/inspecao/${i.id}`
                 }
                 className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:bg-slate-50"
               >
                 <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                  {i.gov_acomodacoes ? (
+                  {i.gov_acomodacoes && i.gov_acomodacoes.tipo !== "area" ? (
                     <>
                       <span className="text-[10px] font-medium uppercase">UH</span>
                       <span className="text-sm font-bold leading-none">{i.gov_acomodacoes.numero}</span>
@@ -77,18 +77,23 @@ export default async function GovernancaHome() {
                   <p className="truncate text-sm font-semibold text-slate-800">
                     {i.gov_processos?.nome ?? "Checklist"}
                   </p>
-                  {i.gov_acomodacoes && i.tipo && (
+                  {(i.gov_acomodacoes || i.gov_camareiras) && (
                     <p className="truncate text-xs text-slate-500">
-                      UH {i.gov_acomodacoes.numero} · {rotuloTipo(i.tipo)}
-                      {i.gov_camareiras?.nome ? ` · ${i.gov_camareiras.nome}` : ""}
+                      {[
+                        i.gov_acomodacoes &&
+                          (i.gov_acomodacoes.tipo === "area"
+                            ? i.gov_acomodacoes.numero
+                            : `UH ${i.gov_acomodacoes.numero} · ${rotuloTipo(i.tipo ?? i.gov_acomodacoes.tipo)}`),
+                        i.gov_camareiras?.nome,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   )}
                   <p className="truncate text-xs text-slate-500">
                     {formatDataHora(i.finalizada_em ?? i.criado_em)}
                     {equipe && i.usuarios?.nome ? ` · por ${i.usuarios.nome}` : ""}
-                    {i.status === "em_andamento" && i.inspetor_id === perfil.id
-                      ? " · toque para continuar"
-                      : ""}
+                    {emAberto(i.status) && i.inspetor_id === perfil.id ? " · toque para continuar" : ""}
                   </p>
                 </div>
                 <StatusBadge status={i.status} />

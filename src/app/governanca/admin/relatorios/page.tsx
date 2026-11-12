@@ -46,7 +46,7 @@ export default async function RelatoriosPage({
   if (checklist) query = query.eq("processo_id", checklist);
   const [{ data }, { data: processos }] = await Promise.all([
     query,
-    supabase.from("gov_processos").select("id, nome, categoria").order("nome"),
+    supabase.from("gov_processos").select("id, nome, gov_setores(nome, propriedades(nome))").order("nome"),
   ]);
   const todas = data ?? [];
   // Conformidade e planos contam só o que já foi finalizado.
@@ -123,7 +123,7 @@ export default async function RelatoriosPage({
           <option value="">Todos os checklists</option>
           {(processos ?? []).map((p) => (
             <option key={p.id} value={p.id}>
-              {p.categoria ? `${p.categoria} · ` : ""}
+              {p.gov_setores ? `${p.gov_setores.propriedades?.nome ?? ""} · ${p.gov_setores.nome} · ` : ""}
               {p.nome}
             </option>
           ))}

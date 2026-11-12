@@ -17,9 +17,11 @@ export default async function KanbanChecklistPage() {
   const { data, error } = await supabase
     .from("gov_inspecoes")
     .select(
-      "id, status, criado_em, finalizada_em, gov_processos(nome, categoria), gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome), gov_respostas(id, gov_planos_acao(id, resolvido_em))",
+      "id, status, criado_em, finalizada_em, gov_processos(nome, gov_setores(nome)), gov_acomodacoes(numero, tipo), gov_camareiras(nome), usuarios(nome), gov_respostas(id, gov_planos_acao(id, resolvido_em))",
     )
-    .or(`status.eq.em_andamento,criado_em.gte.${desde}`)
+    // Abertos (em andamento ou pausados) sempre; os outros, dos últimos dias. Cancelado não entra.
+    .or(`status.in.(em_andamento,pausada),criado_em.gte.${desde}`)
+    .neq("status", "cancelada")
     .order("criado_em", { ascending: false })
     .limit(300);
 
@@ -28,9 +30,14 @@ export default async function KanbanChecklistPage() {
     return {
       id: i.id,
       coluna: colunaKanban({ status: i.status, planos }),
+      pausada: i.status === "pausada",
       checklist: i.gov_processos?.nome ?? "Checklist",
-      categoria: i.gov_processos?.categoria ?? null,
-      uh: i.gov_acomodacoes?.numero ?? null,
+      setor: i.gov_processos?.gov_setores?.nome ?? null,
+      uh: i.gov_acomodacoes
+        ? i.gov_acomodacoes.tipo === "area"
+          ? i.gov_acomodacoes.numero
+          : `UH ${i.gov_acomodacoes.numero}`
+        : null,
       camareira: i.gov_camareiras?.nome ?? null,
       aplicador: i.usuarios?.nome ?? null,
       inicio: i.criado_em,

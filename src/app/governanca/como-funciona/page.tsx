@@ -28,43 +28,47 @@ const ETAPAS: Etapa[] = [
       </>,
       <>
         Com Checklist marcado, escolha o <b>Perfil no checklist</b>: <b>Líder</b> vê as inspeções de
-        todos, o Kanban e escolhe a camareira nos checklists de quarto; <b>Aplicador</b> vê só as
-        inspeções que fez. O administrador marcado é o administrador do checklist.
+        todos, o Kanban e escolhe o colaborador avaliado; <b>Aplicador</b> vê só as inspeções que
+        fez. O administrador marcado é o administrador do checklist.
       </>,
       "Quem tem mais de um ambiente troca entre Manutenção, TI e Checklist no seletor do menu.",
     ],
   },
   {
     numero: 2,
-    titulo: "Cadastrar acomodações e camareiras",
-    quem: "Administrador",
-    onde: { href: "/governanca/admin/acomodacoes", rotulo: "Acomodações", soAdmin: true },
+    titulo: "Cadastrar setores, locais e colaboradores",
+    quem: "Administrador (colaboradores: também o líder)",
+    onde: { href: "/governanca/admin/setores", rotulo: "Setores", soAdmin: true },
     itens: [
       <>
-        Em <b>Acomodações</b>, cadastre cada UH com número e tipo (apartamento ou suíte). Só é
-        necessário para checklists que pedem a UH.
+        Em <b>Setores</b>, cada propriedade (Vivaz, Aquamania) ganha seus setores. Ali também se marca
+        quem acessa cada setor: o líder e o aplicador só veem os setores marcados para eles.
       </>,
       <>
-        Em <b>Camareiras</b>, o administrador ou o líder cadastra a equipe de limpeza. O líder escolhe quem limpou o quarto, e
-        os nomes aparecem como sugestão em &quot;Quem vai fazer?&quot; no plano de ação.
+        Em <b>Locais</b>, cadastre onde o checklist é aplicado: UH (apartamento ou suíte) ou área, como
+        casa de máquinas ou bilheteria.
       </>,
-      "Use Ativa/Inativa em vez de remover quem já tem inspeções, para não perder o histórico.",
+      <>
+        Em <b>Colaboradores</b>, cadastre quem é avaliado (nome e setor, sem login). O líder cadastra
+        só nos próprios setores. Os nomes aparecem como sugestão em &quot;Quem vai fazer?&quot; no
+        plano de ação.
+      </>,
+      "Use Ativo/Inativo em vez de remover quem já tem inspeções, para não perder o histórico.",
     ],
   },
   {
     numero: 3,
     titulo: "Criar o checklist",
-    quem: "Administrador",
-    onde: { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", soAdmin: true },
+    quem: "Administrador e líder (nos próprios setores)",
+    onde: { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", soEquipe: true },
     itens: [
       <>
         Em <b>Gerenciar checklists</b>, clique em <b>+ Criar checklist</b> e informe nome e
-        categoria (por exemplo GOVERNANÇA, MANUTENÇÃO, AQUAMANIA). A categoria agrupa os
-        checklists na hora de preencher.
+        setor. O líder cria e edita só os checklists dos setores dele.
       </>,
       <>
-        Marque <b>Pede a acomodação (UH)</b> só quando o checklist é feito em um quarto. Nesse caso,
-        escolha se vale para apartamentos, suítes ou ambos.
+        Marque <b>Pede o local</b> quando o checklist é feito em um lugar certo e escolha se é
+        em UH (apartamentos, suítes ou ambos) ou em uma <b>área</b>, como casa de máquinas.
       </>,
       <>
         Monte as <b>seções</b> (cada seção vira uma tela no preenchimento) e adicione as{" "}
@@ -73,7 +77,12 @@ const ETAPAS: Etapa[] = [
       <>
         Clique no tipo ao lado de cada pergunta para configurá-la: tipo de resposta (Sim/Não,
         carinhas, texto, número, data, hora, lista de uma ou de várias opções), subárea, dica,
-        obrigatória, permite N/A e se o &quot;Não&quot; abre plano de ação.
+        obrigatória, permite N/A, se o &quot;Não&quot; abre plano de ação e o <b>peso</b> na nota.
+      </>,
+      <>
+        Também na pergunta: o que fica <b>obrigatório em cada resposta</b> (por exemplo, &quot;Não&quot;
+        exige foto e comentário) e as <b>condicionais</b>: uma resposta mostra outra pergunta ou uma
+        seção inteira, que fica escondida até lá e não conta na nota.
       </>,
       "Um checklist sem perguntas ou marcado como Inativo não aparece para quem vai preencher.",
     ],
@@ -85,9 +94,11 @@ const ETAPAS: Etapa[] = [
     onde: { href: "/governanca/nova", rotulo: "Preencher checklist" },
     itens: [
       <>
-        Em <b>Preencher checklist</b>, busque e escolha o checklist.
+        Em <b>Preencher checklist</b>, escolha a <b>propriedade</b>, o <b>setor</b> e o checklist (ou
+        busque pelo nome). Cada um vê só os setores liberados para ele.
       </>,
-      "Se ele pede a UH, escolha a acomodação (os botões 10, 11 e 12 filtram pelo andar). O líder também informa a camareira que limpou.",
+      "Se ele pede o local, escolha a UH (os botões 10, 11 e 12 filtram pelo andar) ou a área.",
+      "Confirme a data do checklist (já vem com hoje). O líder também informa o colaborador avaliado, entre os do setor do checklist.",
       "Responda seção por seção. O botão para avançar só libera quando os itens obrigatórios estão respondidos.",
       <>
         Em cada item dá para comentar e anexar foto. Nos itens com N/A, use quando não se aplica.
@@ -96,11 +107,16 @@ const ETAPAS: Etapa[] = [
       </>,
       <>
         As respostas ficam salvas a cada seção. Se sair no meio, o checklist fica{" "}
-        <b>Em andamento</b> no Início e dá para continuar de onde parou.
+        <b>Em andamento</b> no Início e dá para continuar de onde parou. Também dá para{" "}
+        <b>Pausar</b> e retomar depois.
       </>,
       <>
-        Ao final, clique em <b>Finalizar checklist</b>. Quem preencheu, a data e a hora ficam
-        registrados automaticamente.
+        O líder do setor (e o administrador) pode continuar, pausar, <b>cancelar</b> (fica no
+        histórico) ou <b>excluir</b> o checklist em andamento de outra pessoa.
+      </>,
+      <>
+        Ao final, clique em <b>Finalizar checklist</b>. Quem preencheu, o início, o fim e a duração
+        ficam registrados automaticamente.
       </>,
     ],
   },
@@ -129,8 +145,8 @@ const ETAPAS: Etapa[] = [
         respostas, fotos e planos de ação.
       </>,
       <>
-        O administrador vê a lista completa em <b>Inspeções</b>, com busca por checklist, UH,
-        camareira ou quem aplicou.
+        Líder e administrador veem a lista em <b>Inspeções</b>, com filtros por status, setor,
+        checklist, colaborador, quem aplicou e período, e a duração de cada checklist.
       </>,
     ],
   },

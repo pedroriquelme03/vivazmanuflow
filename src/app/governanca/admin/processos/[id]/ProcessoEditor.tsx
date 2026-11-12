@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import type { Dependencia } from "@/lib/checklist-regras";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   TIPOS_ITEM,
   TIPO_ITEM_LABEL,
   proximaOrdem,
+  rotuloAplicacao,
   tipoItem,
   tipoTemOpcoes,
   type Pergunta,
@@ -18,36 +18,49 @@ import {
   type TipoItem,
   type TipoProcesso,
 } from "@/lib/governanca";
+import { rotuloSetor, type PropriedadeRef, type SetorChecklist } from "@/lib/checklist-setores";
+import { ativosOuAtual } from "@/lib/propriedade-opcoes";
+import { SelectSetor } from "../../../Seletores";
 import { Erro, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../../ui";
-
-type Resultado = PromiseLike<{ error: { message: string } | null }>;
+import { useGravar } from "../../../useGravar";
+import { CampoLocal } from "../CampoLocal";
+import { Condicionais, ExigenciasPorResposta, type AlvoCondicional } from "./RegrasPergunta";
 
 export function ProcessoEditor({
   processo,
   secoes,
+  setores,
+  propriedades,
+  meusSetores,
+  dependencias,
 }: {
   processo: Processo;
   secoes: SecaoComPerguntas[];
+  setores: SetorChecklist[];
+  propriedades: PropriedadeRef[];
+  /** Setores para onde a pessoa pode mover o checklist (admin: todos; líder: os dele). */
+  meusSetores: SetorChecklist[];
+  /** Condicionais das perguntas deste checklist. */
+  dependencias: Dependencia[];
 }) {
-  const supabase = useMemo(() => createClient(), []);
-  const router = useRouter();
+  const { supabase, erro, gravar } = useGravar();
   const [novaSecao, setNovaSecao] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
   const total = secoes.reduce((n, s) => n + s.gov_perguntas.length, 0);
-
-  async function rodar(acao: Resultado) {
-    const { error } = await acao;
-    if (error) return setErro(error.message);
-    setErro(null);
-    router.refresh();
-  }
+  const alvos = useMemo<AlvoCondicional[]>(
+    () =>
+      secoes.flatMap((s) => [
+        { tipo: "secao" as const, id: s.id, rotulo: s.nome },
+        ...s.gov_perguntas.map((q) => ({ tipo: "pergunta" as const, id: q.id, rotulo: `${s.nome} › ${q.texto}` })),
+      ]),
+    [secoes],
+  );
 
   function addSecao(e: React.FormEvent) {
     e.preventDefault();
     if (!novaSecao.trim()) return;
     const nome = novaSecao.trim();
     setNovaSecao("");
-    rodar(
+    gravar(
       supabase
         .from("gov_secoes")
         .insert({ processo_id: processo.id, nome, ordem: proximaOrdem(secoes) }),
@@ -56,19 +69,19 @@ export function ProcessoEditor({
 
   function renomearSecao(s: Secao, nome: string) {
     if (!nome.trim() || nome.trim() === s.nome) return;
-    rodar(supabase.from("gov_secoes").update({ nome: nome.trim() }).eq("id", s.id));
+    gravar(supabase.from("gov_secoes").update({ nome: nome.trim() }).eq("id", s.id));
   }
 
   function removerSecao(s: Secao) {
     if (!confirm(`Remover a seção "${s.nome}" e todas as suas perguntas?`)) return;
-    rodar(supabase.from("gov_secoes").delete().eq("id", s.id));
+    gravar(supabase.from("gov_secoes").delete().eq("id", s.id));
   }
 
   function moverSecao(idx: number, delta: -1 | 1) {
     const outra = secoes[idx + delta];
     const atual = secoes[idx];
     if (!outra) return;
-    rodar(
+    gravar(
       Promise.all([
         supabase.from("gov_secoes").update({ ordem: outra.ordem }).eq("id", atual.id),
         supabase.from("gov_secoes").update({ ordem: atual.ordem }).eq("id", outra.id),
@@ -79,7 +92,7 @@ export function ProcessoEditor({
   function addPergunta(secao: SecaoComPerguntas, texto: string) {
     if (!texto.trim()) return;
     const ultima = secao.gov_perguntas[secao.gov_perguntas.length - 1];
-    rodar(
+    gravar(
       supabase.from("gov_perguntas").insert({
         secao_id: secao.id,
         texto: texto.trim(),
@@ -90,11 +103,11 @@ export function ProcessoEditor({
   }
 
   function atualizarPergunta(p: Pergunta, patch: TablesUpdate<"gov_perguntas">) {
-    rodar(supabase.from("gov_perguntas").update(patch).eq("id", p.id));
+    gravar(supabase.from("gov_perguntas").update(patch).eq("id", p.id));
   }
 
   function removerPergunta(p: Pergunta) {
-    rodar(supabase.from("gov_perguntas").delete().eq("id", p.id));
+    gravar(supabase.from("gov_perguntas").delete().eq("id", p.id));
   }
 
   return (
@@ -106,7 +119,14 @@ export function ProcessoEditor({
         ← Gerenciar checklists
       </Link>
 
-      <DadosProcesso processo={processo} total={total} onSalvar={(patch) => rodar(supabase.from("gov_processos").update(patch).eq("id", processo.id))} />
+      <DadosProcesso
+        processo={processo}
+        total={total}
+        setores={setores}
+        propriedades={propriedades}
+        meusSetores={meusSetores}
+        onSalvar={(patch) => gravar(supabase.from("gov_processos").update(patch).eq("id", processo.id))}
+      />
 
       <Erro texto={erro} />
 
@@ -155,8 +175,22 @@ export function ProcessoEditor({
                   key={p.id}
                   numero={i + 1}
                   pergunta={p}
+                  dependencias={dependencias.filter((d) => d.pergunta_id === p.id)}
+                  alvos={alvos.filter((a) => a.id !== p.id && a.id !== s.id)}
                   onAtualizar={(patch) => atualizarPergunta(p, patch)}
                   onRemover={() => removerPergunta(p)}
+                  onAdicionarCondicional={(gatilho, alvo) =>
+                    gravar(
+                      supabase.from("gov_dependencias").insert({
+                        pergunta_id: p.id,
+                        gatilho,
+                        filho_pergunta_id: alvo.tipo === "pergunta" ? alvo.id : null,
+                        filho_secao_id: alvo.tipo === "secao" ? alvo.id : null,
+                      }),
+                      { "23505": "Essa condicional já existe." },
+                    )
+                  }
+                  onRemoverCondicional={(d) => gravar(supabase.from("gov_dependencias").delete().eq("id", d.id))}
                 />
               ))}
               {s.gov_perguntas.length === 0 && (
@@ -190,15 +224,21 @@ export function ProcessoEditor({
 function DadosProcesso({
   processo,
   total,
+  setores,
+  propriedades,
+  meusSetores,
   onSalvar,
 }: {
   processo: Processo;
   total: number;
+  setores: SetorChecklist[];
+  propriedades: PropriedadeRef[];
+  meusSetores: SetorChecklist[];
   onSalvar: (patch: TablesUpdate<"gov_processos">) => void;
 }) {
   const [editando, setEditando] = useState(false);
   const [nome, setNome] = useState(processo.nome);
-  const [categoria, setCategoria] = useState(processo.categoria ?? "");
+  const [setorId, setSetorId] = useState(processo.setor_id);
   const [descricao, setDescricao] = useState(processo.descricao ?? "");
   const [usaAcomodacao, setUsaAcomodacao] = useState(processo.usa_acomodacao);
   const [tipo, setTipo] = useState<TipoProcesso>((processo.tipo as TipoProcesso) ?? "ambos");
@@ -207,12 +247,12 @@ function DadosProcesso({
     return (
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          {processo.categoria && (
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{processo.categoria}</p>
-          )}
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {rotuloSetor(processo.setor_id, setores, propriedades)}
+          </p>
           <h1 className="text-xl font-bold">{processo.nome}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            {total} itens · {processo.usa_acomodacao ? "pede a UH" : "sem UH"}
+            {total} itens · {rotuloAplicacao(processo)}
             {processo.descricao ? ` · ${processo.descricao}` : ""}
           </p>
         </div>
@@ -231,7 +271,7 @@ function DadosProcesso({
         if (!nome.trim()) return;
         onSalvar({
           nome: nome.trim(),
-          categoria: categoria.trim().toUpperCase() || null,
+          setor_id: setorId,
           descricao: descricao.trim() || null,
           usa_acomodacao: usaAcomodacao,
           tipo: usaAcomodacao ? tipo : "ambos",
@@ -245,25 +285,20 @@ function DadosProcesso({
           <input className={inputCls} value={nome} onChange={(e) => setNome(e.target.value)} />
         </label>
         <label className="block">
-          <span className={labelCls}>Categoria</span>
-          <input className={inputCls} value={categoria} onChange={(e) => setCategoria(e.target.value)} />
+          <span className={labelCls}>Setor</span>
+          <SelectSetor
+            value={setorId}
+            onChange={setSetorId}
+            setores={ativosOuAtual(meusSetores, processo.setor_id)}
+            propriedades={propriedades}
+          />
         </label>
       </div>
       <label className="block">
         <span className={labelCls}>Descrição</span>
         <input className={inputCls} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
       </label>
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" checked={usaAcomodacao} onChange={(e) => setUsaAcomodacao(e.target.checked)} />
-        Pede a acomodação (UH) antes de começar
-      </label>
-      {usaAcomodacao && (
-        <select className={inputCls} value={tipo} onChange={(e) => setTipo(e.target.value as TipoProcesso)}>
-          <option value="ambos">Ambos (suíte e apartamento)</option>
-          <option value="apartamento">Apenas apartamentos</option>
-          <option value="suite">Apenas suítes</option>
-        </select>
-      )}
+      <CampoLocal usaLocal={usaAcomodacao} onUsaLocal={setUsaAcomodacao} tipo={tipo} onTipo={setTipo} />
       <div className="flex gap-2">
         <button type="submit" className={btnPrimario}>
           Salvar
@@ -279,13 +314,23 @@ function DadosProcesso({
 function ItemEditor({
   numero,
   pergunta: p,
+  dependencias,
+  alvos,
   onAtualizar,
   onRemover,
+  onAdicionarCondicional,
+  onRemoverCondicional,
 }: {
   numero: number;
   pergunta: Pergunta;
+  /** Condicionais em que esta pergunta é a que dispara. */
+  dependencias: Dependencia[];
+  /** Outras perguntas e seções do checklist que podem ser mostradas. */
+  alvos: AlvoCondicional[];
   onAtualizar: (patch: TablesUpdate<"gov_perguntas">) => void;
   onRemover: () => void;
+  onAdicionarCondicional: (gatilho: string, alvo: AlvoCondicional) => void;
+  onRemoverCondicional: (dependencia: Dependencia) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const tipo = tipoItem(p.tipo);
@@ -385,7 +430,33 @@ function ItemEditor({
                 &quot;Não&quot; abre plano de ação
               </label>
             )}
+            {tipo === "sim_nao" && (
+              <label className="flex items-center gap-1.5">
+                Peso na nota
+                <input
+                  key={`${p.id}-peso-${p.peso}`}
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  defaultValue={p.peso}
+                  className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  onBlur={(e) => {
+                    const peso = Number(e.target.value);
+                    if (Number.isFinite(peso) && peso >= 0 && peso !== Number(p.peso)) onAtualizar({ peso });
+                  }}
+                />
+              </label>
+            )}
           </div>
+          <ExigenciasPorResposta tipo={tipo} opcoes={p.opcoes} exige={p.exige} onSalvar={(exige) => onAtualizar({ exige })} />
+          <Condicionais
+            tipo={tipo}
+            opcoes={p.opcoes}
+            dependencias={dependencias}
+            alvos={alvos}
+            onAdicionar={onAdicionarCondicional}
+            onRemover={onRemoverCondicional}
+          />
         </div>
       )}
     </li>

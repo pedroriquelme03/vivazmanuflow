@@ -1,4 +1,5 @@
 import { PRIORIDADE_LABEL, type Prioridade } from "@/lib/governanca";
+import { rotuloStatus } from "@/lib/checklist-inspecao";
 
 export const inputCls =
   "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30";
@@ -31,15 +32,31 @@ export function Erro({ texto }: { texto: string | null }) {
   return <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{texto}</p>;
 }
 
-export function StatusBadge({ status }: { status: string }) {
-  const finalizada = status === "finalizada";
+/** Liga/desliga de cadastros: ativo em verde, inativo em cinza. */
+export function BotaoAtivo({ ativo, onClick }: { ativo: boolean; onClick: () => void }) {
   return (
-    <span
-      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-        finalizada ? "bg-brand-100 text-brand-700" : "bg-amber-100 text-amber-700"
-      }`}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={`text-xs font-medium ${ativo ? "text-brand-600" : "text-slate-400"}`}
     >
-      {finalizada ? "Finalizada" : "Em andamento"}
+      {ativo ? "Ativo" : "Inativo"}
+    </button>
+  );
+}
+
+const COR_STATUS: Record<string, string> = {
+  finalizada: "bg-brand-100 text-brand-700",
+  em_andamento: "bg-amber-100 text-amber-700",
+  pausada: "bg-sky-100 text-sky-700",
+  cancelada: "bg-slate-200 text-slate-600",
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${COR_STATUS[status] ?? COR_STATUS.cancelada}`}>
+      {rotuloStatus(status)}
     </span>
   );
 }

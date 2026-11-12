@@ -82,7 +82,7 @@ export function Fluxograma() {
       <Faixa titulo="1 · Cadastro (administrador)" cor="border-slate-200 bg-slate-50">
         <Caixa etapa={1}>Liberar acessos</Caixa>
         <Seta />
-        <Caixa etapa={2}>Cadastrar UHs e camareiras</Caixa>
+        <Caixa etapa={2}>Cadastrar setores, locais e colaboradores</Caixa>
         <Seta />
         <Caixa etapa={3}>Criar checklist: seções e perguntas</Caixa>
       </Faixa>
@@ -94,7 +94,7 @@ export function Fluxograma() {
         <Seta />
         <Decisao nao="vai direto para as perguntas">Pede a UH?</Decisao>
         <Seta rotulo="Sim" />
-        <Caixa>Escolher a UH (líder escolhe a camareira)</Caixa>
+        <Caixa>Escolher a UH (líder escolhe o colaborador)</Caixa>
         <Seta />
         <Caixa>Responder as seções</Caixa>
         <Seta />

@@ -6,12 +6,17 @@ import {
   agruparPorSecao,
   corNota,
   formatDataHora,
+  formatarDuracao,
   formatarValor,
   inspecionaEquipe,
-  notaInspecao,
   rotuloTipo,
 } from "@/lib/governanca";
+import { cuidaDoSetor } from "@/lib/checklist-setores";
+import { duracaoMinutos, emAberto, formatarDataCurta } from "@/lib/checklist-inspecao";
+import { notaPonderada } from "@/lib/checklist-regras";
+import { AcoesInspecao } from "../../AcoesInspecao";
 import { GovernancaShell } from "../../GovernancaShell";
+import { carregarSetoresDaPessoa } from "../../setores-dados";
 import { PrioridadeBadge, StatusBadge, Vazio, cardCls } from "../../ui";
 import { ResolverPlano } from "./ResolverPlano";
 
@@ -26,11 +31,11 @@ export default async function InspecaoDetalhePage({
   const { perfil, papel } = await exigirGovernanca(`/governanca/inspecao/${id}`);
 
   const supabase = await createClient();
-  const [{ data: insp }, { data: respostas }] = await Promise.all([
+  const [{ data: insp }, { data: respostas }, { meusSetores }] = await Promise.all([
     supabase
       .from("gov_inspecoes")
       .select(
-        "*, gov_acomodacoes(numero, tipo), gov_camareiras(nome), usuarios(nome), gov_processos(nome)",
+        "*, gov_acomodacoes(numero, tipo), gov_camareiras(nome), usuarios(nome), gov_processos(nome, setor_id)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -38,13 +43,16 @@ export default async function InspecaoDetalhePage({
       .from("gov_respostas")
       .select("*, gov_planos_acao(*)")
       .eq("inspecao_id", id),
+    carregarSetoresDaPessoa(supabase, perfil.id, papel),
   ]);
+  const duracao = insp ? duracaoMinutos(insp.criado_em, insp.finalizada_em) : null;
 
   const lista = respostas ?? [];
   const grupos = agruparPorSecao(lista.map((r) => ({ ...r, grupo: r.pergunta_grupo })));
   const totalSim = lista.filter((r) => r.resposta === "sim").length;
   const totalNao = lista.filter((r) => r.resposta === "nao").length;
-  const nota = notaInspecao(totalSim, totalNao);
+  // Nota com o peso de cada pergunta guardado na resposta (respostas antigas valem 1).
+  const nota = notaPonderada(lista.map((r) => ({ resposta: r.resposta, peso: Number(r.pergunta_peso ?? 1) })));
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
@@ -54,13 +62,13 @@ export default async function InspecaoDetalhePage({
       >
         ← {inspecionaEquipe(papel) ? "Voltar ao Kanban" : "Voltar"}
       </Link>
-      {insp?.status === "em_andamento" && insp.inspetor_id === perfil.id && (
-        <Link
-          href={`/governanca/nova?continuar=${insp.id}`}
-          className="mb-4 block rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 ring-1 ring-amber-200"
-        >
-          Este checklist ainda está em andamento. Toque para continuar de onde parou.
-        </Link>
+      {insp && (
+        <AcoesInspecao
+          inspecao={insp}
+          eu={perfil.id}
+          cuidaDoSetor={cuidaDoSetor(papel, insp.gov_processos?.setor_id, meusSetores)}
+          depoisDeExcluir={inspecionaEquipe(papel) ? "/governanca/admin/inspecoes" : "/governanca"}
+        />
       )}
 
       {!insp ? (
@@ -72,7 +80,10 @@ export default async function InspecaoDetalhePage({
               <div>
                 {insp.gov_acomodacoes ? (
                   <>
-                    <p className="text-2xl font-bold text-slate-800">UH {insp.gov_acomodacoes.numero}</p>
+                    <p className="text-2xl font-bold text-slate-800">
+                      {insp.gov_acomodacoes.tipo === "area" ? "" : "UH "}
+                      {insp.gov_acomodacoes.numero}
+                    </p>
                     <p className="text-sm text-slate-500">
                       {rotuloTipo(insp.tipo ?? insp.gov_acomodacoes.tipo)} · {insp.gov_processos?.nome}
                     </p>
@@ -84,11 +95,12 @@ export default async function InspecaoDetalhePage({
               <StatusBadge status={insp.status} />
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              {insp.gov_acomodacoes && (
-                <Info rotulo="Camareira" valor={insp.gov_camareiras?.nome ?? "—"} />
-              )}
-              <Info rotulo="Inspetor" valor={insp.usuarios?.nome ?? "—"} />
-              <Info rotulo="Data" valor={formatDataHora(insp.finalizada_em ?? insp.criado_em)} />
+              {insp.gov_camareiras && <Info rotulo="Colaborador" valor={insp.gov_camareiras.nome} />}
+              <Info rotulo="Aplicado por" valor={insp.usuarios?.nome ?? "—"} />
+              <Info rotulo="Data do checklist" valor={formatarDataCurta(insp.data_referencia)} />
+              <Info rotulo="Início" valor={formatDataHora(insp.criado_em)} />
+              {insp.finalizada_em && <Info rotulo="Fim" valor={formatDataHora(insp.finalizada_em)} />}
+              {duracao !== null && <Info rotulo="Duração" valor={formatarDuracao(duracao)} />}
               {totalSim + totalNao > 0 && (
                 <Info rotulo="Conformidade" valor={`${totalSim} sim · ${totalNao} não`} />
               )}
@@ -179,7 +191,7 @@ export default async function InspecaoDetalhePage({
                                 🔧 Chamado aberto na Manutenção · acompanhar
                               </Link>
                             ) : (
-                              insp.status === "em_andamento" && (
+                              emAberto(insp.status) && (
                                 <p className="mt-1 text-xs text-slate-500">
                                   O chamado na Manutenção é aberto quando o checklist for finalizado.
                                 </p>

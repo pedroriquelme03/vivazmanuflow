@@ -1057,6 +1057,7 @@ export type Database = {
           id: string
           numero: string
           tipo: string
+          propriedade_id: string
           ativo: boolean
           criado_em: string
         }
@@ -1064,6 +1065,7 @@ export type Database = {
           id?: string
           numero: string
           tipo: string
+          propriedade_id: string
           ativo?: boolean
           criado_em?: string
         }
@@ -1071,31 +1073,148 @@ export type Database = {
           id?: string
           numero?: string
           tipo?: string
+          propriedade_id?: string
           ativo?: boolean
           criado_em?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gov_acomodacoes_propriedade_id_fkey"
+            columns: ["propriedade_id"]
+            isOneToOne: false
+            referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gov_camareiras: {
         Row: {
           id: string
           nome: string
+          setor_id: string
           ativo: boolean
           criado_em: string
         }
         Insert: {
           id?: string
           nome: string
+          setor_id: string
           ativo?: boolean
           criado_em?: string
         }
         Update: {
           id?: string
           nome?: string
+          setor_id?: string
           ativo?: boolean
           criado_em?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gov_camareiras_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "gov_setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_dependencias: {
+        Row: {
+          id: string
+          pergunta_id: string
+          gatilho: string
+          filho_pergunta_id: string | null
+          filho_secao_id: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          pergunta_id: string
+          gatilho: string
+          filho_pergunta_id?: string | null
+          filho_secao_id?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          pergunta_id?: string
+          gatilho?: string
+          filho_pergunta_id?: string | null
+          filho_secao_id?: string | null
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_dependencias_pergunta_id_fkey"
+            columns: ["pergunta_id"]
+            isOneToOne: false
+            referencedRelation: "gov_perguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_setores: {
+        Row: {
+          id: string
+          propriedade_id: string
+          nome: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          propriedade_id: string
+          nome: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          propriedade_id?: string
+          nome?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_setores_propriedade_id_fkey"
+            columns: ["propriedade_id"]
+            isOneToOne: false
+            referencedRelation: "propriedades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_usuario_setores: {
+        Row: {
+          usuario_id: string
+          setor_id: string
+        }
+        Insert: {
+          usuario_id: string
+          setor_id: string
+        }
+        Update: {
+          usuario_id?: string
+          setor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_usuario_setores_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_usuario_setores_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "gov_setores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gov_relatorios_diarios: {
         Row: {
@@ -1174,6 +1293,7 @@ export type Database = {
           codigo_origem: string | null
           usa_acomodacao: boolean
           categoria: string | null
+          setor_id: string
           id: string
           nome: string
           descricao: string | null
@@ -1185,6 +1305,7 @@ export type Database = {
           codigo_origem?: string | null
           usa_acomodacao?: boolean
           categoria?: string | null
+          setor_id: string
           id?: string
           nome: string
           descricao?: string | null
@@ -1196,6 +1317,7 @@ export type Database = {
           codigo_origem?: string | null
           usa_acomodacao?: boolean
           categoria?: string | null
+          setor_id?: string
           id?: string
           nome?: string
           descricao?: string | null
@@ -1203,7 +1325,15 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gov_processos_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "gov_setores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gov_secoes: {
         Row: {
@@ -1245,6 +1375,8 @@ export type Database = {
           obrigatoria: boolean
           permite_na: boolean
           opcoes: string[]
+          peso: number
+          exige: Json
           tipo: string
           id: string
           secao_id: string
@@ -1259,6 +1391,8 @@ export type Database = {
           obrigatoria?: boolean
           permite_na?: boolean
           opcoes?: string[]
+          peso?: number
+          exige?: Json
           tipo?: string
           id?: string
           secao_id: string
@@ -1273,6 +1407,8 @@ export type Database = {
           obrigatoria?: boolean
           permite_na?: boolean
           opcoes?: string[]
+          peso?: number
+          exige?: Json
           tipo?: string
           id?: string
           secao_id?: string
@@ -1301,6 +1437,7 @@ export type Database = {
           status: string
           criado_em: string
           finalizada_em: string | null
+          data_referencia: string
         }
         Insert: {
           id?: string
@@ -1312,6 +1449,7 @@ export type Database = {
           status?: string
           criado_em?: string
           finalizada_em?: string | null
+          data_referencia?: string
         }
         Update: {
           id?: string
@@ -1323,6 +1461,7 @@ export type Database = {
           status?: string
           criado_em?: string
           finalizada_em?: string | null
+          data_referencia?: string
         }
         Relationships: [
           {
@@ -1360,6 +1499,7 @@ export type Database = {
           valor: string | null
           pergunta_grupo: string | null
           pergunta_tipo: string
+          pergunta_peso: number
           id: string
           inspecao_id: string
           pergunta_id: string | null
@@ -1376,6 +1516,7 @@ export type Database = {
           valor?: string | null
           pergunta_grupo?: string | null
           pergunta_tipo?: string
+          pergunta_peso?: number
           id?: string
           inspecao_id: string
           pergunta_id?: string | null
