@@ -60,6 +60,13 @@ export function rotuloTipo(tipo: string, curto = false) {
   return curto ? "Apto" : "Apartamento";
 }
 
+export const TIPOS_LOCAL: TipoAcomodacao[] = ["apartamento", "suite", "area"];
+
+/** "UH · Suíte", "UH · Apartamento" ou "Área". */
+export function rotuloTipoLocal(tipo: string) {
+  return tipo === "area" ? "Área" : `UH · ${rotuloTipo(tipo)}`;
+}
+
 export function rotuloTipoProcesso(tipo: string) {
   if (tipo === "ambos") return "Ambos";
   if (tipo === "area") return "Áreas";
@@ -180,6 +187,9 @@ export type RespostaParcial = {
   comentario?: string;
   anexoPreview?: string | null;
   anexoFile?: unknown;
+  /** Encontrou no local um item diferente do cadastrado: precisa dizer qual. */
+  itemDiferente?: boolean;
+  itemEncontrado?: string;
   plano: { o_que_fazer: string } | null;
 };
 
@@ -201,6 +211,7 @@ export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) 
   const tipo = tipoItem(item.tipo);
   if (r?.resposta === "na") return true;
   if (complementosFaltando({ tipo, exige: item.exige }, r).length > 0) return false;
+  if (r?.itemDiferente && !r.itemEncontrado?.trim()) return false;
   if (tipo === "sim_nao") {
     if (!r || r.resposta === null) return !obrigatoria;
     if (r.resposta === "nao" && (item.plano_acao ?? true) && !r.plano?.o_que_fazer.trim()) {
@@ -469,12 +480,12 @@ export function resumoPorCamareira(inspecoes: InspecaoRel[], respostas: Resposta
 /** Checklist em andamento há mais que isso aparece como parado. */
 export const MINUTOS_PARADO = 120;
 
-function minutosEntre(inicio: string, fim: string | number) {
+export function minutosEntre(inicio: string, fim: string | number) {
   const ate = typeof fim === "number" ? fim : new Date(fim).getTime();
   return Math.max(0, (ate - new Date(inicio).getTime()) / 60000);
 }
 
-function media(valores: number[]) {
+export function media(valores: number[]) {
   return valores.length ? valores.reduce((s, v) => s + v, 0) / valores.length : null;
 }
 

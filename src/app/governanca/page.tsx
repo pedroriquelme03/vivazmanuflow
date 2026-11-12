@@ -23,7 +23,7 @@ export default async function GovernancaHome() {
   const { data, error } = await supabase
     .from("gov_inspecoes")
     .select(
-      "id, tipo, status, criado_em, finalizada_em, inspetor_id, gov_acomodacoes(numero, tipo), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
+      "id, tipo, status, criado_em, finalizada_em, inspetor_id, identificacao, gov_acomodacoes(numero, tipo), gov_camareiras(nome), gov_processos(nome), usuarios(nome)",
     )
     .neq("status", "cancelada")
     .order("criado_em", { ascending: false })
@@ -76,6 +76,7 @@ export default async function GovernancaHome() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-800">
                     {i.gov_processos?.nome ?? "Checklist"}
+                    {i.identificacao ? ` · ${i.identificacao}` : ""}
                   </p>
                   {(i.gov_acomodacoes || i.gov_camareiras) && (
                     <p className="truncate text-xs text-slate-500">

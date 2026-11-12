@@ -35,6 +35,8 @@ type NavItem = {
   match: (path: string) => boolean;
   icone: React.ReactNode;
   soAdmin?: boolean;
+  /** Admin ou líder (o líder vê só a equipe do sistema dele). */
+  soGestor?: boolean;
   soManutencao?: boolean;
   soTi?: boolean;
 };
@@ -61,24 +63,18 @@ const ICONE_CHECKLIST: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" />
     </svg>
   ),
-  "/governanca/admin/setores": (
+  "/governanca/relatorio-diario": (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+      <rect x="4" y="5" width="16" height="16" rx="2" />
+      <path strokeLinecap="round" d="M8 3v4M16 3v4M4 10h16M8 14h4" />
+    </svg>
+  ),
+  "/governanca/admin/cadastros": (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
       <rect x="3" y="3" width="7" height="7" rx="1.5" />
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  ),
-  "/governanca/admin/locais": (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
-      <circle cx="12" cy="9.5" r="2.5" />
-    </svg>
-  ),
-  "/governanca/admin/colaboradores": (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-      <circle cx="12" cy="8" r="3.5" />
-      <path strokeLinecap="round" d="M5 20a7 7 0 0 1 14 0" />
     </svg>
   ),
   "/governanca/como-funciona": (
@@ -105,7 +101,7 @@ const NAV: NavItem[] = [
   {
     href: "/admin",
     rotulo: "Cadastros",
-    soAdmin: true,
+    soGestor: true,
     match: (p) =>
       p === "/admin" ||
       (p.startsWith("/admin/") &&
@@ -296,7 +292,7 @@ export function AdminSidebar({
   }, [ambiente, ti, pathname, router]);
 
   return (
-    <aside className={`flex w-64 shrink-0 flex-col text-white ${FUNDO[ambiente]} ${className}`}>
+    <aside className={`flex w-72 shrink-0 flex-col text-white ${FUNDO[ambiente]} ${className}`}>
       <div className="px-5 pt-5">
         <div className="flex items-center gap-3">
           <BrandMark
@@ -440,7 +436,7 @@ function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
     const checklist: NavItem[] = menuChecklist(papel).map((item) => ({
       href: item.href,
       rotulo: item.rotulo,
-      match: (p: string) => itemChecklistAtivo(item.href, p),
+      match: (p: string) => itemChecklistAtivo(item, p),
       icone: ICONE_CHECKLIST[item.href],
     }));
     return [...checklist, ...NAV_CHAMADOS];
@@ -450,6 +446,7 @@ function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
   const daArea = NAV.filter(
     (item) =>
       (!item.soAdmin || ehAdmin) &&
+      (!item.soGestor || ehAdmin || perfil.role === "lider") &&
       (!item.soManutencao || !ti) &&
       (!item.soTi || ti),
   );

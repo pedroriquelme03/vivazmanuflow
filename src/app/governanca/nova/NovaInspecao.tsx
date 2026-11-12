@@ -26,8 +26,10 @@ import {
 } from "@/lib/governanca";
 import type { PropriedadeRef, SetorChecklist } from "@/lib/checklist-setores";
 import { formatarDataCurta } from "@/lib/checklist-inspecao";
-import { notaPonderada, ocultos, type Dependencia } from "@/lib/checklist-regras";
+import { notaPonderada, ocultos, textoDaResposta, type Dependencia } from "@/lib/checklist-regras";
+import { previstoNoLocal, type ItemLocal, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import { compararNumeroUh } from "@/lib/mapa-uhs";
+import { passoAvaliado } from "@/lib/checklist-avaliado";
 import { EscolhaChecklist } from "./EscolhaChecklist";
 import { PassoDados } from "./PassoDados";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
@@ -57,6 +59,8 @@ export type RascunhoInspecao = {
     valor: string | null;
     comentario: string | null;
     anexo_url: string | null;
+    item_diferente: boolean;
+    item_encontrado: string | null;
     plano: {
       prioridade: string;
       o_que_fazer: string;
@@ -90,6 +94,8 @@ function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaL
     comentario: r.comentario ?? "",
     mostrarComentario: Boolean(r.comentario),
     anexoPreview: r.anexo_url,
+    itemDiferente: r.item_diferente,
+    itemEncontrado: r.item_encontrado ?? "",
     plano: r.plano
       ? {
           prioridade: (["baixa", "media", "alta"].includes(r.plano.prioridade)
@@ -113,11 +119,14 @@ export function NovaInspecao({
   propriedades,
   rascunho,
   hoje,
+  tiposItem,
   relatorioDoDia = [],
   dataRelatorio = null,
 }: {
   /** Hoje (aaaa-mm-dd, Brasília), calculado no servidor. */
   hoje: string;
+  /** Tipos de item do patrimônio (TV, ar...), para conferir na UH. */
+  tiposItem: TipoItemPatrimonio[];
   relatorioDoDia?: UhDoRelatorio[];
   /** Data (aaaa-mm-dd) do relatório usado, quando não é o de hoje. */
   dataRelatorio?: string | null;
@@ -145,6 +154,11 @@ export function NovaInspecao({
   // Colaborador do rascunho que a pessoa não enxerga (outro setor): mantido ao salvar.
   const [camareiraOculta, setCamareiraOculta] = useState<string | null>(null);
   const [dataReferencia, setDataReferencia] = useState(rascunho?.dataReferencia ?? hoje);
+  // "Para mim" ou "para outra pessoa", quando o checklist pergunta no começo.
+  const [paraMim, setParaMim] = useState<boolean | null>(null);
+  const [iniciando, setIniciando] = useState(false);
+  // Itens do local escolhido (TV, ar...), para as perguntas que conferem item.
+  const [itensDoLocal, setItensDoLocal] = useState<ItemLocal[]>([]);
 
   const [secaoIndex, setSecaoIndex] = useState(0);
   const [respostas, setRespostas] = useState<Record<string, RespostaLocal>>({});
@@ -199,6 +213,8 @@ export function NovaInspecao({
   const completa = secaoAtual ? secaoCompleta(secaoAtual.gov_perguntas, respostas, escondidos.perguntas) : false;
   // Só os colaboradores do setor do checklist (o banco também confere ao salvar).
   const colaboradores = camareiras.filter((c) => c.setor_id === processo?.setor_id);
+  // Como o avaliado é escolhido neste checklist, para quem está preenchendo.
+  const passo = passoAvaliado(processo?.avaliado, equipe);
   const nomesCamareiras = colaboradores.map((c) => c.nome);
   const usaUh = processo?.usa_acomodacao ?? false;
 
@@ -255,6 +271,7 @@ export function NovaInspecao({
       );
       setProcesso(p);
       setAcomodacao(acomodacoes.find((a) => a.id === rascunho.acomodacaoId) ?? null);
+      void carregarItens(rascunho.acomodacaoId);
       const doRascunho = camareiras.find((c) => c.id === rascunho.camareiraId) ?? null;
       setCamareira(doRascunho);
       setCamareiraOculta(doRascunho ? null : rascunho.camareiraId);
@@ -280,6 +297,7 @@ export function NovaInspecao({
     setAcomodacao(null);
     setCamareira(null);
     setCamareiraOculta(null);
+    setParaMim(null);
     const init: Record<string, RespostaLocal> = {};
     p.secoes.forEach((s) => s.gov_perguntas.forEach((q) => (init[q.id] = respostaVazia())));
     setRespostas(init);
@@ -289,8 +307,52 @@ export function NovaInspecao({
     subir();
   }
 
+  async function carregarItens(localId: string | null) {
+    if (!localId) return setItensDoLocal([]);
+    const { data } = await supabase.from("gov_local_itens").select("*").eq("local_id", localId);
+    setItensDoLocal(data ?? []);
+  }
+
+  /** O que a pergunta confere no local: o tipo (ex.: TV) e o que está cadastrado. */
+  function conferenciaDe(q: { tipo_item_id: string | null }) {
+    const tipo = tiposItem.find((t) => t.id === q.tipo_item_id);
+    if (!tipo || !acomodacao) return null;
+    return { tipo: tipo.nome, previsto: previstoNoLocal(itensDoLocal, acomodacao.id, tipo.id) };
+  }
+
+  /** Antes das perguntas: se o checklist é para quem aplica, usa o colaborador da conta dele. */
+  async function comecar() {
+    const paraSiMesmo = passo === "proprio" || (passo === "pergunta" && paraMim === true);
+    if (paraSiMesmo && processo) {
+      setIniciando(true);
+      const { data: id, error } = await supabase.rpc("gov_meu_colaborador", { p_setor_id: processo.setor_id });
+      setIniciando(false);
+      if (error || !id) {
+        setErro(
+          erroSchemaGov(error?.message ?? "", error?.code)
+            ? "Rode no Supabase o SQL 20261112220000_checklist_avaliado.sql para aplicar o checklist para você mesmo."
+            : (error?.message ?? "Não deu para abrir o checklist no seu nome."),
+        );
+        return;
+      }
+      setCamareira({
+        id,
+        nome: eu.nome,
+        setor_id: processo.setor_id,
+        ativo: true,
+        criado_em: new Date().toISOString(),
+        usuario_id: eu.id,
+      });
+      setCamareiraOculta(null);
+    }
+    setErro(null);
+    setFase("perguntas");
+    subir();
+  }
+
   function escolherAcomodacao(a: Acomodacao) {
     setAcomodacao(a);
+    void carregarItens(a.id);
     setErro(null);
     setFase("dados");
   }
@@ -333,6 +395,13 @@ export function NovaInspecao({
     return supabase.storage.from(BUCKET_GOVERNANCA).getPublicUrl(caminho).data.publicUrl;
   }
 
+  /** Resposta da pergunta que identifica o checklist (ex.: o nome do evento). */
+  function identificacao() {
+    const id = processo?.identificador_pergunta_id;
+    const q = id ? secoes.flatMap((s) => s.gov_perguntas).find((p) => p.id === id) : undefined;
+    return q ? textoDaResposta(tipoItem(q.tipo), respostas[q.id]) : null;
+  }
+
   function cabecalho() {
     return {
       acomodacao_id: acomodacao?.id ?? null,
@@ -340,6 +409,7 @@ export function NovaInspecao({
       tipo: acomodacao?.tipo === "suite" || acomodacao?.tipo === "apartamento" ? acomodacao.tipo : null,
       camareira_id: camareira?.id ?? camareiraOculta,
       data_referencia: dataReferencia,
+      identificacao: identificacao(),
     };
   }
 
@@ -427,6 +497,10 @@ export function NovaInspecao({
           pergunta_ordem: q.ordem,
           pergunta_tipo: tipo,
           pergunta_peso: Number(q.peso),
+          // Conferência do item do local: o que estava cadastrado e o que foi encontrado.
+          item_previsto: conferenciaDe(q)?.previsto ?? null,
+          item_diferente: Boolean(conferenciaDe(q)) && r.itemDiferente,
+          item_encontrado: conferenciaDe(q) && r.itemDiferente ? r.itemEncontrado.trim() || null : null,
           pergunta_grupo: q.grupo,
           secao_nome: secao.nome,
           secao_ordem: secao.ordem,
@@ -710,14 +784,21 @@ export function NovaInspecao({
 
       {fase === "dados" && (
         <PassoDados
-          escolheColaborador={equipe}
+          passo={passo}
+          eu={eu}
+          paraMim={paraMim}
+          onParaMim={(valor) => {
+            setParaMim(valor);
+            if (valor) setCamareira(null);
+          }}
           colaboradores={colaboradores}
           colaborador={camareira}
           onColaborador={setCamareira}
           data={dataReferencia}
           hoje={hoje}
           onData={setDataReferencia}
-          onContinuar={() => setFase("perguntas")}
+          iniciando={iniciando}
+          onContinuar={comecar}
         />
       )}
 
@@ -757,6 +838,7 @@ export function NovaInspecao({
                     responsaveis={nomesCamareiras}
                     responsavelPadrao={camareira?.nome}
                     quemPediu={eu.nome}
+                    conferencia={conferenciaDe(q)}
                   />
                 ))}
               </div>

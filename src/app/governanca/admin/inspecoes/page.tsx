@@ -15,7 +15,7 @@ export default async function InspecoesPage() {
     supabase
       .from("gov_inspecoes")
       .select(
-        "id, status, criado_em, finalizada_em, data_referencia, inspetor_id, processo_id, acomodacao_id, camareira_id, gov_acomodacoes(numero, tipo), gov_camareiras(nome), gov_processos(nome, setor_id), usuarios(nome)",
+        "id, status, criado_em, finalizada_em, data_referencia, identificacao, inspetor_id, processo_id, acomodacao_id, camareira_id, gov_acomodacoes(numero, tipo), gov_camareiras(nome), gov_processos(nome, setor_id), usuarios(nome)",
       )
       .order("criado_em", { ascending: false })
       .limit(500),
@@ -31,6 +31,7 @@ export default async function InspecoesPage() {
     setorId: i.gov_processos?.setor_id ?? null,
     checklistId: i.processo_id,
     checklist: i.gov_processos?.nome ?? "Checklist",
+    identificacao: i.identificacao,
     local: i.gov_acomodacoes
       ? i.gov_acomodacoes.tipo === "area"
         ? i.gov_acomodacoes.numero

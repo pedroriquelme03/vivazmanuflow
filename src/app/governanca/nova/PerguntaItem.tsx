@@ -29,6 +29,9 @@ export type RespostaLocal = {
   mostrarComentario: boolean;
   anexoFile: File | null;
   anexoPreview: string | null;
+  /** O item encontrado no local é diferente do cadastrado (e qual é). */
+  itemDiferente: boolean;
+  itemEncontrado: string;
   plano: PlanoLocal | null;
 };
 
@@ -41,9 +44,14 @@ export function respostaVazia(): RespostaLocal {
     mostrarComentario: false,
     anexoFile: null,
     anexoPreview: null,
+    itemDiferente: false,
+    itemEncontrado: "",
     plano: null,
   };
 }
+
+/** Item do local que a pergunta confere: o tipo (ex.: TV) e o que está cadastrado. */
+export type ConferenciaItem = { tipo: string; previsto: string | null };
 
 function planoVazio(quemPediu: string, quemVaiFazer = ""): PlanoLocal {
   return { prioridade: "media", o_que_fazer: "", quem_vai_fazer: quemVaiFazer, quem_pediu: quemPediu };
@@ -60,10 +68,13 @@ export function PerguntaItem({
   responsaveis,
   responsavelPadrao,
   quemPediu,
+  conferencia,
 }: {
   pergunta: Pergunta;
   valor: RespostaLocal;
   onChange: (v: RespostaLocal) => void;
+  /** Pergunta ligada a um item do local: mostra o cadastrado e pede aviso se for diferente. */
+  conferencia?: ConferenciaItem | null;
   /** Nomes sugeridos em "Quem vai fazer?" (camareiras). */
   responsaveis: string[];
   responsavelPadrao?: string;
@@ -76,6 +87,9 @@ export function PerguntaItem({
   const exigidos = complementosExigidos({ tipo, exige: pergunta.exige }, valor);
   const faltando = complementosFaltando({ tipo, exige: pergunta.exige }, valor);
   const comentarioObrigatorio = exigidos.includes("comentario");
+  // Item que não aceita comentário/foto esconde o botão, a não ser que a resposta exija.
+  const aceitaComentario = pergunta.permite_comentario !== false || comentarioObrigatorio || Boolean(valor.comentario);
+  const aceitaFoto = pergunta.permite_foto !== false || exigidos.includes("foto") || Boolean(valor.anexoPreview);
 
   function setSimNao(r: RespostaValor) {
     if (r === "nao" && pergunta.plano_acao) {
@@ -151,6 +165,36 @@ export function PerguntaItem({
         {!pergunta.obrigatoria && <span className="ml-1 text-xs font-normal text-slate-400">(opcional)</span>}
       </p>
       {pergunta.dica && <p className="mt-0.5 text-xs text-slate-500">{pergunta.dica}</p>}
+
+      {conferencia && (
+        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm">
+          <p className="text-sky-900">
+            {conferencia.previsto ? (
+              <>
+                No cadastro desta UH: <b>{conferencia.tipo} {conferencia.previsto}</b>
+              </>
+            ) : (
+              <>Nenhum item “{conferencia.tipo}” cadastrado neste local.</>
+            )}
+          </p>
+          <label className="mt-1.5 flex items-center gap-2 text-sky-900">
+            <input
+              type="checkbox"
+              checked={valor.itemDiferente}
+              onChange={(e) => onChange({ ...valor, itemDiferente: e.target.checked })}
+            />
+            {conferencia.previsto ? "O que tem aqui é diferente do cadastro" : "Encontrei esse item aqui"}
+          </label>
+          {valor.itemDiferente && (
+            <input
+              className={`${inputCls} mt-2`}
+              value={valor.itemEncontrado}
+              onChange={(e) => onChange({ ...valor, itemEncontrado: e.target.value })}
+              placeholder="O que você encontrou? (marca e modelo) — obrigatório"
+            />
+          )}
+        </div>
+      )}
 
       <div className="mt-3">
         {tipo === "sim_nao" && (
@@ -288,23 +332,27 @@ export function PerguntaItem({
             N/A
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => onChange({ ...valor, mostrarComentario: !valor.mostrarComentario })}
-          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          💬 {valor.mostrarComentario || valor.comentario ? "Comentário" : "Comentar"}
-        </button>
-        <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-          📎 {valor.anexoFile ? "Trocar foto" : "Anexar foto"}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleAnexo}
-          />
-        </label>
+        {aceitaComentario && (
+          <button
+            type="button"
+            onClick={() => onChange({ ...valor, mostrarComentario: !valor.mostrarComentario })}
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            💬 {valor.mostrarComentario || valor.comentario ? "Comentário" : "Comentar"}
+          </button>
+        )}
+        {aceitaFoto && (
+          <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            📎 {valor.anexoFile ? "Trocar foto" : "Anexar foto"}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleAnexo}
+            />
+          </label>
+        )}
       </div>
       {anexoErro && <p className="mt-1 text-xs text-red-600">{anexoErro}</p>}
       {faltando.length > 0 && (
@@ -314,7 +362,7 @@ export function PerguntaItem({
         </p>
       )}
 
-      {(valor.mostrarComentario || valor.comentario || comentarioObrigatorio) && (
+      {aceitaComentario && (valor.mostrarComentario || valor.comentario || comentarioObrigatorio) && (
         <textarea
           className={`${inputCls} mt-3`}
           rows={2}

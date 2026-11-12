@@ -9,9 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function ProcessosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ novo?: string }>;
+  searchParams: Promise<{ novo?: string; setor?: string }>;
 }) {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/processos", "equipe");
+  const busca = await searchParams;
   const supabase = await createClient();
   // O banco devolve só os checklists dos setores da pessoa (o admin vê todos).
   const [{ data }, { setores, propriedades, meusSetores }] = await Promise.all([
@@ -31,7 +32,8 @@ export default async function ProcessosPage({
         setores={setores}
         propriedades={propriedades}
         meusSetores={meusSetores}
-        abrirNovo={(await searchParams).novo === "1"}
+        abrirNovo={busca.novo === "1"}
+        setorInicial={busca.setor}
       />
     </GovernancaShell>
   );

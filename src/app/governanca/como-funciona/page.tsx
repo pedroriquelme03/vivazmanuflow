@@ -31,6 +31,11 @@ const ETAPAS: Etapa[] = [
         todos, o Kanban e escolhe o colaborador avaliado; <b>Aplicador</b> vê só as inspeções que
         fez. O administrador marcado é o administrador do checklist.
       </>,
+      <>
+        Gente que usa <b>só o Checklist</b> também pode ser cadastrada dentro dele, em{" "}
+        <b>Cadastros &gt; Equipe</b>: o líder cria o login e dá acesso só aos setores dele; o
+        administrador, a qualquer setor. Administrador só o administrador cria.
+      </>,
       "Quem tem mais de um ambiente troca entre Manutenção, TI e Checklist no seletor do menu.",
     ],
   },
@@ -38,15 +43,24 @@ const ETAPAS: Etapa[] = [
     numero: 2,
     titulo: "Cadastrar setores, locais e colaboradores",
     quem: "Administrador (colaboradores: também o líder)",
-    onde: { href: "/governanca/admin/setores", rotulo: "Setores", soAdmin: true },
+    onde: { href: "/governanca/admin/cadastros", rotulo: "Cadastros", soEquipe: true },
     itens: [
+      <>
+        Tudo fica em <b>Cadastros</b>: Equipe, Colaboradores, Setores e Locais.
+      </>,
       <>
         Em <b>Setores</b>, cada propriedade (Vivaz, Aquamania) ganha seus setores. Ali também se marca
         quem acessa cada setor: o líder e o aplicador só veem os setores marcados para eles.
       </>,
       <>
         Em <b>Locais</b>, cadastre onde o checklist é aplicado: UH (apartamento ou suíte) ou área, como
-        casa de máquinas ou bilheteria.
+        casa de máquinas ou bilheteria. Abra o local para editar a categoria, a acomodação e os itens
+        dele, separados em <b>Eletrônicos</b> (TV, ar-condicionado, cofre…) e <b>Mobília</b> (cama,
+        banheira…), cada um com marca, modelo e número de <b>patrimônio</b>.
+      </>,
+      <>
+        Em <b>Locais &gt; Tipos de item</b>, crie, renomeie, troque de seção ou remova os tipos (TV, Cama…).
+        Renomear muda em todos os locais.
       </>,
       <>
         Em <b>Colaboradores</b>, cadastre quem é avaliado (nome e setor, sem login). O líder cadastra
@@ -83,6 +97,15 @@ const ETAPAS: Etapa[] = [
         Também na pergunta: o que fica <b>obrigatório em cada resposta</b> (por exemplo, &quot;Não&quot;
         exige foto e comentário) e as <b>condicionais</b>: uma resposta mostra outra pergunta ou uma
         seção inteira, que fica escondida até lá e não conta na nota.
+      </>,
+      <>
+        Em checklist que pede a UH, a pergunta pode <b>conferir um item do local</b> (ex.: TV): na hora de
+        responder aparece o modelo cadastrado, e quem aplica avisa se encontrou outro. Os Relatórios
+        mostram os problemas por modelo.
+      </>,
+      <>
+        Em <b>Editar dados</b>, a <b>pergunta que identifica</b> faz a resposta dela aparecer junto do
+        nome do checklist nas listas (ex.: o nome do evento).
       </>,
       "Um checklist sem perguntas ou marcado como Inativo não aparece para quem vai preencher.",
     ],

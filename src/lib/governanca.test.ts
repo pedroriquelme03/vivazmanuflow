@@ -133,6 +133,9 @@ const uh = (numero: string, tipo: string): Acomodacao => ({
   numero,
   tipo,
   propriedade_id: "p-vivaz",
+  categoria: null,
+  acomodacao: null,
+  permite_pet: false,
   ativo: true,
   criado_em: "",
 });
@@ -270,6 +273,12 @@ describe("complementos obrigatórios e condicionais no preenchimento", () => {
     expect(itemRespondido(comFoto, { resposta: "nao", plano: null })).toBe(false);
     expect(itemRespondido(comFoto, { resposta: "nao", plano: null, anexoPreview: "blob:x" })).toBe(true);
     expect(itemRespondido(comFoto, { resposta: "sim", plano: null })).toBe(true);
+  });
+
+  it("item diferente do cadastrado só segue dizendo o que foi encontrado", () => {
+    const q = { id: "tv", tipo: "sim_nao", plano_acao: false };
+    expect(itemRespondido(q, { resposta: "sim", plano: null, itemDiferente: true, itemEncontrado: " " })).toBe(false);
+    expect(itemRespondido(q, { resposta: "sim", plano: null, itemDiferente: true, itemEncontrado: "LG 43'" })).toBe(true);
   });
 
   it("pergunta escondida não trava a seção, e seção escondida é pulada ao retomar", () => {

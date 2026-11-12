@@ -94,6 +94,7 @@ describe("filtrarInspecoes", () => {
     setorId: "s-gov",
     checklistId: "c1",
     checklist: "Revisão de suítes",
+    identificacao: null,
     local: "1005",
     localId: "l1",
     colaborador: "Ana Souza",

@@ -6,22 +6,38 @@ export type ItemChecklist = {
   href: string;
   rotulo: string;
   acesso: AcessoChecklist;
+  /** Telas que ficam dentro deste item e o deixam marcado no menu. */
+  inclui?: string[];
 };
 
-/** Menu lateral do ambiente Checklist: Kanban, Relatórios e Fechamento do mês no fim. */
+/** Rotas que ficam dentro da tela Cadastros. */
+export const ROTAS_CADASTROS = [
+  "/governanca/admin/equipe",
+  "/governanca/admin/colaboradores",
+  "/governanca/admin/setores",
+  "/governanca/admin/locais",
+];
+
+/**
+ * Menu lateral do ambiente Checklist, enxuto: o dia a dia em cima; cadastros
+ * (equipe, colaboradores, setores, locais) numa tela só; relatórios com o
+ * fechamento do mês dentro.
+ */
 export const MENU_CHECKLIST: ItemChecklist[] = [
   { href: "/governanca", rotulo: "Início", acesso: "todos" },
   { href: "/governanca/nova", rotulo: "Preencher checklist", acesso: "todos" },
   { href: "/governanca/relatorio-diario", rotulo: "Relatório diário", acesso: "todos" },
   { href: "/governanca/admin/inspecoes", rotulo: "Inspeções", acesso: "equipe" },
-  { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", acesso: "equipe" },
-  { href: "/governanca/admin/setores", rotulo: "Setores", acesso: "admin" },
-  { href: "/governanca/admin/locais", rotulo: "Locais", acesso: "admin" },
-  { href: "/governanca/admin/colaboradores", rotulo: "Colaboradores", acesso: "equipe" },
-  { href: "/governanca/como-funciona", rotulo: "Como funciona", acesso: "todos" },
   { href: "/governanca/admin/kanban", rotulo: "Kanban", acesso: "equipe" },
-  { href: "/governanca/admin/relatorios", rotulo: "Relatórios", acesso: "admin" },
-  { href: "/governanca/admin/fechamento", rotulo: "Fechamento do mês", acesso: "admin" },
+  { href: "/governanca/admin/processos", rotulo: "Gerenciar checklists", acesso: "equipe" },
+  { href: "/governanca/admin/cadastros", rotulo: "Cadastros", acesso: "equipe", inclui: ROTAS_CADASTROS },
+  {
+    href: "/governanca/admin/relatorios",
+    rotulo: "Relatórios",
+    acesso: "admin",
+    inclui: ["/governanca/admin/fechamento"],
+  },
+  { href: "/governanca/como-funciona", rotulo: "Como funciona", acesso: "todos" },
 ];
 
 export function podeAcessar(papel: GovPapel, acesso: AcessoChecklist) {
@@ -36,9 +52,9 @@ export function menuChecklist(papel: GovPapel | null): ItemChecklist[] {
   return MENU_CHECKLIST.filter((item) => podeAcessar(papel, item.acesso));
 }
 
-export function itemChecklistAtivo(href: string, caminho: string) {
-  if (href === "/governanca") {
+export function itemChecklistAtivo(item: Pick<ItemChecklist, "href" | "inclui">, caminho: string) {
+  if (item.href === "/governanca") {
     return caminho === "/governanca" || caminho.startsWith("/governanca/inspecao/");
   }
-  return caminho.startsWith(href);
+  return [item.href, ...(item.inclui ?? [])].some((rota) => caminho.startsWith(rota));
 }

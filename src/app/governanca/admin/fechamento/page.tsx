@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { MIGRATION_HINT_GOV, erroSchemaGov, fechamentoMensal } from "@/lib/governanca";
 import { GovernancaShell } from "../../GovernancaShell";
-import { Erro, Titulo } from "../../ui";
+import { AbasRelatorios, Erro, Titulo } from "../../ui";
 import { FechamentoMes } from "./FechamentoMes";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,7 @@ export default async function FechamentoPage({
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
+      <AbasRelatorios atual="fechamento" />
       <Titulo
         titulo="Fechamento do mês"
         subtitulo="Nota de cada camareira no mês para a planilha de produtividade do RH."

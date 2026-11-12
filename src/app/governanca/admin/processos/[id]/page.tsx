@@ -17,9 +17,10 @@ export default async function ProcessoEditorPage({
   const { perfil, papel } = await exigirGovernanca(`/governanca/admin/processos/${id}`, "equipe");
   const supabase = await createClient();
   // Checklist de outro setor não volta do banco para o líder: aparece como não encontrado.
-  const [{ data }, { setores, propriedades, meusSetores }] = await Promise.all([
+  const [{ data }, { setores, propriedades, meusSetores }, { data: tiposItem }] = await Promise.all([
     supabase.from("gov_processos").select("*, gov_secoes(*, gov_perguntas(*))").eq("id", id).maybeSingle(),
     carregarSetoresDaPessoa(supabase, perfil.id, papel),
+    supabase.from("gov_tipos_item").select("*").order("nome"),
   ]);
   const idsPerguntas = (data?.gov_secoes ?? []).flatMap((s) => s.gov_perguntas.map((q) => q.id));
   const { data: dependencias } = idsPerguntas.length
@@ -38,6 +39,7 @@ export default async function ProcessoEditorPage({
           propriedades={propriedades}
           meusSetores={meusSetores}
           dependencias={dependencias ?? []}
+          tiposItem={tiposItem ?? []}
         />
       )}
     </GovernancaShell>

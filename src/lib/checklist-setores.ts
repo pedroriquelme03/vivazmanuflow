@@ -14,6 +14,8 @@ export const SEM_SETOR = "Sem setor";
 
 const porNome = (a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, "pt-BR");
 
+export const jaExisteSetor = (nome: string) => `Já existe o setor "${nome}" nessa propriedade.`;
+
 /** Tira espaços sobrando: "  Casa   de máquinas " → "Casa de máquinas". */
 export function limparNome(nome: string) {
   return nome.trim().replace(/\s+/g, " ");

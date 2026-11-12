@@ -2,29 +2,36 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Dependencia } from "@/lib/checklist-regras";
+import { removerDoExige, renomearNoExige, serveDeIdentificador, type Dependencia } from "@/lib/checklist-regras";
+import { MODOS_AVALIADO, modoAvaliado, rotuloModoAvaliado, type ModoAvaliado } from "@/lib/checklist-avaliado";
+import type { TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
-  TIPOS_ITEM,
-  TIPO_ITEM_LABEL,
   proximaOrdem,
   rotuloAplicacao,
-  tipoItem,
-  tipoTemOpcoes,
   type Pergunta,
   type Processo,
   type Secao,
   type SecaoComPerguntas,
-  type TipoItem,
   type TipoProcesso,
 } from "@/lib/governanca";
 import { rotuloSetor, type PropriedadeRef, type SetorChecklist } from "@/lib/checklist-setores";
 import { ativosOuAtual } from "@/lib/propriedade-opcoes";
+import { useConfirmacao } from "@/components/Confirmacao";
 import { SelectSetor } from "../../../Seletores";
-import { Erro, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../../ui";
+import {
+  Erro,
+  btnPequeno,
+  btnPequenoPerigo,
+  btnPrimario,
+  btnSecundario,
+  cardCls,
+  inputCls,
+  labelCls,
+} from "../../../ui";
 import { useGravar } from "../../../useGravar";
 import { CampoLocal } from "../CampoLocal";
-import { Condicionais, ExigenciasPorResposta, type AlvoCondicional } from "./RegrasPergunta";
+import { EditorPergunta, type AlvoCondicional } from "./EditorPergunta";
 
 export function ProcessoEditor({
   processo,
@@ -33,6 +40,7 @@ export function ProcessoEditor({
   propriedades,
   meusSetores,
   dependencias,
+  tiposItem,
 }: {
   processo: Processo;
   secoes: SecaoComPerguntas[];
@@ -42,10 +50,13 @@ export function ProcessoEditor({
   meusSetores: SetorChecklist[];
   /** Condicionais das perguntas deste checklist. */
   dependencias: Dependencia[];
+  /** Tipos de item do patrimônio (TV, ar...), para conferir na UH. */
+  tiposItem: TipoItemPatrimonio[];
 }) {
   const { supabase, erro, gravar } = useGravar();
+  const [confirmar, janela] = useConfirmacao();
   const [novaSecao, setNovaSecao] = useState("");
-  const total = secoes.reduce((n, s) => n + s.gov_perguntas.length, 0);
+  const perguntas = secoes.flatMap((s) => s.gov_perguntas);
   const alvos = useMemo<AlvoCondicional[]>(
     () =>
       secoes.flatMap((s) => [
@@ -60,11 +71,7 @@ export function ProcessoEditor({
     if (!novaSecao.trim()) return;
     const nome = novaSecao.trim();
     setNovaSecao("");
-    gravar(
-      supabase
-        .from("gov_secoes")
-        .insert({ processo_id: processo.id, nome, ordem: proximaOrdem(secoes) }),
-    );
+    gravar(supabase.from("gov_secoes").insert({ processo_id: processo.id, nome, ordem: proximaOrdem(secoes) }));
   }
 
   function renomearSecao(s: Secao, nome: string) {
@@ -72,9 +79,14 @@ export function ProcessoEditor({
     gravar(supabase.from("gov_secoes").update({ nome: nome.trim() }).eq("id", s.id));
   }
 
-  function removerSecao(s: Secao) {
-    if (!confirm(`Remover a seção "${s.nome}" e todas as suas perguntas?`)) return;
-    gravar(supabase.from("gov_secoes").delete().eq("id", s.id));
+  async function removerSecao(s: SecaoComPerguntas) {
+    const ok = await confirmar({
+      titulo: `Excluir a seção "${s.nome}"?`,
+      texto: `As ${s.gov_perguntas.length} perguntas dela também são apagadas. Respostas já dadas continuam no histórico.`,
+      confirmar: "Excluir seção",
+      perigo: true,
+    });
+    if (ok) gravar(supabase.from("gov_secoes").delete().eq("id", s.id));
   }
 
   function moverSecao(idx: number, delta: -1 | 1) {
@@ -106,22 +118,60 @@ export function ProcessoEditor({
     gravar(supabase.from("gov_perguntas").update(patch).eq("id", p.id));
   }
 
-  function removerPergunta(p: Pergunta) {
-    gravar(supabase.from("gov_perguntas").delete().eq("id", p.id));
+  async function removerPergunta(p: Pergunta) {
+    const ok = await confirmar({
+      titulo: "Excluir esta pergunta?",
+      texto: `"${p.texto}". Respostas já dadas continuam no histórico.`,
+      confirmar: "Excluir pergunta",
+      perigo: true,
+    });
+    if (ok) gravar(supabase.from("gov_perguntas").delete().eq("id", p.id));
+  }
+
+  /** Renomear a opção leva junto o que estava ligado a ela (obrigatórios e condicionais). */
+  function renomearOpcao(p: Pergunta, antiga: string, nova: string) {
+    gravar(
+      Promise.all([
+        supabase
+          .from("gov_perguntas")
+          .update({ opcoes: p.opcoes.map((o) => (o === antiga ? nova : o)), exige: renomearNoExige(p.exige, antiga, nova) })
+          .eq("id", p.id),
+        supabase.from("gov_dependencias").update({ gatilho: nova }).eq("pergunta_id", p.id).eq("gatilho", antiga),
+      ]).then(([a, b]) => ({ error: a.error ?? b.error })),
+    );
+  }
+
+  async function removerOpcao(p: Pergunta, opcao: string) {
+    const ligadas = dependencias.filter((d) => d.pergunta_id === p.id && d.gatilho === opcao).length;
+    const ok = await confirmar({
+      titulo: `Remover a opção "${opcao}"?`,
+      texto: ligadas ? `${ligadas} condicional(is) ligada(s) a ela também saem.` : undefined,
+      confirmar: "Remover",
+      perigo: true,
+    });
+    if (!ok) return;
+    gravar(
+      Promise.all([
+        supabase
+          .from("gov_perguntas")
+          .update({ opcoes: p.opcoes.filter((o) => o !== opcao), exige: removerDoExige(p.exige, opcao) })
+          .eq("id", p.id),
+        supabase.from("gov_dependencias").delete().eq("pergunta_id", p.id).eq("gatilho", opcao),
+      ]).then(([a, b]) => ({ error: a.error ?? b.error })),
+    );
   }
 
   return (
     <>
-      <Link
-        href="/governanca/admin/processos"
-        className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800"
-      >
+      {janela}
+      <Link href="/governanca/admin/processos" className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800">
         ← Gerenciar checklists
       </Link>
 
       <DadosProcesso
         processo={processo}
-        total={total}
+        total={perguntas.length}
+        perguntas={perguntas}
         setores={setores}
         propriedades={propriedades}
         meusSetores={meusSetores}
@@ -133,52 +183,48 @@ export function ProcessoEditor({
       <div className="space-y-4">
         {secoes.map((s, idx) => (
           <div key={s.id} className={cardCls}>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <input
                 key={`${s.id}-${s.nome}`}
                 defaultValue={s.nome}
                 onBlur={(e) => renomearSecao(s, e.target.value)}
                 aria-label="Nome da seção"
-                className="min-w-0 flex-1 border-0 border-b border-transparent bg-transparent text-lg font-bold outline-none focus:border-slate-300"
+                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1 text-lg font-bold outline-none hover:border-slate-200 focus:border-slate-300"
               />
-              <span className="text-xs text-slate-400">{s.gov_perguntas.length} itens</span>
-              <button
-                type="button"
-                onClick={() => moverSecao(idx, -1)}
-                disabled={idx === 0}
-                className="px-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                aria-label="Subir seção"
-              >
+              <span className="text-xs text-slate-400">
+                {s.gov_perguntas.length} {s.gov_perguntas.length === 1 ? "pergunta" : "perguntas"}
+              </span>
+              <button type="button" onClick={() => moverSecao(idx, -1)} disabled={idx === 0} className={btnPequeno} aria-label="Subir seção">
                 ↑
               </button>
               <button
                 type="button"
                 onClick={() => moverSecao(idx, 1)}
                 disabled={idx === secoes.length - 1}
-                className="px-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
+                className={btnPequeno}
                 aria-label="Descer seção"
               >
                 ↓
               </button>
-              <button
-                type="button"
-                onClick={() => removerSecao(s)}
-                className="text-xs text-slate-400 hover:text-red-600"
-              >
-                Remover
+              <button type="button" onClick={() => removerSecao(s)} className={btnPequenoPerigo}>
+                Excluir seção
               </button>
             </div>
 
             <ul className="mb-3 divide-y divide-slate-100">
               {s.gov_perguntas.map((p, i) => (
-                <ItemEditor
+                <EditorPergunta
                   key={p.id}
                   numero={i + 1}
                   pergunta={p}
                   dependencias={dependencias.filter((d) => d.pergunta_id === p.id)}
                   alvos={alvos.filter((a) => a.id !== p.id && a.id !== s.id)}
+                  tiposItem={tiposItem}
+                  usaLocal={processo.usa_acomodacao}
                   onAtualizar={(patch) => atualizarPergunta(p, patch)}
                   onRemover={() => removerPergunta(p)}
+                  onRenomearOpcao={(antiga, nova) => renomearOpcao(p, antiga, nova)}
+                  onRemoverOpcao={(opcao) => removerOpcao(p, opcao)}
                   onAdicionarCondicional={(gatilho, alvo) =>
                     gravar(
                       supabase.from("gov_dependencias").insert({
@@ -193,9 +239,7 @@ export function ProcessoEditor({
                   onRemoverCondicional={(d) => gravar(supabase.from("gov_dependencias").delete().eq("id", d.id))}
                 />
               ))}
-              {s.gov_perguntas.length === 0 && (
-                <li className="py-2 text-sm text-slate-500">Nenhuma pergunta nesta seção.</li>
-              )}
+              {s.gov_perguntas.length === 0 && <li className="py-2 text-sm text-slate-500">Nenhuma pergunta nesta seção.</li>}
             </ul>
 
             <NovaPergunta onAdd={(texto) => addPergunta(s, texto)} />
@@ -224,6 +268,7 @@ export function ProcessoEditor({
 function DadosProcesso({
   processo,
   total,
+  perguntas,
   setores,
   propriedades,
   meusSetores,
@@ -231,6 +276,7 @@ function DadosProcesso({
 }: {
   processo: Processo;
   total: number;
+  perguntas: Pergunta[];
   setores: SetorChecklist[];
   propriedades: PropriedadeRef[];
   meusSetores: SetorChecklist[];
@@ -242,19 +288,26 @@ function DadosProcesso({
   const [descricao, setDescricao] = useState(processo.descricao ?? "");
   const [usaAcomodacao, setUsaAcomodacao] = useState(processo.usa_acomodacao);
   const [tipo, setTipo] = useState<TipoProcesso>((processo.tipo as TipoProcesso) ?? "ambos");
+  const [identificador, setIdentificador] = useState(processo.identificador_pergunta_id ?? "");
+  const [avaliado, setAvaliado] = useState<ModoAvaliado>(modoAvaliado(processo.avaliado));
+  const perguntaIdentificador = perguntas.find((q) => q.id === processo.identificador_pergunta_id);
 
   if (!editando) {
     return (
-      <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             {rotuloSetor(processo.setor_id, setores, propriedades)}
           </p>
           <h1 className="text-xl font-bold">{processo.nome}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            {total} itens · {rotuloAplicacao(processo)}
+            {total} {total === 1 ? "pergunta" : "perguntas"} · {rotuloAplicacao(processo)}
             {processo.descricao ? ` · ${processo.descricao}` : ""}
           </p>
+          <p className="mt-0.5 text-xs text-slate-500">Avaliado: {rotuloModoAvaliado(processo.avaliado)}</p>
+          {perguntaIdentificador && (
+            <p className="mt-0.5 text-xs text-slate-500">Identifica pela resposta de: {perguntaIdentificador.texto}</p>
+          )}
         </div>
         <button type="button" onClick={() => setEditando(true)} className={`${btnSecundario} shrink-0 py-2`}>
           Editar dados
@@ -265,7 +318,7 @@ function DadosProcesso({
 
   return (
     <form
-      className={`${cardCls} mb-5 space-y-3`}
+      className={`${cardCls} mb-5 space-y-4`}
       onSubmit={(e) => {
         e.preventDefault();
         if (!nome.trim()) return;
@@ -275,6 +328,8 @@ function DadosProcesso({
           descricao: descricao.trim() || null,
           usa_acomodacao: usaAcomodacao,
           tipo: usaAcomodacao ? tipo : "ambos",
+          identificador_pergunta_id: identificador || null,
+          avaliado,
         });
         setEditando(false);
       }}
@@ -299,6 +354,48 @@ function DadosProcesso({
         <input className={inputCls} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
       </label>
       <CampoLocal usaLocal={usaAcomodacao} onUsaLocal={setUsaAcomodacao} tipo={tipo} onTipo={setTipo} />
+      <fieldset>
+        <legend className={labelCls}>Quem é avaliado</legend>
+        <div className="grid gap-2 lg:grid-cols-3">
+          {MODOS_AVALIADO.map((m) => (
+            <label
+              key={m.valor}
+              className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-sm ${
+                avaliado === m.valor ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              <input
+                type="radio"
+                name="avaliado"
+                className="mt-0.5"
+                checked={avaliado === m.valor}
+                onChange={() => setAvaliado(m.valor)}
+              />
+              <span className="min-w-0">
+                <b className="block text-slate-800">{m.rotulo}</b>
+                <span className="block text-xs text-slate-500">{m.descricao}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="block">
+        <span className={labelCls}>Pergunta que identifica cada aplicação (opcional)</span>
+        <select className={inputCls} value={identificador} onChange={(e) => setIdentificador(e.target.value)}>
+          <option value="">Nenhuma</option>
+          {perguntas
+            .filter((q) => serveDeIdentificador(q.tipo) || q.id === processo.identificador_pergunta_id)
+            .map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.texto}
+              </option>
+            ))}
+        </select>
+        <span className="mt-1 block text-xs text-slate-500">
+          A resposta dela aparece junto do nome do checklist nas listas e no Kanban. Ex.: no checklist de eventos, a
+          pergunta “Evento” faz aparecer “Natal”, “Carnaval”…
+        </span>
+      </label>
       <div className="flex gap-2">
         <button type="submit" className={btnPrimario}>
           Salvar
@@ -308,158 +405,6 @@ function DadosProcesso({
         </button>
       </div>
     </form>
-  );
-}
-
-function ItemEditor({
-  numero,
-  pergunta: p,
-  dependencias,
-  alvos,
-  onAtualizar,
-  onRemover,
-  onAdicionarCondicional,
-  onRemoverCondicional,
-}: {
-  numero: number;
-  pergunta: Pergunta;
-  /** Condicionais em que esta pergunta é a que dispara. */
-  dependencias: Dependencia[];
-  /** Outras perguntas e seções do checklist que podem ser mostradas. */
-  alvos: AlvoCondicional[];
-  onAtualizar: (patch: TablesUpdate<"gov_perguntas">) => void;
-  onRemover: () => void;
-  onAdicionarCondicional: (gatilho: string, alvo: AlvoCondicional) => void;
-  onRemoverCondicional: (dependencia: Dependencia) => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const tipo = tipoItem(p.tipo);
-
-  return (
-    <li className="py-2">
-      <div className="flex items-center gap-2">
-        <span className="w-6 shrink-0 text-right text-xs text-slate-400">{numero}.</span>
-        <input
-          key={`${p.id}-${p.texto}`}
-          defaultValue={p.texto}
-          onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== p.texto && onAtualizar({ texto: e.target.value.trim() })}
-          aria-label={`Pergunta ${numero}`}
-          className={inputCls}
-        />
-        <button
-          type="button"
-          onClick={() => setAberto((v) => !v)}
-          className="shrink-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
-          aria-expanded={aberto}
-        >
-          {TIPO_ITEM_LABEL[tipo].split(" (")[0]}
-        </button>
-        <button
-          type="button"
-          onClick={onRemover}
-          className="shrink-0 text-slate-400 hover:text-red-600"
-          aria-label="Remover pergunta"
-        >
-          ✕
-        </button>
-      </div>
-      {p.grupo && !aberto && <p className="ml-8 mt-1 text-[11px] text-slate-400">{p.grupo}</p>}
-
-      {aberto && (
-        <div className="ml-8 mt-2 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-600">Tipo de resposta</span>
-            <select
-              className={inputCls}
-              value={tipo}
-              onChange={(e) => onAtualizar({ tipo: e.target.value as TipoItem })}
-            >
-              {TIPOS_ITEM.map((t) => (
-                <option key={t} value={t}>
-                  {TIPO_ITEM_LABEL[t]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-600">Subárea (opcional)</span>
-            <input
-              key={`${p.id}-g-${p.grupo ?? ""}`}
-              className={inputCls}
-              defaultValue={p.grupo ?? ""}
-              placeholder="Ex.: Bombas › Bomba 1"
-              onBlur={(e) => (e.target.value.trim() || null) !== p.grupo && onAtualizar({ grupo: e.target.value.trim() || null })}
-            />
-          </label>
-          {tipoTemOpcoes(tipo) && (
-            <label className="block sm:col-span-2">
-              <span className="mb-1 block text-xs font-medium text-slate-600">Opções (uma por linha)</span>
-              <textarea
-                key={`${p.id}-o-${p.opcoes.join("|")}`}
-                className={inputCls}
-                rows={Math.min(8, Math.max(3, p.opcoes.length))}
-                defaultValue={p.opcoes.join("\n")}
-                onBlur={(e) => {
-                  const opcoes = e.target.value.split("\n").map((o) => o.trim()).filter(Boolean);
-                  if (opcoes.join("|") !== p.opcoes.join("|")) onAtualizar({ opcoes });
-                }}
-              />
-            </label>
-          )}
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-xs font-medium text-slate-600">Dica (opcional)</span>
-            <input
-              key={`${p.id}-d-${p.dica ?? ""}`}
-              className={inputCls}
-              defaultValue={p.dica ?? ""}
-              onBlur={(e) => (e.target.value.trim() || null) !== p.dica && onAtualizar({ dica: e.target.value.trim() || null })}
-            />
-          </label>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700 sm:col-span-2">
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={p.obrigatoria} onChange={(e) => onAtualizar({ obrigatoria: e.target.checked })} />
-              Obrigatória
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={p.permite_na} onChange={(e) => onAtualizar({ permite_na: e.target.checked })} />
-              Permite N/A
-            </label>
-            {tipo === "sim_nao" && (
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={p.plano_acao} onChange={(e) => onAtualizar({ plano_acao: e.target.checked })} />
-                &quot;Não&quot; abre plano de ação
-              </label>
-            )}
-            {tipo === "sim_nao" && (
-              <label className="flex items-center gap-1.5">
-                Peso na nota
-                <input
-                  key={`${p.id}-peso-${p.peso}`}
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  defaultValue={p.peso}
-                  className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm"
-                  onBlur={(e) => {
-                    const peso = Number(e.target.value);
-                    if (Number.isFinite(peso) && peso >= 0 && peso !== Number(p.peso)) onAtualizar({ peso });
-                  }}
-                />
-              </label>
-            )}
-          </div>
-          <ExigenciasPorResposta tipo={tipo} opcoes={p.opcoes} exige={p.exige} onSalvar={(exige) => onAtualizar({ exige })} />
-          <Condicionais
-            tipo={tipo}
-            opcoes={p.opcoes}
-            dependencias={dependencias}
-            alvos={alvos}
-            onAdicionar={onAdicionarCondicional}
-            onRemover={onRemoverCondicional}
-          />
-        </div>
-      )}
-    </li>
   );
 }
 
@@ -474,13 +419,8 @@ function NovaPergunta({ onAdd }: { onAdd: (texto: string) => void }) {
       }}
       className="flex items-center gap-2"
     >
-      <input
-        className={inputCls}
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        placeholder="Nova pergunta…"
-      />
-      <button type="submit" className={`${btnSecundario} shrink-0 py-2`}>
+      <input className={inputCls} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Nova pergunta…" />
+      <button type="submit" className={`${btnSecundario} shrink-0 py-2`} disabled={!texto.trim()}>
         + Adicionar
       </button>
     </form>

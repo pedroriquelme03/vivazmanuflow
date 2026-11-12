@@ -18,11 +18,13 @@ export function useListaCadastro<T>(
   options?: {
     getAtivo?: (item: T) => boolean;
     filtro?: (item: T) => boolean;
+    /** Quantos por página ao abrir (padrão 10). */
+    pageSizeInicial?: PageSize;
   },
 ) {
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState<StatusFiltro>("todos");
-  const [pageSize, setPageSize] = useState<PageSize>(10);
+  const [pageSize, setPageSize] = useState<PageSize>(options?.pageSizeInicial ?? 10);
   const [pagina, setPagina] = useState(1);
 
   const getAtivo = options?.getAtivo;

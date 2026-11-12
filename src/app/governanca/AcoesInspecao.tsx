@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { acoesInspecao } from "@/lib/checklist-inspecao";
+import { useConfirmacao } from "@/components/Confirmacao";
 import { Erro, btnSecundario } from "./ui";
 import { useGravar } from "./useGravar";
 
@@ -24,16 +25,34 @@ export function AcoesInspecao({
 }) {
   const router = useRouter();
   const { supabase, erro, gravar } = useGravar();
+  const [confirmar, janela] = useConfirmacao();
   const pode = acoesInspecao(inspecao, { id: eu, cuidaDoSetor });
   if (!Object.values(pode).some(Boolean)) return null;
 
   const mudarStatus = (status: "pausada" | "cancelada") =>
     gravar(supabase.from("gov_inspecoes").update({ status }).eq("id", inspecao.id));
 
+  async function cancelar() {
+    const ok = await confirmar({
+      titulo: "Cancelar este checklist?",
+      texto: "Ele para de contar como em andamento e fica no histórico como cancelado.",
+      confirmar: "Cancelar checklist",
+      cancelar: "Voltar",
+      perigo: true,
+    });
+    if (ok) mudarStatus("cancelada");
+  }
+
   async function excluir() {
-    if (!confirm("Excluir este checklist e todas as respostas dele? Não dá para desfazer.")) return;
-    const ok = await gravar(supabase.from("gov_inspecoes").delete().eq("id", inspecao.id), {}, { recarregar: false });
-    if (ok) {
+    const ok = await confirmar({
+      titulo: "Excluir este checklist?",
+      texto: "Ele e todas as respostas dele são apagados. Não dá para desfazer.",
+      confirmar: "Excluir",
+      perigo: true,
+    });
+    if (!ok) return;
+    const apagou = await gravar(supabase.from("gov_inspecoes").delete().eq("id", inspecao.id), {}, { recarregar: false });
+    if (apagou) {
       router.replace(depoisDeExcluir);
       router.refresh();
     }
@@ -41,6 +60,7 @@ export function AcoesInspecao({
 
   return (
     <div className="mb-4">
+      {janela}
       <Erro texto={erro} />
       <div className="flex flex-wrap gap-2">
         {pode.continuar && (
@@ -57,7 +77,7 @@ export function AcoesInspecao({
           <button
             type="button"
             className={`${btnSecundario} py-2`}
-            onClick={() => confirm("Cancelar este checklist? Ele fica no histórico como cancelado.") && mudarStatus("cancelada")}
+            onClick={cancelar}
           >
             Cancelar checklist
           </button>

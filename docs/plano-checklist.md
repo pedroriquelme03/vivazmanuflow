@@ -1,22 +1,36 @@
 # Plano — Checklist no padrão do Checklist Fácil
 
-> Rascunho para validação (12/11/2026). Nada foi implementado ainda.
+> Plano criado em 12/11/2026 e em andamento.
 > Base: doc do Josué ("Especificação – Modelos de Checklist"), conversa com o Gabriel
 > e o que vimos ao vivo no Checklist Fácil (CF).
 
-## Andamento (12/11/2026, nada commitado)
+## Andamento (12/11/2026)
 
 | SQL (rodar nesta ordem, junto com a publicação do código) | O que faz | Status |
 |---|---|---|
 | `20261112120000_checklist_setores.sql` | Fase 1: setores, colaboradores, locais | Rodado |
-| `20261112150000_checklist_setores_aquamania.sql` | Aquamania separado em 6 setores; Avaliação de qualidade → Auditoria e Qualidade | Falta rodar |
-| `20261112160000_checklist_fase2.sql` | Fase 2: visão por setor, líder edita checklists do setor, pausar/cancelar/excluir, data de referência, área como local | Falta rodar |
-| `20261112170000_checklist_fase3.sql` | Fase 3 (parte 1): peso, obrigatórios por resposta, condicionais | Falta rodar |
+| `20261112150000_checklist_setores_aquamania.sql` | Aquamania separado em 6 setores; Avaliação de qualidade → Auditoria e Qualidade | Rodado |
+| `20261112160000_checklist_fase2.sql` | Fase 2: visão por setor, líder edita checklists do setor, pausar/cancelar/excluir, data de referência, área como local | Rodado |
+| `20261112170000_checklist_fase3.sql` | Fase 3 (parte 1): peso, obrigatórios por resposta, condicionais | Rodado |
+| `20261112180000_checklist_patrimonio.sql` | Características da UH, tipos de item e itens por local; pergunta confere item | Rodado |
+| `20261112181000_checklist_patrimonio_uhs.sql` | Preenche as 171 UHs da planilha (685 itens) | Rodado |
+| `20261112190000_checklist_identificador.sql` | Pergunta que identifica cada aplicação | Rodado |
+| `20261112200000_checklist_patrimonio_mobilia.sql` | Itens separados em Eletrônicos e Mobília, nº de patrimônio por item, UH 1104 → 1105 | Rodado |
+| `20261112210000_checklist_equipe.sql` | Equipe dentro do checklist: líder cria login só do Checklist e dá acesso aos setores dele | Rodado |
+| `20261112220000_checklist_avaliado.sql` | "Quem é avaliado" em cada checklist (líder escolhe / a própria pessoa / perguntar no começo); colaborador ligado ao login; trava para ninguém aplicar no nome de outro | **Falta rodar** |
+| `20261112230000_checklist_complementos.sql` | Pergunta pode não aceitar comentário e/ou foto | **Falta rodar** |
+| `20261112231000_checklist_fase4_cf.sql` | Fase 4: pesos e comentário/foto dos 44 checklists do CF; cria o checklist 968170 (Jardinagem) | **Falta rodar** |
 
-Fase 3 que ainda falta: subáreas de verdade (área dentro de área, hoje é o texto
-`grupo`), opções de lista com peso, plano de ação com campos configuráveis, item
-identificador. Depois: Fase 4 (completar os 48 checklists com as regras do CF) e
-Fase 5 (patrimônio).
+Sem SQL (só código): Cadastros da Manutenção/TI para o líder (cada um só o próprio sistema;
+Solicitações só para a TI), relatórios com filtros, telas novas de Equipe e Cadastros.
+
+**O que a exportação do CF não traz** (Fase 4): condicionais, obrigatórios por resposta,
+peso por opção e campos do plano de ação. Isso tem que vir do CF na tela ou do JSON do Josué.
+
+Vai vir: planilha nova das UHs (com mobília, patrimônio e números atualizados) para renovar o cadastro.
+
+Ainda falta da Fase 3: subáreas de verdade (área dentro de área; hoje é o texto `grupo`),
+opções de lista com peso e plano de ação com campos configuráveis.
 
 ## Por quê
 

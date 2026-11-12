@@ -86,10 +86,14 @@ export default async function InspecaoDetalhePage({
                     </p>
                     <p className="text-sm text-slate-500">
                       {rotuloTipo(insp.tipo ?? insp.gov_acomodacoes.tipo)} · {insp.gov_processos?.nome}
+                      {insp.identificacao ? ` · ${insp.identificacao}` : ""}
                     </p>
                   </>
                 ) : (
-                  <p className="text-xl font-bold text-slate-800">{insp.gov_processos?.nome}</p>
+                  <>
+                    <p className="text-xl font-bold text-slate-800">{insp.gov_processos?.nome}</p>
+                    {insp.identificacao && <p className="text-sm text-slate-500">{insp.identificacao}</p>}
+                  </>
                 )}
               </div>
               <StatusBadge status={insp.status} />
@@ -161,6 +165,12 @@ export default async function InspecaoDetalhePage({
                           </p>
                         )}
                         {r.comentario && <p className="mt-1 text-sm text-slate-500">{r.comentario}</p>}
+                        {(r.item_previsto || r.item_diferente) && (
+                          <p className={`mt-1 text-xs ${r.item_diferente ? "font-semibold text-amber-700" : "text-slate-500"}`}>
+                            Cadastro: {r.item_previsto ?? "nada cadastrado"}
+                            {r.item_diferente && <> · ⚠ encontrado: {r.item_encontrado ?? "—"}</>}
+                          </p>
+                        )}
                         {r.anexo_url && (
                           <a href={r.anexo_url} target="_blank" rel="noreferrer">
                             {/* eslint-disable-next-line @next/next/no-img-element -- foto do Storage */}

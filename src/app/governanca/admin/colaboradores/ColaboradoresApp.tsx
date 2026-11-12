@@ -11,7 +11,20 @@ import {
 import { ativosOuAtual } from "@/lib/propriedade-opcoes";
 import { ListaCadastroControles, useListaCadastro } from "@/components/ListaCadastroControles";
 import { SelectSetor } from "../../Seletores";
-import { BotaoAtivo, Erro, Titulo, Vazio, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../ui";
+import { useConfirmacao } from "@/components/Confirmacao";
+import {
+  ChaveAtivo,
+  Erro,
+  Titulo, Voltar,
+  Vazio,
+  btnPequeno,
+  btnPequenoPerigo,
+  btnPrimario,
+  btnSecundario,
+  cardCls,
+  inputCls,
+  labelCls,
+} from "../../ui";
 import { useGravar } from "../../useGravar";
 
 export function ColaboradoresApp({
@@ -19,6 +32,7 @@ export function ColaboradoresApp({
   setores,
   propriedades,
   meusSetores,
+  filtroInicial,
 }: {
   lista: Colaborador[];
   /** Todos os setores, para mostrar o nome. */
@@ -26,18 +40,22 @@ export function ColaboradoresApp({
   propriedades: PropriedadeRef[];
   /** Setores onde a pessoa cadastra (admin: todos). */
   meusSetores: SetorChecklist[];
+  /** Setor já filtrado ao vir da página do setor. */
+  filtroInicial?: string;
 }) {
   const { supabase, erro, setErro, gravar } = useGravar();
+  const [confirmar, janela] = useConfirmacao();
   const setoresParaEscolher = ativosOuAtual(meusSetores);
   const [nome, setNome] = useState("");
   const [setorId, setSetorId] = useState(setoresParaEscolher.length === 1 ? setoresParaEscolher[0].id : "");
-  const [filtroSetor, setFiltroSetor] = useState("");
+  const [filtroSetor, setFiltroSetor] = useState(filtroInicial ?? "");
   const [salvando, setSalvando] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
 
   const rotulo = (id: string) => rotuloSetor(id, setores, propriedades);
   const controles = useListaCadastro(lista, (c) => `${c.nome} ${rotulo(c.setor_id)}`, {
     getAtivo: (c) => c.ativo,
+    pageSizeInicial: 50,
     filtro: (c) => !filtroSetor || c.setor_id === filtroSetor,
   });
 
@@ -60,15 +78,37 @@ export function ColaboradoresApp({
     }
   }
 
-  function remover(c: Colaborador) {
-    if (!confirm(`Remover ${c.nome}?`)) return;
-    gravar(supabase.from("gov_camareiras").delete().eq("id", c.id), {
-      "23503": `${c.nome} já aparece em checklists aplicados. Marque como inativo para manter o histórico.`,
+  async function remover(c: Colaborador) {
+    const ok = await confirmar({
+      titulo: `Excluir ${c.nome}?`,
+      texto: "Se já foi avaliado em algum checklist, não dá para excluir: desative para manter o histórico.",
+      confirmar: "Excluir",
+      perigo: true,
     });
+    if (!ok) return;
+    gravar(supabase.from("gov_camareiras").delete().eq("id", c.id), {
+      "23503": `${c.nome} já aparece em checklists aplicados. Desative para manter o histórico.`,
+    });
+  }
+
+  async function mudarAtivo(c: Colaborador, ativo: boolean) {
+    if (
+      !ativo &&
+      !(await confirmar({
+        titulo: `Desativar ${c.nome}?`,
+        texto: "Deixa de aparecer na hora de escolher quem fez o serviço. O histórico continua.",
+        confirmar: "Desativar",
+      }))
+    ) {
+      return;
+    }
+    gravar(supabase.from("gov_camareiras").update({ ativo }).eq("id", c.id));
   }
 
   return (
     <>
+      {janela}
+      <Voltar href="/governanca/admin/cadastros">Cadastros</Voltar>
       <Titulo
         titulo="Colaboradores"
         subtitulo="Quem é avaliado nos checklists (nome e setor, sem login). Na hora de aplicar, aparece só o pessoal do setor do checklist."
@@ -129,25 +169,34 @@ export function ColaboradoresApp({
             ) : (
               <div
                 key={c.id}
-                className={`flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 ${c.ativo ? "" : "opacity-60"}`}
+                className={`flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3 ${c.ativo ? "bg-white" : "bg-slate-50 opacity-70"}`}
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700">
                   {c.nome.charAt(0)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{c.nome}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium">{c.nome}</span>
+                    {c.usuario_id && (
+                      <span
+                        className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700"
+                        title="Aplica checklists para si mesmo com a própria conta"
+                      >
+                        Com login
+                      </span>
+                    )}
+                  </span>
                   <span className="block truncate text-xs text-slate-500">{rotulo(c.setor_id)}</span>
                 </span>
-                <BotaoAtivo
-                  ativo={c.ativo}
-                  onClick={() => gravar(supabase.from("gov_camareiras").update({ ativo: !c.ativo }).eq("id", c.id))}
-                />
-                <button type="button" onClick={() => setEditando(c.id)} className="text-xs text-slate-400 hover:text-brand-600">
-                  Editar
-                </button>
-                <button type="button" onClick={() => remover(c)} className="text-xs text-slate-400 hover:text-red-600">
-                  Remover
-                </button>
+                <div className="flex items-center gap-2">
+                  <ChaveAtivo ativo={c.ativo} onChange={(ativo) => mudarAtivo(c, ativo)} rotulo={c.nome} />
+                  <button type="button" onClick={() => setEditando(c.id)} className={btnPequeno}>
+                    Editar
+                  </button>
+                  <button type="button" onClick={() => remover(c)} className={btnPequenoPerigo}>
+                    Excluir
+                  </button>
+                </div>
               </div>
             ),
           )}

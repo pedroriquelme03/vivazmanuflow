@@ -17,7 +17,7 @@ export default async function KanbanChecklistPage() {
   const { data, error } = await supabase
     .from("gov_inspecoes")
     .select(
-      "id, status, criado_em, finalizada_em, gov_processos(nome, gov_setores(nome)), gov_acomodacoes(numero, tipo), gov_camareiras(nome), usuarios(nome), gov_respostas(id, gov_planos_acao(id, resolvido_em))",
+      "id, status, criado_em, finalizada_em, identificacao, gov_processos(nome, gov_setores(nome)), gov_acomodacoes(numero, tipo), gov_camareiras(nome), usuarios(nome), gov_respostas(id, gov_planos_acao(id, resolvido_em))",
     )
     // Abertos (em andamento ou pausados) sempre; os outros, dos últimos dias. Cancelado não entra.
     .or(`status.in.(em_andamento,pausada),criado_em.gte.${desde}`)
@@ -31,7 +31,7 @@ export default async function KanbanChecklistPage() {
       id: i.id,
       coluna: colunaKanban({ status: i.status, planos }),
       pausada: i.status === "pausada",
-      checklist: i.gov_processos?.nome ?? "Checklist",
+      checklist: [i.gov_processos?.nome ?? "Checklist", i.identificacao].filter(Boolean).join(" · "),
       setor: i.gov_processos?.gov_setores?.nome ?? null,
       uh: i.gov_acomodacoes
         ? i.gov_acomodacoes.tipo === "area"

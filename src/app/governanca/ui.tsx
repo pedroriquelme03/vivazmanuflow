@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { PRIORIDADE_LABEL, type Prioridade } from "@/lib/governanca";
 import { rotuloStatus } from "@/lib/checklist-inspecao";
 
@@ -13,6 +15,42 @@ export const btnPrimario = `${btnBase} bg-brand-600 text-white hover:bg-brand-70
 export const btnSecundario = `${btnBase} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
 
 export const cardCls = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
+
+const ABAS_RELATORIOS = [
+  { valor: "indicadores", rotulo: "Indicadores", href: "/governanca/admin/relatorios" },
+  { valor: "fechamento", rotulo: "Fechamento do mês", href: "/governanca/admin/fechamento" },
+] as const;
+
+/** Relatórios e Fechamento do mês ficam juntos no menu: as abas trocam entre os dois. */
+export function AbasRelatorios({ atual }: { atual: (typeof ABAS_RELATORIOS)[number]["valor"] }) {
+  return (
+    <nav className="mb-5 flex gap-1 border-b border-slate-200" aria-label="Relatórios">
+      {ABAS_RELATORIOS.map((a) => (
+        <Link
+          key={a.valor}
+          href={a.href}
+          aria-current={a.valor === atual ? "page" : undefined}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${
+            a.valor === atual
+              ? "border-brand-600 text-brand-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          {a.rotulo}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** Link de volta para a tela de cima (ex.: "← Cadastros"). */
+export function Voltar({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className="mb-3 inline-block text-sm text-slate-500 hover:text-slate-800">
+      ← {children}
+    </Link>
+  );
+}
 
 export function Titulo({ titulo, subtitulo }: { titulo: string; subtitulo?: string }) {
   return (
@@ -32,17 +70,70 @@ export function Erro({ texto }: { texto: string | null }) {
   return <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{texto}</p>;
 }
 
-/** Liga/desliga de cadastros: ativo em verde, inativo em cinza. */
-export function BotaoAtivo({ ativo, onClick }: { ativo: boolean; onClick: () => void }) {
+/** Botões pequenos das listas (Editar, Remover...), com cara de botão. */
+const btnPequenoBase =
+  "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:pointer-events-none disabled:opacity-40";
+export const btnPequeno = `${btnPequenoBase} border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+export const btnPequenoPerigo = `${btnPequenoBase} border-red-200 bg-white text-red-700 hover:bg-red-50`;
+
+/** Chave liga/desliga com texto ao lado. */
+export function Chave({
+  ligado,
+  onChange,
+  children,
+  rotulo,
+  ajuda,
+}: {
+  ligado: boolean;
+  onChange: (ligado: boolean) => void;
+  children: ReactNode;
+  /** Nome para leitores de tela quando o texto visível não basta. */
+  rotulo?: string;
+  /** Explicação curta embaixo do texto. */
+  ajuda?: string;
+}) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      aria-pressed={ativo}
-      className={`text-xs font-medium ${ativo ? "text-brand-600" : "text-slate-400"}`}
+      role="switch"
+      aria-checked={ligado}
+      aria-label={rotulo}
+      onClick={() => onChange(!ligado)}
+      className="inline-flex shrink-0 items-start gap-2 rounded-lg py-1 text-left text-sm"
     >
-      {ativo ? "Ativo" : "Inativo"}
+      <span
+        className={`relative mt-0.5 inline-block h-5 w-9 shrink-0 rounded-full transition ${ligado ? "bg-brand-600" : "bg-slate-300"}`}
+        aria-hidden
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${ligado ? "left-[18px]" : "left-0.5"}`}
+        />
+      </span>
+      <span>
+        <span className="block font-medium text-slate-700">{children}</span>
+        {ajuda && <span className="block text-xs text-slate-500">{ajuda}</span>}
+      </span>
     </button>
+  );
+}
+
+/** Chave liga/desliga dos cadastros (Ativo / Inativo). */
+export function ChaveAtivo({
+  ativo,
+  onChange,
+  rotulo,
+}: {
+  ativo: boolean;
+  onChange: (ativo: boolean) => void;
+  /** Para leitores de tela, ex.: "Colaborador Ana Souza". */
+  rotulo?: string;
+}) {
+  return (
+    <Chave ligado={ativo} onChange={onChange} rotulo={rotulo ? `${rotulo}: ${ativo ? "ativo" : "inativo"}` : undefined}>
+      <span className={`text-xs font-semibold ${ativo ? "text-brand-700" : "text-slate-500"}`}>
+        {ativo ? "Ativo" : "Inativo"}
+      </span>
+    </Chave>
   );
 }
 

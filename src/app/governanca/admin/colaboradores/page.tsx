@@ -7,7 +7,11 @@ import { ColaboradoresApp } from "./ColaboradoresApp";
 
 export const dynamic = "force-dynamic";
 
-export default async function ColaboradoresPage() {
+export default async function ColaboradoresPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ setor?: string }>;
+}) {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/colaboradores", "equipe");
   const supabase = await createClient();
   const { setores, propriedades, meusSetores } = await carregarSetoresDaPessoa(supabase, perfil.id, papel);
@@ -27,6 +31,7 @@ export default async function ColaboradoresPage() {
         setores={setores}
         propriedades={propriedades}
         meusSetores={meusSetores}
+        filtroInicial={(await searchParams).setor}
       />
     </GovernancaShell>
   );

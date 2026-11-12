@@ -124,6 +124,7 @@ export function InspecoesApp({
                     <Link href={`/governanca/inspecao/${i.id}`} className="font-semibold text-brand-700 hover:underline">
                       {i.checklist}
                     </Link>
+                    {i.identificacao && <span className="block text-xs font-medium text-slate-600">{i.identificacao}</span>}
                     <span className="block text-xs text-slate-400">{rotuloSetor(i.setorId, setores, propriedades)}</span>
                   </td>
                   <td className="px-4 py-3 text-slate-500">{i.local ?? "—"}</td>

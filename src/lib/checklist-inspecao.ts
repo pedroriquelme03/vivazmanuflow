@@ -76,6 +76,8 @@ export type LinhaInspecao = {
   setorId: string | null;
   checklistId: string;
   checklist: string;
+  /** Resposta da pergunta que identifica (ex.: nome do evento). */
+  identificacao: string | null;
   local: string | null;
   localId: string | null;
   colaborador: string | null;
@@ -119,7 +121,7 @@ export function filtrarInspecoes(lista: readonly LinhaInspecao[], f: FiltrosInsp
       (!f.de || i.dataReferencia >= f.de) &&
       (!f.ate || i.dataReferencia <= f.ate) &&
       (!q ||
-        normalizarBusca([i.checklist, i.local, i.colaborador, i.aplicador].filter(Boolean).join(" ")).includes(q)),
+        normalizarBusca([i.checklist, i.identificacao, i.local, i.colaborador, i.aplicador].filter(Boolean).join(" ")).includes(q)),
   );
 }
 

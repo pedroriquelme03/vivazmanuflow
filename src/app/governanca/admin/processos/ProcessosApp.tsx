@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { rotuloAplicacao, type Processo, type TipoProcesso } from "@/lib/governanca";
+import type { Processo, TipoProcesso } from "@/lib/governanca";
 import {
   agruparPorSetor,
   buscarPorSetor,
@@ -13,9 +12,11 @@ import {
 import { ativosOuAtual } from "@/lib/propriedade-opcoes";
 import { GruposPorSetor } from "../../GruposPorSetor";
 import { SelectSetor } from "../../Seletores";
-import { BotaoAtivo, Erro, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../ui";
+import { useConfirmacao } from "@/components/Confirmacao";
+import { Erro, btnPrimario, btnSecundario, cardCls, inputCls, labelCls } from "../../ui";
 import { useGravar } from "../../useGravar";
 import { CampoLocal } from "./CampoLocal";
+import { LinhaChecklist } from "./LinhaChecklist";
 
 export function ProcessosApp({
   lista,
@@ -23,6 +24,7 @@ export function ProcessosApp({
   propriedades,
   meusSetores,
   abrirNovo = false,
+  setorInicial,
 }: {
   lista: (Processo & { perguntas: number })[];
   /** Todos os setores, para agrupar e mostrar o nome. */
@@ -31,12 +33,16 @@ export function ProcessosApp({
   /** Setores onde a pessoa cria e edita checklists (admin: todos; líder: os dele). */
   meusSetores: SetorChecklist[];
   abrirNovo?: boolean;
+  /** Setor já escolhido ao abrir "Criar checklist" pela página do setor. */
+  setorInicial?: string;
 }) {
   const router = useRouter();
-  const { supabase, erro, setErro, gravar } = useGravar();
+  const escrita = useGravar();
+  const { supabase, erro, setErro, gravar } = escrita;
+  const [confirmar, janela] = useConfirmacao();
   const [aberto, setAberto] = useState(abrirNovo);
   const [nome, setNome] = useState("");
-  const [setorId, setSetorId] = useState("");
+  const [setorId, setSetorId] = useState(setorInicial ?? "");
   const [descricao, setDescricao] = useState("");
   const [usaAcomodacao, setUsaAcomodacao] = useState(false);
   const [tipo, setTipo] = useState<TipoProcesso>("ambos");
@@ -85,15 +91,10 @@ export function ProcessosApp({
     if (ok && id) router.push(`/governanca/admin/processos/${id}`);
   }
 
-  function remover(p: Processo) {
-    if (!confirm(`Remover o checklist "${p.nome}"? Todas as seções e perguntas serão excluídas.`)) return;
-    gravar(supabase.from("gov_processos").delete().eq("id", p.id), {
-      "23503": `"${p.nome}" já foi usado em inspeções. Marque como inativo em vez de remover.`,
-    });
-  }
 
   return (
     <>
+      {janela}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Gerenciar checklists</h1>
@@ -164,25 +165,14 @@ export function ProcessosApp({
       <GruposPorSetor
         grupos={grupos}
         renderItem={(p) => (
-          <div
+          <LinhaChecklist
             key={p.id}
-            className={`flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${p.ativo ? "" : "opacity-60"}`}
-          >
-            <Link href={`/governanca/admin/processos/${p.id}`} className="min-w-0 flex-1">
-              <p className="truncate font-semibold">{p.nome}</p>
-              <p className="truncate text-xs text-slate-500">
-                {p.perguntas} {p.perguntas === 1 ? "item" : "itens"} · {rotuloAplicacao(p)}
-                {p.descricao ? ` · ${p.descricao}` : ""}
-              </p>
-            </Link>
-            <BotaoAtivo
-              ativo={p.ativo}
-              onClick={() => gravar(supabase.from("gov_processos").update({ ativo: !p.ativo }).eq("id", p.id))}
-            />
-            <button type="button" onClick={() => remover(p)} className="text-xs text-slate-400 hover:text-red-600">
-              Remover
-            </button>
-          </div>
+            processo={p}
+            setoresParaMover={meusSetores}
+            propriedades={propriedades}
+            escrita={escrita}
+            confirmar={confirmar}
+          />
         )}
       />
       {grupos.length === 0 && (

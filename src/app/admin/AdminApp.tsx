@@ -34,6 +34,15 @@ import {
   ListaCadastroControles,
   useListaCadastro,
 } from "@/components/ListaCadastroControles";
+import {
+  BtnAdd,
+  CampoModal,
+  CardCadastro as Card,
+  ErroMsg,
+  LinhaCadastro as Linha,
+} from "@/components/CadastroUi";
+import { abasDoLider, type SistemaEquipe } from "@/lib/equipe-lider";
+import { EquipeLider } from "./EquipeLider";
 
 type Prop = Tables<"propriedades">;
 type Setor = Tables<"setores">;
@@ -169,8 +178,13 @@ export function AdminApp(props: {
   pesoConfig: PesoCfg | null;
   solicitacoes?: SolicAcesso[];
   avisoSolicitacoes?: string | null;
+  /** Líder da Manutenção/TI: só a Equipe do sistema dele (e Solicitações, se for da TI). */
+  papel?: "admin" | "lider";
+  sistemas?: SistemaEquipe[];
 }) {
-  const [aba, setAba] = useState<Aba>("Locais principais");
+  const ehLider = props.papel === "lider";
+  const abas: readonly Aba[] = ehLider ? abasDoLider(props.sistemas ?? []) : ABAS;
+  const [aba, setAba] = useState<Aba>(ehLider ? "Equipe" : "Locais principais");
   const [preencherEquipe, setPreencherEquipe] = useState<{
     nome: string;
     email: string;
@@ -180,11 +194,13 @@ export function AdminApp(props: {
     <div className="mx-auto w-full min-h-0 max-w-4xl flex-1 overflow-y-auto px-4 py-6">
       <h1 className="text-xl font-bold">Cadastros</h1>
       <p className="mt-0.5 text-sm text-slate-500">
-        Cadastre locais, solicitantes, demandas pré-definidas, pesos e a equipe.
+        {ehLider
+          ? "Cadastre e edite a equipe do seu sistema."
+          : "Cadastre locais, solicitantes, demandas pré-definidas, pesos e a equipe."}
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:hidden">
-        {ABAS.map((a) => (
+        {abas.map((a) => (
           <button
             key={a}
             type="button"
@@ -201,7 +217,7 @@ export function AdminApp(props: {
       </div>
 
       <div className="mt-4 hidden gap-1 overflow-x-auto border-b border-slate-200 sm:flex">
-        {ABAS.map((a) => (
+        {abas.map((a) => (
           <button
             key={a}
             type="button"
@@ -259,6 +275,15 @@ export function AdminApp(props: {
           />
         )}
         <div className={aba === "Equipe" ? "block" : "hidden"}>
+          {ehLider ? (
+            <EquipeLider
+              itens={props.usuarios}
+              propriedades={props.propriedades}
+              sistemas={props.sistemas ?? []}
+              preencher={preencherEquipe}
+              onPreencherConsumido={() => setPreencherEquipe(null)}
+            />
+          ) : (
           <Equipe
             itens={props.usuarios}
             emails={props.emailsEquipe}
@@ -266,6 +291,7 @@ export function AdminApp(props: {
             preencher={preencherEquipe}
             onPreencherConsumido={() => setPreencherEquipe(null)}
           />
+          )}
         </div>
       </div>
     </div>
@@ -278,73 +304,6 @@ function useAdmin() {
   const router = useRouter();
   const [erro, setErro] = useState<string | null>(null);
   return { supabase, refresh: () => router.refresh(), erro, setErro };
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">{children}</div>
-  );
-}
-
-function Linha({
-  nome,
-  ativo,
-  extra,
-  onRenomear,
-  onToggle,
-  onEditar,
-  acoes,
-}: {
-  nome: string;
-  ativo: boolean;
-  extra?: string;
-  onRenomear?: () => void;
-  onToggle?: () => void;
-  onEditar?: () => void;
-  acoes?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2 border-t border-slate-100 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
-      <div className={`min-w-0 ${ativo ? "" : "opacity-50"}`}>
-        <p className="break-words text-sm font-medium text-slate-800">{nome}</p>
-        {extra && (
-          <p className="break-words text-xs text-slate-400">{extra}</p>
-        )}
-      </div>
-      <div className="flex shrink-0 flex-wrap gap-1">
-        {onEditar && (
-          <button
-            type="button"
-            onClick={onEditar}
-            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
-          >
-            Editar
-          </button>
-        )}
-        {acoes}
-        {onRenomear && (
-          <button
-            onClick={onRenomear}
-            className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
-          >
-            Renomear
-          </button>
-        )}
-        {onToggle && (
-          <button
-            onClick={onToggle}
-            className={`rounded-md px-2 py-1 text-xs font-medium ${
-              ativo
-                ? "text-slate-500 hover:bg-slate-100"
-                : "text-emerald-600 hover:bg-emerald-50"
-            }`}
-          >
-            {ativo ? "Desativar" : "Reativar"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function ModalVer({
@@ -393,21 +352,6 @@ function ModalVer({
         </button>
       </div>
     </div>
-  );
-}
-
-function CampoModal({
-  rotulo,
-  children,
-}: {
-  rotulo: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1">
-      <span className="text-xs font-medium text-slate-500">{rotulo}</span>
-      {children}
-    </label>
   );
 }
 
@@ -756,13 +700,6 @@ function ModalEditarEquipe({
         </div>
       </div>
     </div>
-  );
-}
-
-function ErroMsg({ erro }: { erro: string | null }) {
-  if (!erro) return null;
-  return (
-    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>
   );
 }
 
@@ -2261,17 +2198,5 @@ function EscolhaAvisos({
           : "O aviso de chamado novo chega só do que estiver marcado aqui. Desmarque tudo para não receber nenhum."}
       </p>
     </div>
-  );
-}
-
-function BtnAdd({ onClick, rotulo = "Adicionar" }: { onClick: () => void; rotulo?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-    >
-      {rotulo}
-    </button>
   );
 }

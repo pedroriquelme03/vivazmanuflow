@@ -1058,6 +1058,9 @@ export type Database = {
           numero: string
           tipo: string
           propriedade_id: string
+          categoria: string | null
+          acomodacao: string | null
+          permite_pet: boolean
           ativo: boolean
           criado_em: string
         }
@@ -1066,6 +1069,9 @@ export type Database = {
           numero: string
           tipo: string
           propriedade_id: string
+          categoria?: string | null
+          acomodacao?: string | null
+          permite_pet?: boolean
           ativo?: boolean
           criado_em?: string
         }
@@ -1074,6 +1080,9 @@ export type Database = {
           numero?: string
           tipo?: string
           propriedade_id?: string
+          categoria?: string | null
+          acomodacao?: string | null
+          permite_pet?: boolean
           ativo?: boolean
           criado_em?: string
         }
@@ -1089,6 +1098,7 @@ export type Database = {
       }
       gov_camareiras: {
         Row: {
+          usuario_id: string | null
           id: string
           nome: string
           setor_id: string
@@ -1096,6 +1106,7 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          usuario_id?: string | null
           id?: string
           nome: string
           setor_id: string
@@ -1103,6 +1114,7 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          usuario_id?: string | null
           id?: string
           nome?: string
           setor_id?: string
@@ -1115,6 +1127,75 @@ export type Database = {
             columns: ["setor_id"]
             isOneToOne: false
             referencedRelation: "gov_setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_tipos_item: {
+        Row: {
+          id: string
+          nome: string
+          grupo: string
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+          grupo?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+          grupo?: string
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      gov_local_itens: {
+        Row: {
+          id: string
+          local_id: string
+          tipo_item_id: string
+          marca: string | null
+          modelo: string | null
+          patrimonio: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          local_id: string
+          tipo_item_id: string
+          marca?: string | null
+          modelo?: string | null
+          patrimonio?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          local_id?: string
+          tipo_item_id?: string
+          marca?: string | null
+          modelo?: string | null
+          patrimonio?: string | null
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_local_itens_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "gov_acomodacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_local_itens_tipo_item_id_fkey"
+            columns: ["tipo_item_id"]
+            isOneToOne: false
+            referencedRelation: "gov_tipos_item"
             referencedColumns: ["id"]
           },
         ]
@@ -1290,10 +1371,12 @@ export type Database = {
       }
       gov_processos: {
         Row: {
+          avaliado: string
           codigo_origem: string | null
           usa_acomodacao: boolean
           categoria: string | null
           setor_id: string
+          identificador_pergunta_id: string | null
           id: string
           nome: string
           descricao: string | null
@@ -1302,10 +1385,12 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          avaliado?: string
           codigo_origem?: string | null
           usa_acomodacao?: boolean
           categoria?: string | null
           setor_id: string
+          identificador_pergunta_id?: string | null
           id?: string
           nome: string
           descricao?: string | null
@@ -1314,10 +1399,12 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          avaliado?: string
           codigo_origem?: string | null
           usa_acomodacao?: boolean
           categoria?: string | null
           setor_id?: string
+          identificador_pergunta_id?: string | null
           id?: string
           nome?: string
           descricao?: string | null
@@ -1376,6 +1463,9 @@ export type Database = {
           permite_na: boolean
           opcoes: string[]
           peso: number
+          permite_comentario: boolean
+          permite_foto: boolean
+          tipo_item_id: string | null
           exige: Json
           tipo: string
           id: string
@@ -1392,6 +1482,9 @@ export type Database = {
           permite_na?: boolean
           opcoes?: string[]
           peso?: number
+          permite_comentario?: boolean
+          permite_foto?: boolean
+          tipo_item_id?: string | null
           exige?: Json
           tipo?: string
           id?: string
@@ -1408,6 +1501,9 @@ export type Database = {
           permite_na?: boolean
           opcoes?: string[]
           peso?: number
+          permite_comentario?: boolean
+          permite_foto?: boolean
+          tipo_item_id?: string | null
           exige?: Json
           tipo?: string
           id?: string
@@ -1424,6 +1520,13 @@ export type Database = {
             referencedRelation: "gov_secoes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "gov_perguntas_tipo_item_id_fkey"
+            columns: ["tipo_item_id"]
+            isOneToOne: false
+            referencedRelation: "gov_tipos_item"
+            referencedColumns: ["id"]
+          },
         ]
       }
       gov_inspecoes: {
@@ -1438,6 +1541,7 @@ export type Database = {
           criado_em: string
           finalizada_em: string | null
           data_referencia: string
+          identificacao: string | null
         }
         Insert: {
           id?: string
@@ -1450,6 +1554,7 @@ export type Database = {
           criado_em?: string
           finalizada_em?: string | null
           data_referencia?: string
+          identificacao?: string | null
         }
         Update: {
           id?: string
@@ -1462,6 +1567,7 @@ export type Database = {
           criado_em?: string
           finalizada_em?: string | null
           data_referencia?: string
+          identificacao?: string | null
         }
         Relationships: [
           {
@@ -1500,6 +1606,9 @@ export type Database = {
           pergunta_grupo: string | null
           pergunta_tipo: string
           pergunta_peso: number
+          item_previsto: string | null
+          item_diferente: boolean
+          item_encontrado: string | null
           id: string
           inspecao_id: string
           pergunta_id: string | null
@@ -1517,6 +1626,9 @@ export type Database = {
           pergunta_grupo?: string | null
           pergunta_tipo?: string
           pergunta_peso?: number
+          item_previsto?: string | null
+          item_diferente?: boolean
+          item_encontrado?: string | null
           id?: string
           inspecao_id: string
           pergunta_id?: string | null
@@ -1533,6 +1645,9 @@ export type Database = {
           valor?: string | null
           pergunta_grupo?: string | null
           pergunta_tipo?: string
+          item_previsto?: string | null
+          item_diferente?: boolean
+          item_encontrado?: string | null
           id?: string
           inspecao_id?: string
           pergunta_id?: string | null
@@ -1816,6 +1931,22 @@ export type Database = {
           p_propriedade_id?: string
         }
         Returns: string
+      }
+      gov_meu_colaborador: {
+        Args: { p_setor_id: string }
+        Returns: string
+      }
+      checklist_equipe: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          nome: string
+          email: string | null
+          papel: string
+          ambientes: string[]
+          ativo: boolean
+          setores: string[]
+        }[]
       }
       admin_redefinir_senha: {
         Args: { p_user_id: string; p_senha: string }

@@ -13,6 +13,7 @@ import {
   type Movimento,
   type UhDoDia,
 } from "@/lib/mapa-uhs";
+import { useConfirmacao } from "@/components/Confirmacao";
 import { Erro, Titulo, Vazio, btnPrimario, btnSecundario, cardCls } from "../ui";
 
 type Relatorio = Tables<"gov_relatorios_diarios">;
@@ -64,6 +65,7 @@ export function RelatorioDiario({
   const [lendo, setLendo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [confirmar, janela] = useConfirmacao();
   const [soPendentes, setSoPendentes] = useState(false);
   // Marcação otimista: id → feita (até o servidor confirmar).
   const [marcadas, setMarcadas] = useState<Record<string, boolean>>({});
@@ -99,7 +101,12 @@ export function RelatorioDiario({
     const data = dataIso(previa.data);
     if (
       relatorio?.data === data &&
-      !confirm(`Já existe um relatório de ${previa.data}. Substituir? As marcações feitas nele serão apagadas.`)
+      !(await confirmar({
+        titulo: `Substituir o relatório de ${previa.data}?`,
+        texto: "As UHs marcadas como feitas nele voltam a ficar pendentes.",
+        confirmar: "Substituir",
+        perigo: true,
+      }))
     ) {
       return;
     }
@@ -151,6 +158,7 @@ export function RelatorioDiario({
 
   return (
     <>
+      {janela}
       <Titulo
         titulo="Relatório diário"
         subtitulo="UHs que precisam ser limpas no dia, tiradas do relatório de governança do Desbravador."

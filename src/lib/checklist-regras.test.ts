@@ -5,8 +5,12 @@ import {
   lerExige,
   notaPonderada,
   ocultos,
+  removerDoExige,
+  renomearNoExige,
   respostasDadas,
   respostasPossiveis,
+  serveDeIdentificador,
+  textoDaResposta,
   type Dependencia,
 } from "./checklist-regras";
 
@@ -22,6 +26,22 @@ describe("respostasDadas", () => {
     expect(respostasDadas("sim_nao", { resposta: "na" })).toEqual([]);
     expect(respostasDadas("sim_nao", undefined)).toEqual([]);
     expect(respostasDadas("texto_curto", { valor: "sim" })).toEqual([]);
+  });
+
+  it("texto da resposta para identificar a aplicação", () => {
+    expect(textoDaResposta("selecao_unica", { valor: "Natal" })).toBe("Natal");
+    expect(textoDaResposta("sim_nao", { resposta: "nao" })).toBe("Não");
+    expect(textoDaResposta("selecao_multipla", { selecionadas: ["A", "B"] })).toBe("A, B");
+    expect(textoDaResposta("texto_curto", { valor: "  " })).toBeNull();
+    expect(textoDaResposta("texto_curto", { resposta: "na", valor: "x" })).toBeNull();
+  });
+
+  it("só pergunta que diferencia uma aplicação serve de identificador", () => {
+    expect(serveDeIdentificador("selecao_unica")).toBe(true);
+    expect(serveDeIdentificador("texto_curto")).toBe(true);
+    expect(serveDeIdentificador("data")).toBe(true);
+    expect(serveDeIdentificador("sim_nao")).toBe(false);
+    expect(serveDeIdentificador("carinhas")).toBe(false);
   });
 
   it("respostas possíveis por tipo", () => {
@@ -53,6 +73,19 @@ describe("complementos obrigatórios", () => {
   it("lista de várias opções soma as exigências das marcadas", () => {
     const lista = { tipo: "selecao_multipla", exige: { Vazamento: ["foto"], Sujo: ["comentario"] } };
     expect(complementosExigidos(lista, { selecionadas: ["Vazamento", "Sujo"] })).toEqual(["comentario", "foto"]);
+  });
+});
+
+describe("opção renomeada ou removida", () => {
+  const exige = { Sujo: ["foto"], Quebrado: ["comentario"] };
+
+  it("renomear leva a exigência para o nome novo", () => {
+    expect(renomearNoExige(exige, "Sujo", "Muito sujo")).toEqual({ Quebrado: ["comentario"], "Muito sujo": ["foto"] });
+    expect(renomearNoExige(exige, "Outro", "X")).toEqual(exige);
+  });
+
+  it("remover tira a exigência da opção", () => {
+    expect(removerDoExige(exige, "Sujo")).toEqual({ Quebrado: ["comentario"] });
   });
 });
 

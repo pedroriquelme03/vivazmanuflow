@@ -42,6 +42,19 @@ export function respostasDadas(tipo: string, r: Resposta | undefined): string[] 
   return [];
 }
 
+/** A resposta em texto curto, para mostrar como identificação ("Natal", "Sim", "A, B"). */
+export function textoDaResposta(tipo: string, r: Resposta | undefined): string | null {
+  if (!r || r.resposta === "na") return null;
+  if (tipo === "sim_nao") return r.resposta === "sim" ? "Sim" : r.resposta === "nao" ? "Não" : null;
+  if (tipo === "selecao_multipla") return r.selecionadas?.length ? r.selecionadas.join(", ") : null;
+  return r.valor?.trim() || null;
+}
+
+/** Sim/Não e carinhas não diferenciam uma aplicação da outra; o resto (texto, lista, data…) serve. */
+export function serveDeIdentificador(tipo: string) {
+  return tipo !== "sim_nao" && tipo !== "carinhas";
+}
+
 /** Respostas possíveis de uma pergunta, para configurar exigências e condicionais. */
 export function respostasPossiveis(tipo: string, opcoes: readonly string[]) {
   if (tipo === "sim_nao") return ["sim", "nao"];
@@ -67,6 +80,19 @@ export function lerExige(json: unknown): Exige {
       ])
       .filter(([, lista]) => (lista as Complemento[]).length > 0),
   );
+}
+
+/** Opção da lista renomeada: o que era exigido nela passa para o nome novo. */
+export function renomearNoExige(exige: unknown, antiga: string, nova: string): Exige {
+  const atual = lerExige(exige);
+  if (!(antiga in atual) || antiga === nova) return atual;
+  const { [antiga]: lista, ...resto } = atual;
+  return { ...resto, [nova]: lista };
+}
+
+/** Opção da lista removida: some também das exigências. */
+export function removerDoExige(exige: unknown, opcao: string): Exige {
+  return Object.fromEntries(Object.entries(lerExige(exige)).filter(([chave]) => chave !== opcao));
 }
 
 /** Complementos que a resposta dada torna obrigatórios. */

@@ -46,6 +46,19 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* O Tailwind 4 deixa botão com a seta comum: aqui todo clicável mostra a mãozinha. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"],
+  select:not(:disabled),
+  summary,
+  label:has(> input[type="checkbox"]:not(:disabled)),
+  label:has(> input[type="file"]) {
+    cursor: pointer;
+  }
+}
+
 /* O overlay de dev do Next (nextjs-portal) fica por cima dos botões no celular. */
 nextjs-portal {
   pointer-events: none !important;

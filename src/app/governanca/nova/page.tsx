@@ -26,6 +26,7 @@ export default async function NovaInspecaoPage({
     rascunhoRes,
     { data: doRelatorio },
     { setores, propriedades },
+    { data: tiposItem },
   ] = await Promise.all([
     supabase.from("gov_acomodacoes").select("*").eq("ativo", true).order("numero"),
     supabase.from("gov_camareiras").select("*").eq("ativo", true).order("nome"),
@@ -36,7 +37,7 @@ export default async function NovaInspecaoPage({
       ? supabase
           .from("gov_inspecoes")
           .select(
-            "id, processo_id, acomodacao_id, camareira_id, data_referencia, gov_respostas(pergunta_id, resposta, valor, comentario, anexo_url, gov_planos_acao(prioridade, o_que_fazer, quem_vai_fazer, quem_pediu))",
+            "id, processo_id, acomodacao_id, camareira_id, data_referencia, gov_respostas(pergunta_id, resposta, valor, comentario, anexo_url, item_diferente, item_encontrado, gov_planos_acao(prioridade, o_que_fazer, quem_vai_fazer, quem_pediu))",
           )
           .eq("id", continuar)
           .in("status", ["em_andamento", "pausada"])
@@ -52,6 +53,7 @@ export default async function NovaInspecaoPage({
       .limit(1)
       .maybeSingle(),
     carregarSetores(supabase),
+    supabase.from("gov_tipos_item").select("*"),
   ]);
 
   const linha = rascunhoRes.data;
@@ -68,6 +70,8 @@ export default async function NovaInspecaoPage({
           valor: r.valor,
           comentario: r.comentario,
           anexo_url: r.anexo_url,
+          item_diferente: r.item_diferente,
+          item_encontrado: r.item_encontrado,
           plano: r.gov_planos_acao?.[0] ?? null,
         })),
       }
@@ -93,6 +97,7 @@ export default async function NovaInspecaoPage({
         propriedades={propriedades}
         rascunho={rascunho}
         hoje={hoje}
+        tiposItem={tiposItem ?? []}
         dataRelatorio={doRelatorio && doRelatorio.data !== hoje ? doRelatorio.data : null}
         relatorioDoDia={(doRelatorio?.gov_relatorio_uhs ?? []).map((u) => ({
           numero: u.numero,
