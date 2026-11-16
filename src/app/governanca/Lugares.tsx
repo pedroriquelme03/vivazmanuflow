@@ -13,51 +13,76 @@ import {
   type LugarRef,
   type NivelLugar,
 } from "@/lib/checklist-lugares";
-import { inputCls } from "./ui";
+import { inputCls, labelCls } from "./ui";
 
 const ROTULOS: Record<NivelLugar, string> = { categoria: "Categoria", tipo: "Tipo de espaço", classificacao: "Classificação" };
 
 /**
  * Escolhe um ponto da árvore de uma unidade, em cascata: Categoria → Tipo →
- * Classificação. Devolve o ponto mais específico escolhido. `minimo` = "tipo" exige
- * pelo menos o tipo (um local específico fica num tipo ou classificação).
+ * Classificação. Os três campos ficam sempre à vista (o layout não pula); os que
+ * ainda não dá para escolher ficam apagados. Devolve o ponto mais específico.
+ *   modo "local": o local fica num tipo (classificação opcional);
+ *   modo "aplicacao": pode parar em qualquer nível (vale para tudo abaixo).
+ * `embutido` devolve só os campos, para entrarem na grade de quem chama.
  */
 export function EscolhaLugar({
   lugares,
   propriedadeId,
   valor,
   onChange,
-  vazio = "Escolha…",
+  modo = "local",
+  embutido = false,
 }: {
   lugares: readonly LugarRef[];
   propriedadeId: string;
   valor: string;
   onChange: (lugarId: string) => void;
-  vazio?: string;
+  modo?: "local" | "aplicacao";
+  embutido?: boolean;
 }) {
   const filtro = filtroDoLugar(lugares, valor || null);
   const categorias = filhos(lugares, null, propriedadeId);
   const tipos = filtro.categoria ? filhos(lugares, filtro.categoria) : [];
   const classificacoes = filtro.tipo ? filhos(lugares, filtro.tipo) : [];
   const mudar = (nivel: NivelLugar, id: string) => onChange(alvoDoFiltro(mudarFiltroLugar(filtro, nivel, id)) ?? "");
+  const deLocal = modo === "local";
 
-  return (
-    <div className="grid gap-2 sm:grid-cols-3">
-      <Nivel rotulo={ROTULOS.categoria} valor={filtro.categoria} opcoes={categorias} vazio={vazio} onChange={(id) => mudar("categoria", id)} />
-      {filtro.categoria && (
-        <Nivel rotulo={ROTULOS.tipo} valor={filtro.tipo} opcoes={tipos} vazio="Todos os tipos" onChange={(id) => mudar("tipo", id)} />
-      )}
-      {filtro.tipo && classificacoes.length > 0 && (
-        <Nivel
-          rotulo={ROTULOS.classificacao}
-          valor={filtro.classificacao}
-          opcoes={classificacoes}
-          vazio="Sem classificação"
-          onChange={(id) => mudar("classificacao", id)}
-        />
-      )}
-    </div>
+  const campos = (
+    <>
+      <Nivel
+        rotulo={ROTULOS.categoria}
+        valor={filtro.categoria}
+        opcoes={categorias}
+        vazio={categorias.length ? "Escolha a categoria…" : "Nenhuma categoria"}
+        onChange={(id) => mudar("categoria", id)}
+      />
+      <Nivel
+        rotulo={ROTULOS.tipo}
+        valor={filtro.tipo}
+        opcoes={tipos}
+        desligado={!filtro.categoria}
+        vazio={!filtro.categoria ? "Escolha a categoria antes" : deLocal ? "Escolha o tipo…" : "Toda a categoria"}
+        onChange={(id) => mudar("tipo", id)}
+      />
+      <Nivel
+        rotulo={ROTULOS.classificacao}
+        valor={filtro.classificacao}
+        opcoes={classificacoes}
+        desligado={!filtro.tipo || classificacoes.length === 0}
+        vazio={
+          !filtro.tipo
+            ? "Escolha o tipo antes"
+            : classificacoes.length === 0
+              ? "Este tipo não tem"
+              : deLocal
+                ? "Sem classificação"
+                : "Todo o tipo"
+        }
+        onChange={(id) => mudar("classificacao", id)}
+      />
+    </>
   );
+  return embutido ? campos : <div className="grid gap-3 sm:grid-cols-3">{campos}</div>;
 }
 
 function Nivel({
@@ -65,18 +90,25 @@ function Nivel({
   valor,
   opcoes,
   vazio,
+  desligado = false,
   onChange,
 }: {
   rotulo: string;
   valor: string;
   opcoes: readonly LugarRef[];
   vazio: string;
+  desligado?: boolean;
   onChange: (id: string) => void;
 }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block text-xs font-medium text-slate-500">{rotulo}</span>
-      <select className={inputCls} value={valor} onChange={(e) => onChange(e.target.value)}>
+      <span className={labelCls}>{rotulo}</span>
+      <select
+        className={`${inputCls} disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400`}
+        value={valor}
+        disabled={desligado}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="">{vazio}</option>
         {opcoes.map((l) => (
           <option key={l.id} value={l.id}>

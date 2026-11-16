@@ -202,12 +202,12 @@ function DadosLocal({
   return (
     <form onSubmit={salvar} className={`${cardCls} space-y-4`}>
       <h2 className="text-base font-semibold text-slate-800">Dados</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className={labelCls}>Nome ou número</span>
-          <input className={inputCls} value={numero} onChange={(e) => setNumero(e.target.value)} />
-        </label>
-        <label className="block">
+      <label className="block max-w-md">
+        <span className={labelCls}>Nome ou número</span>
+        <input className={inputCls} value={numero} onChange={(e) => setNumero(e.target.value)} />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="block min-w-0">
           <span className={labelCls}>Unidade</span>
           <SelectPropriedade
             value={propriedadeId}
@@ -218,10 +218,7 @@ function DadosLocal({
             propriedades={ativosOuAtual(propriedades, local.propriedade_id)}
           />
         </label>
-      </div>
-      <div>
-        <span className={labelCls}>Onde fica</span>
-        <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={lugarId} onChange={setLugarId} />
+        <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={lugarId} onChange={setLugarId} embutido />
       </div>
       {ficha.fichaUh && (
         <div className="grid gap-3 sm:grid-cols-2">

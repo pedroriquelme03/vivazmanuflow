@@ -66,9 +66,9 @@ export function OndeSeAplica({
           </span>
         )}
       </div>
-      <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
-        <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={novo} onChange={setNovo} vazio="Escolha a categoria…" />
-        <button type="button" className={btnPequeno} onClick={ligar} disabled={!novo || ligados.includes(novo)}>
+      <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+        <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={novo} onChange={setNovo} modo="aplicacao" />
+        <button type="button" className={`${btnPequeno} max-w-full`} onClick={ligar} disabled={!novo || ligados.includes(novo)}>
           + Ligar a {novo ? caminhoLugar(lugares, novo) : "este ponto"}
         </button>
       </div>

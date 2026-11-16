@@ -118,10 +118,11 @@ export function LocaisApp({
         </div>
       </div>
 
-      <form onSubmit={adicionar} className={`${cardCls} mb-6 space-y-3`}>
-        <h2 className="text-sm font-semibold text-slate-700">Novo local</h2>
-        <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
-          <label className="block">
+      <form onSubmit={adicionar} className={`${cardCls} mb-6`}>
+        <h2 className="text-base font-semibold text-slate-800">Novo local</h2>
+        <p className="mt-0.5 text-sm text-slate-500">Escolha onde ele fica na árvore e dê o nome ou número.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block min-w-0">
             <span className={labelCls}>Unidade</span>
             <SelectPropriedade
               value={propriedadeId}
@@ -132,7 +133,10 @@ export function LocaisApp({
               propriedades={propriedades}
             />
           </label>
-          <label className="block">
+          <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={lugarId} onChange={setLugarId} embutido />
+        </div>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block min-w-0 flex-1">
             <span className={labelCls}>Nome ou número</span>
             <input
               className={inputCls}
@@ -141,14 +145,10 @@ export function LocaisApp({
               placeholder="Ex.: 1005, Casa de Máquinas 8, Piscina adulto"
             />
           </label>
+          <button type="submit" className={`${btnPrimario} shrink-0`} disabled={salvando || !podeAdicionar}>
+            + Adicionar local
+          </button>
         </div>
-        <div>
-          <span className={labelCls}>Onde fica</span>
-          <EscolhaLugar lugares={lugares} propriedadeId={propriedadeId} valor={lugarId} onChange={setLugarId} />
-        </div>
-        <button type="submit" className={btnPrimario} disabled={salvando || !podeAdicionar}>
-          + Adicionar local
-        </button>
       </form>
 
       <Erro texto={erro} />
