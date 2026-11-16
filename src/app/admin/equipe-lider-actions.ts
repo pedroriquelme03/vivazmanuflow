@@ -82,7 +82,7 @@ export async function salvarPessoaLider(
   if (id === lider.perfil.id) return { erro: "Seu próprio cadastro quem muda é o administrador." };
 
   const servico = createServiceClient();
-  const { data: alvo } = await servico.from("usuarios").select("id, role, ambientes, email").eq("id", id).maybeSingle();
+  const { data: alvo } = await servico.from("usuarios").select("id, role, ambientes, email, governanca_papel").eq("id", id).maybeSingle();
   if (!alvo || !pessoaDoSistema(alvo, lider.sistemas)) return { erro: "Essa pessoa não é do seu sistema." };
   // O papel não muda por aqui: o líder não promove ninguém.
   const erro = validarCadastroLider({ ...dados, role: alvo.role }, lider.sistemas, false);
@@ -112,7 +112,11 @@ export async function salvarPessoaLider(
       atualizado_em: new Date().toISOString(),
     })
     .eq("id", id);
-  if (erroPerfil) return { erro: erroPerfil.message };
+  if (erroPerfil) {
+    // Desfaz a troca de e-mail no login para não ficar diferente do cadastro.
+    if (login.email && alvo.email) await servico.auth.admin.updateUserById(id, { email: alvo.email, email_confirm: true });
+    return { erro: erroPerfil.message };
+  }
 
   revalidatePath("/admin");
   return { ok: `${dados.nome.trim()} atualizado.` };

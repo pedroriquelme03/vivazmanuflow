@@ -5,9 +5,10 @@
 --       'escolher'    — no começo o líder escolhe "para mim" ou "para outra pessoa";
 --                       o aplicador faz sempre para ele mesmo.
 --   * O colaborador pode ter login (gov_camareiras.usuario_id): "para mim" usa o
---     colaborador ligado à conta de quem aplica, criado na primeira vez.
+--     colaborador ligado à conta de quem aplica, criado na primeira vez (nunca liga
+--     pelo nome, para ninguém virar outra pessoa por ter o mesmo nome).
 --   * Segurança: quem não cuida do setor (aplicador) só consegue gravar a si mesmo como
---     avaliado; no modo 'proprio', só quem aplica. Escolher o nome de outro não passa.
+--     avaliado; no modo 'proprio', só quem aplica, e não finaliza sem avaliado.
 --   * Os checklists dos setores de Manutenção começam em 'escolher'.
 -- Precisa de 20261112210000_checklist_equipe.sql. Pode rodar de novo.
 
@@ -34,52 +35,73 @@ CREATE UNIQUE INDEX IF NOT EXISTS gov_camareiras_usuario_setor_unico
   ON public.gov_camareiras (setor_id, usuario_id)
   WHERE usuario_id IS NOT NULL;
 
--- O colaborador de quem está logado neste setor; cria (ou liga pelo nome) na primeira vez.
-CREATE OR REPLACE FUNCTION public.gov_meu_colaborador(p_setor_id uuid)
+-- Versão antiga (por setor), caso tenha sido criada em teste.
+DROP FUNCTION IF EXISTS public.gov_meu_colaborador(uuid);
+
+-- O colaborador de quem está logado no setor do checklist; cria na primeira vez.
+-- Só para checklist em que a pessoa aplica para si ('proprio' ou 'escolher').
+CREATE OR REPLACE FUNCTION public.gov_meu_colaborador_no_checklist(p_processo_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_setor uuid;
   v_id uuid;
   v_nome text;
 BEGIN
-  IF auth.uid() IS NULL OR NOT private.gov_ve_setor(p_setor_id) THEN
-    RAISE EXCEPTION 'Sem acesso a este setor';
+  SELECT p.setor_id INTO v_setor
+  FROM public.gov_processos p
+  JOIN public.gov_setores s ON s.id = p.setor_id AND s.ativo
+  WHERE p.id = p_processo_id
+    AND p.ativo
+    AND p.avaliado IN ('proprio', 'escolher');
+
+  IF auth.uid() IS NULL OR v_setor IS NULL OR NOT private.gov_ve_processo(p_processo_id) THEN
+    RAISE EXCEPTION 'Este checklist não é aplicado para si mesmo';
   END IF;
 
   SELECT id INTO v_id
   FROM public.gov_camareiras
-  WHERE setor_id = p_setor_id AND usuario_id = auth.uid()
+  WHERE setor_id = v_setor AND usuario_id = auth.uid()
   LIMIT 1;
   IF v_id IS NOT NULL THEN
     RETURN v_id;
   END IF;
 
-  SELECT nome INTO v_nome FROM public.usuarios WHERE id = auth.uid();
-
-  -- Já cadastrado como colaborador sem login, com o mesmo nome: liga à conta.
-  SELECT id INTO v_id
-  FROM public.gov_camareiras
-  WHERE setor_id = p_setor_id
-    AND usuario_id IS NULL
-    AND lower(btrim(nome)) = lower(btrim(v_nome))
-  LIMIT 1;
-  IF v_id IS NOT NULL THEN
-    UPDATE public.gov_camareiras SET usuario_id = auth.uid() WHERE id = v_id;
-    RETURN v_id;
+  SELECT nome INTO v_nome FROM public.usuarios WHERE id = auth.uid() AND ativo;
+  IF v_nome IS NULL THEN
+    RAISE EXCEPTION 'Usuário inativo';
   END IF;
 
   INSERT INTO public.gov_camareiras (nome, setor_id, usuario_id, ativo)
-  VALUES (v_nome, p_setor_id, auth.uid(), true)
+  VALUES (v_nome, v_setor, auth.uid(), true)
   RETURNING id INTO v_id;
   RETURN v_id;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.gov_meu_colaborador(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.gov_meu_colaborador(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.gov_meu_colaborador_no_checklist(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.gov_meu_colaborador_no_checklist(uuid) TO authenticated;
+
+-- Criar inspeção: além de líder/admin, o aplicador pode pôr a si mesmo como avaliado.
+DROP POLICY IF EXISTS gov_inspecoes_criar ON public.gov_inspecoes;
+CREATE POLICY gov_inspecoes_criar ON public.gov_inspecoes
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    inspetor_id = auth.uid()
+    AND status = 'em_andamento'
+    AND private.gov_ve_processo(processo_id)
+    AND (
+      camareira_id IS NULL
+      OR private.governanca_papel() IN ('admin', 'lider')
+      OR EXISTS (
+        SELECT 1 FROM public.gov_camareiras c
+        WHERE c.id = camareira_id AND c.usuario_id = auth.uid()
+      )
+    )
+  );
 
 -- Ninguém grava outra pessoa como avaliada sem poder.
 CREATE OR REPLACE FUNCTION private.gov_inspecao_avaliado()
@@ -93,15 +115,24 @@ DECLARE
   v_setor uuid;
   v_dono uuid;
 BEGIN
-  IF NEW.camareira_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-  IF TG_OP = 'UPDATE' AND NEW.camareira_id IS NOT DISTINCT FROM OLD.camareira_id THEN
+  IF TG_OP = 'UPDATE'
+     AND NEW.camareira_id IS NOT DISTINCT FROM OLD.camareira_id
+     AND NEW.processo_id IS NOT DISTINCT FROM OLD.processo_id
+     AND NEW.inspetor_id IS NOT DISTINCT FROM OLD.inspetor_id
+     AND NEW.status IS NOT DISTINCT FROM OLD.status THEN
     RETURN NEW;
   END IF;
 
   SELECT p.avaliado, p.setor_id INTO v_modo, v_setor
   FROM public.gov_processos p WHERE p.id = NEW.processo_id;
+
+  IF NEW.camareira_id IS NULL THEN
+    IF v_modo = 'proprio' AND NEW.status = 'finalizada' THEN
+      RAISE EXCEPTION 'Neste checklist o avaliado é quem aplica.';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   SELECT c.usuario_id INTO v_dono
   FROM public.gov_camareiras c WHERE c.id = NEW.camareira_id;
 
@@ -122,5 +153,5 @@ $$;
 
 DROP TRIGGER IF EXISTS gov_inspecoes_avaliado ON public.gov_inspecoes;
 CREATE TRIGGER gov_inspecoes_avaliado
-  BEFORE INSERT OR UPDATE OF camareira_id ON public.gov_inspecoes
+  BEFORE INSERT OR UPDATE OF camareira_id, processo_id, inspetor_id, status ON public.gov_inspecoes
   FOR EACH ROW EXECUTE FUNCTION private.gov_inspecao_avaliado();

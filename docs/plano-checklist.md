@@ -17,9 +17,11 @@
 | `20261112190000_checklist_identificador.sql` | Pergunta que identifica cada aplicação | Rodado |
 | `20261112200000_checklist_patrimonio_mobilia.sql` | Itens separados em Eletrônicos e Mobília, nº de patrimônio por item, UH 1104 → 1105 | Rodado |
 | `20261112210000_checklist_equipe.sql` | Equipe dentro do checklist: líder cria login só do Checklist e dá acesso aos setores dele | Rodado |
-| `20261112220000_checklist_avaliado.sql` | "Quem é avaliado" em cada checklist (líder escolhe / a própria pessoa / perguntar no começo); colaborador ligado ao login; trava para ninguém aplicar no nome de outro | **Falta rodar** |
+| `20261112220000_checklist_avaliado.sql` | "Quem é avaliado" em cada checklist (líder escolhe / a própria pessoa / perguntar no começo); colaborador ligado ao login; trava no banco para ninguém aplicar no nome de outro | **Falta rodar** |
 | `20261112230000_checklist_complementos.sql` | Pergunta pode não aceitar comentário e/ou foto | **Falta rodar** |
 | `20261112231000_checklist_fase4_cf.sql` | Fase 4: pesos e comentário/foto dos 44 checklists do CF; cria o checklist 968170 (Jardinagem) | **Falta rodar** |
+| `20261112240000_checklist_plano_campos.sql` | Plano de ação configurável: prazo, onde, por quê, como e custo (opcional/obrigatório por pergunta) | **Falta rodar** |
+| `20261112250000_checklist_equipe_seguranca.sql` | Equipe: o líder vê só quem divide setor com ele (ou sem setor) e não vê administradores | **Falta rodar** |
 
 Sem SQL (só código): Cadastros da Manutenção/TI para o líder (cada um só o próprio sistema;
 Solicitações só para a TI), relatórios com filtros, telas novas de Equipe e Cadastros.
@@ -29,8 +31,8 @@ peso por opção e campos do plano de ação. Isso tem que vir do CF na tela ou 
 
 Vai vir: planilha nova das UHs (com mobília, patrimônio e números atualizados) para renovar o cadastro.
 
-Ainda falta da Fase 3: subáreas de verdade (área dentro de área; hoje é o texto `grupo`),
-opções de lista com peso e plano de ação com campos configuráveis.
+Ainda falta da Fase 3: subáreas de verdade (área dentro de área; hoje é o texto `grupo`)
+e opções de lista com peso.
 
 ## Por quê
 

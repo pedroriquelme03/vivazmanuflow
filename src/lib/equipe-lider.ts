@@ -29,10 +29,12 @@ export function abasDoLider(sistemas: readonly SistemaEquipe[]) {
  * então qualquer líder de Manutenção ou TI cuida. Admin e líder, nunca.
  */
 export function pessoaDoSistema(
-  alvo: { role: string; ambientes: readonly string[] | null },
+  alvo: { role: string; ambientes: readonly string[] | null; governanca_papel?: string | null },
   sistemas: readonly SistemaEquipe[],
 ) {
   if (sistemas.length === 0) return false;
+  // Líder no Checklist: trocar o login dela daria acesso de líder do checklist. Só o admin.
+  if ((alvo.ambientes ?? []).includes("checklist") && alvo.governanca_papel === "lider") return false;
   if (alvo.role === "solicitante") return true;
   if (alvo.role !== "colaborador") return false;
   const dele = (alvo.ambientes ?? []).filter((a) => a !== "checklist");

@@ -30,6 +30,7 @@ import { notaPonderada, ocultos, textoDaResposta, type Dependencia } from "@/lib
 import { previstoNoLocal, type ItemLocal, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import { compararNumeroUh } from "@/lib/mapa-uhs";
 import { passoAvaliado } from "@/lib/checklist-avaliado";
+import { extrasDoBanco, extrasParaGravar, lerCamposPlano } from "@/lib/checklist-plano";
 import { EscolhaChecklist } from "./EscolhaChecklist";
 import { PassoDados } from "./PassoDados";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
@@ -66,6 +67,11 @@ export type RascunhoInspecao = {
       o_que_fazer: string;
       quem_vai_fazer: string | null;
       quem_pediu: string | null;
+      prazo?: string | null;
+      onde?: string | null;
+      por_que?: string | null;
+      como?: string | null;
+      custo?: number | null;
     } | null;
   }[];
 };
@@ -104,6 +110,7 @@ function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaL
           o_que_fazer: r.plano.o_que_fazer,
           quem_vai_fazer: r.plano.quem_vai_fazer ?? "",
           quem_pediu: r.plano.quem_pediu ?? "",
+          extras: extrasDoBanco(r.plano),
         }
       : null,
   };
@@ -323,9 +330,10 @@ export function NovaInspecao({
   /** Antes das perguntas: se o checklist é para quem aplica, usa o colaborador da conta dele. */
   async function comecar() {
     const paraSiMesmo = passo === "proprio" || (passo === "pergunta" && paraMim === true);
-    if (paraSiMesmo && processo) {
+    // Já tem avaliado (rascunho retomado ou já buscado): mantém, para não trocar a pessoa.
+    if (paraSiMesmo && processo && !camareira && !camareiraOculta) {
       setIniciando(true);
-      const { data: id, error } = await supabase.rpc("gov_meu_colaborador", { p_setor_id: processo.setor_id });
+      const { data: id, error } = await supabase.rpc("gov_meu_colaborador_no_checklist", { p_processo_id: processo.id });
       setIniciando(false);
       if (error || !id) {
         setErro(
@@ -526,6 +534,7 @@ export function NovaInspecao({
       if (e2) throw e2;
 
       const idPorPergunta = new Map((inseridas ?? []).map((r) => [r.pergunta_id, r.id]));
+      const perguntaPorId = new Map(secoes.flatMap((s) => s.gov_perguntas).map((q) => [q.id, q]));
       const planos = ids.flatMap((perguntaId) => {
         const r = respostas[perguntaId];
         const respostaId = idPorPergunta.get(perguntaId);
@@ -537,6 +546,7 @@ export function NovaInspecao({
             o_que_fazer: r.plano.o_que_fazer.trim(),
             quem_vai_fazer: r.plano.quem_vai_fazer.trim() || null,
             quem_pediu: r.plano.quem_pediu.trim() || eu.nome,
+            ...extrasParaGravar(lerCamposPlano(perguntaPorId.get(perguntaId)?.plano_campos), r.plano.extras),
           },
         ];
       });

@@ -1,3 +1,4 @@
+import { lerCamposPlano, planoFaltando, type ExtrasPlano } from "./checklist-plano";
 import type { Tables } from "@/lib/database.types";
 import { complementosFaltando } from "@/lib/checklist-regras";
 
@@ -190,7 +191,7 @@ export type RespostaParcial = {
   /** Encontrou no local um item diferente do cadastrado: precisa dizer qual. */
   itemDiferente?: boolean;
   itemEncontrado?: string;
-  plano: { o_que_fazer: string } | null;
+  plano: { o_que_fazer: string; extras?: ExtrasPlano } | null;
 };
 
 type ItemRegra = {
@@ -199,6 +200,7 @@ type ItemRegra = {
   obrigatoria?: boolean;
   plano_acao?: boolean;
   exige?: unknown;
+  plano_campos?: unknown;
 };
 
 /**
@@ -215,6 +217,10 @@ export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) 
   if (tipo === "sim_nao") {
     if (!r || r.resposta === null) return !obrigatoria;
     if (r.resposta === "nao" && (item.plano_acao ?? true) && !r.plano?.o_que_fazer.trim()) {
+      return false;
+    }
+    // Campos do plano que a pergunta marcou como obrigatórios (prazo, onde...).
+    if (r.resposta === "nao" && r.plano && planoFaltando(lerCamposPlano(item.plano_campos), r.plano.extras).length > 0) {
       return false;
     }
     return true;

@@ -9,6 +9,7 @@ import {
   type RespostaValor,
 } from "@/lib/governanca";
 import { complementosExigidos, complementosFaltando } from "@/lib/checklist-regras";
+import { camposDoPlano, lerCamposPlano, planoFaltando, type ExtrasPlano } from "@/lib/checklist-plano";
 import { inputCls, labelCls } from "../ui";
 
 const MAX_ANEXO_BYTES = 10 * 1024 * 1024;
@@ -19,6 +20,8 @@ export type PlanoLocal = {
   o_que_fazer: string;
   quem_vai_fazer: string;
   quem_pediu: string;
+  /** Prazo, onde, por quê, como e custo, conforme a pergunta pede. */
+  extras: ExtrasPlano;
 };
 
 export type RespostaLocal = {
@@ -54,7 +57,7 @@ export function respostaVazia(): RespostaLocal {
 export type ConferenciaItem = { tipo: string; previsto: string | null };
 
 function planoVazio(quemPediu: string, quemVaiFazer = ""): PlanoLocal {
-  return { prioridade: "media", o_que_fazer: "", quem_vai_fazer: quemVaiFazer, quem_pediu: quemPediu };
+  return { prioridade: "media", o_que_fazer: "", quem_vai_fazer: quemVaiFazer, quem_pediu: quemPediu, extras: {} };
 }
 
 const botao =
@@ -87,6 +90,9 @@ export function PerguntaItem({
   const exigidos = complementosExigidos({ tipo, exige: pergunta.exige }, valor);
   const faltando = complementosFaltando({ tipo, exige: pergunta.exige }, valor);
   const comentarioObrigatorio = exigidos.includes("comentario");
+  const configPlano = lerCamposPlano(pergunta.plano_campos);
+  const camposPlano = camposDoPlano(configPlano);
+  const faltandoPlano = valor.plano ? planoFaltando(configPlano, valor.plano.extras) : [];
   // Item que não aceita comentário/foto esconde o botão, a não ser que a resposta exija.
   const aceitaComentario = pergunta.permite_comentario !== false || comentarioObrigatorio || Boolean(valor.comentario);
   const aceitaFoto = pergunta.permite_foto !== false || exigidos.includes("foto") || Boolean(valor.anexoPreview);
@@ -452,7 +458,26 @@ export function PerguntaItem({
                 tabIndex={-1}
               />
             </label>
+            {camposPlano.map((c) => (
+              <label key={c.campo} className={`block ${c.campo === "como" || c.campo === "por_que" ? "sm:col-span-2" : ""}`}>
+                <span className={labelCls}>
+                  {c.rotulo}
+                  {c.obrigatorio ? " *" : ""}
+                </span>
+                <input
+                  className={inputCls}
+                  type={c.tipo === "date" ? "date" : "text"}
+                  inputMode={c.tipo === "number" ? "decimal" : undefined}
+                  value={valor.plano!.extras?.[c.campo] ?? ""}
+                  onChange={(e) => setPlano({ extras: { ...valor.plano!.extras, [c.campo]: e.target.value } })}
+                  placeholder={c.dica}
+                />
+              </label>
+            ))}
           </div>
+          {faltandoPlano.length > 0 && (
+            <p className="text-xs font-medium text-red-600">Falta no plano: {faltandoPlano.join(", ")}.</p>
+          )}
         </div>
       )}
     </div>

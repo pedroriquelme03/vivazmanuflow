@@ -45,6 +45,12 @@ describe("pessoaDoSistema", () => {
     expect(pessoaDoSistema(dosDois, ["manutencao", "ti"])).toBe(true);
   });
 
+  it("quem é líder no Checklist só o admin edita", () => {
+    expect(
+      pessoaDoSistema({ role: "colaborador", ambientes: ["manutencao", "checklist"], governanca_papel: "lider" }, ["manutencao"]),
+    ).toBe(false);
+  });
+
   it("solicitante qualquer líder cuida; admin e líder, nunca", () => {
     expect(pessoaDoSistema({ role: "solicitante", ambientes: ["manutencao", "ti"] }, ["ti"])).toBe(true);
     expect(pessoaDoSistema({ role: "admin", ambientes: ["manutencao"] }, ["manutencao"])).toBe(false);

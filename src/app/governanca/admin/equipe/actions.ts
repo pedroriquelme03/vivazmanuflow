@@ -108,20 +108,11 @@ export async function salvarMembroChecklist(dados: EdicaoMembro): Promise<Result
   if (!alvo || !podeMexerNoAcesso(alvo, eu.perfil.id)) return { erro: "Você não pode editar essa pessoa." };
 
   const servico = createServiceClient();
-  const { inserir, remover } = mudancaDeSetores(alvo.setores, dados.setores, eu.setores);
-  if (inserir.length) {
-    const { error } = await servico
-      .from("gov_usuario_setores")
-      .insert(inserir.map((setor_id) => ({ usuario_id: alvo.id, setor_id })));
-    if (error) return { erro: `Setores: ${error.message}` };
-  }
-  if (remover.length) {
-    const { error } = await servico.from("gov_usuario_setores").delete().eq("usuario_id", alvo.id).in("setor_id", remover);
-    if (error) return { erro: `Setores: ${error.message}` };
-  }
-
-  const mudaLogin = podeMudarLogin(alvo);
-  if (podeMudarPerfil(alvo, eu.ehAdmin)) {
+  // Perfil e situação primeiro, depois a senha e por último os setores: se algo
+  // falhar no meio, o que já foi gravado continua coerente.
+  const quem = { ehAdmin: eu.ehAdmin, setores: eu.setores };
+  const mudaLogin = podeMudarLogin(alvo, quem);
+  if (podeMudarPerfil(alvo, quem)) {
     const { error } = await servico
       .from("usuarios")
       .update({
@@ -137,6 +128,18 @@ export async function salvarMembroChecklist(dados: EdicaoMembro): Promise<Result
       const { error: erroSenha } = await servico.auth.admin.updateUserById(alvo.id, { password: dados.senha });
       if (erroSenha) return { erro: `Senha: ${erroSenha.message}` };
     }
+  }
+
+  const { inserir, remover } = mudancaDeSetores(alvo.setores, dados.setores, eu.setores);
+  if (inserir.length) {
+    const { error } = await servico
+      .from("gov_usuario_setores")
+      .insert(inserir.map((setor_id) => ({ usuario_id: alvo.id, setor_id })));
+    if (error) return { erro: `Setores: ${error.message}` };
+  }
+  if (remover.length) {
+    const { error } = await servico.from("gov_usuario_setores").delete().eq("usuario_id", alvo.id).in("setor_id", remover);
+    if (error) return { erro: `Setores: ${error.message}` };
   }
 
   revalidatePath("/governanca/admin/equipe");

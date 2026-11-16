@@ -32,6 +32,8 @@ import { AbasRelatorios, Kpi, PrioridadeBadge, StatusBadge, Titulo, Vazio, btnPr
 
 export const dynamic = "force-dynamic";
 
+const POR_PAGINA = 500;
+
 type Params = Partial<Record<keyof FiltrosRelatorio, string>>;
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<Params> }) {
@@ -40,24 +42,37 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const f = lerFiltrosRelatorio(await searchParams, hoje);
 
   const supabase = await createClient();
-  let query = supabase
-    .from("gov_inspecoes")
-    .select(
-      "id, status, criado_em, finalizada_em, data_referencia, processo_id, camareira_id, inspetor_id, gov_processos(nome, setor_id), gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome), gov_respostas(id, resposta, pergunta_texto, item_previsto, item_diferente, item_encontrado, gov_planos_acao(*))",
-    )
-    .order("criado_em", { ascending: false });
-  if (f.de) query = query.gte("data_referencia", f.de);
-  if (f.ate) query = query.lte("data_referencia", f.ate);
-  const [{ data }, { setores, propriedades }, { data: processos }, { data: colaboradores }, { data: equipe }] =
+  // O banco devolve no máximo 1000 linhas por vez: busca em páginas para os totais
+  // não ficarem cortados em períodos longos.
+  async function buscarInspecoes() {
+    const todas = [];
+    for (let inicio = 0; ; inicio += POR_PAGINA) {
+      let query = supabase
+        .from("gov_inspecoes")
+        .select(
+          "id, status, criado_em, finalizada_em, data_referencia, processo_id, camareira_id, inspetor_id, gov_processos(nome, setor_id), gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome), gov_respostas(id, resposta, pergunta_texto, item_previsto, item_diferente, item_encontrado, gov_planos_acao(*))",
+        )
+        .order("criado_em", { ascending: false })
+        .order("id")
+        .range(inicio, inicio + POR_PAGINA - 1);
+      if (f.de) query = query.gte("data_referencia", f.de);
+      if (f.ate) query = query.lte("data_referencia", f.ate);
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      todas.push(...(data ?? []));
+      if (!data || data.length < POR_PAGINA) return todas;
+    }
+  }
+  const [data, { setores, propriedades }, { data: processos }, { data: colaboradores }, { data: equipe }] =
     await Promise.all([
-      query,
+      buscarInspecoes(),
       carregarSetores(supabase),
       supabase.from("gov_processos").select("id, nome, setor_id").order("nome"),
       supabase.from("gov_camareiras").select("id, nome, setor_id").order("nome"),
       supabase.rpc("checklist_equipe"),
     ]);
 
-  const brutas = data ?? [];
+  const brutas = data;
   const linhas: InspecaoRelatorio[] = brutas.map((i) => ({
     id: i.id,
     status: i.status,

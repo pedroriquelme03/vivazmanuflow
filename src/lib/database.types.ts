@@ -1465,6 +1465,7 @@ export type Database = {
           peso: number
           permite_comentario: boolean
           permite_foto: boolean
+          plano_campos: Json
           tipo_item_id: string | null
           exige: Json
           tipo: string
@@ -1484,6 +1485,7 @@ export type Database = {
           peso?: number
           permite_comentario?: boolean
           permite_foto?: boolean
+          plano_campos?: Json
           tipo_item_id?: string | null
           exige?: Json
           tipo?: string
@@ -1503,6 +1505,7 @@ export type Database = {
           peso?: number
           permite_comentario?: boolean
           permite_foto?: boolean
+          plano_campos?: Json
           tipo_item_id?: string | null
           exige?: Json
           tipo?: string
@@ -1679,6 +1682,11 @@ export type Database = {
       }
       gov_planos_acao: {
         Row: {
+          prazo: string | null
+          onde: string | null
+          por_que: string | null
+          como: string | null
+          custo: number | null
           id: string
           resposta_id: string
           prioridade: string
@@ -1693,6 +1701,11 @@ export type Database = {
           chamado_token: string | null
         }
         Insert: {
+          prazo?: string | null
+          onde?: string | null
+          por_que?: string | null
+          como?: string | null
+          custo?: number | null
           id?: string
           resposta_id: string
           prioridade?: string
@@ -1707,6 +1720,11 @@ export type Database = {
           chamado_token?: string | null
         }
         Update: {
+          prazo?: string | null
+          onde?: string | null
+          por_que?: string | null
+          como?: string | null
+          custo?: number | null
           id?: string
           resposta_id?: string
           prioridade?: string
@@ -1932,8 +1950,8 @@ export type Database = {
         }
         Returns: string
       }
-      gov_meu_colaborador: {
-        Args: { p_setor_id: string }
+      gov_meu_colaborador_no_checklist: {
+        Args: { p_processo_id: string }
         Returns: string
       }
       checklist_equipe: {

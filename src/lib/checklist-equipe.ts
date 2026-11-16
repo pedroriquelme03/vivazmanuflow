@@ -81,19 +81,29 @@ export function podeMexerNoAcesso(membro: Pick<MembroEquipe, "id" | "papel">, eu
   return membro.id !== euId && membro.papel !== "admin";
 }
 
+export type QuemEdita = { ehAdmin: boolean; setores: readonly string[] };
+
+/**
+ * O líder só cuida de aplicador que está inteiro nos setores dele: não mexe em
+ * outro líder nem em quem também é de setor que não é dele.
+ */
+function liderCuida(membro: Pick<MembroEquipe, "papel" | "setores">, setores: readonly string[]) {
+  return membro.papel === "camareira" && membro.setores.length > 0 && membro.setores.every((s) => setores.includes(s));
+}
+
 /**
  * Login, senha e situação mudam aqui só de quem é só do Checklist (quem também
  * usa Manutenção/TI muda em Cadastros > Equipe de lá, para não derrubar o login
- * nos outros painéis).
+ * nos outros painéis). O líder, além disso, só de aplicador dos setores dele.
  */
-export function podeMudarLogin(membro: Pick<MembroEquipe, "ambientes" | "papel">) {
-  return soDoChecklist(membro);
+export function podeMudarLogin(membro: Pick<MembroEquipe, "ambientes" | "papel" | "setores">, eu: QuemEdita) {
+  return soDoChecklist(membro) && (eu.ehAdmin || liderCuida(membro, eu.setores));
 }
 
-/** Perfil no checklist (Aplicador/Líder): o admin muda de qualquer um; o líder, só de quem é só do Checklist. */
-export function podeMudarPerfil(membro: Pick<MembroEquipe, "ambientes" | "papel">, euSouAdmin: boolean) {
+/** Perfil (Aplicador/Líder): o admin muda de qualquer um menos admin; o líder, só de aplicador dos setores dele. */
+export function podeMudarPerfil(membro: Pick<MembroEquipe, "ambientes" | "papel" | "setores">, eu: QuemEdita) {
   if (membro.papel === "admin") return false;
-  return euSouAdmin || soDoChecklist(membro);
+  return eu.ehAdmin || (soDoChecklist(membro) && liderCuida(membro, eu.setores));
 }
 
 /**

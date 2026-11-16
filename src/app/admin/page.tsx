@@ -98,7 +98,11 @@ async function CadastrosDoLider({
   ]);
   const todos = usuarios ?? [];
   const doSistema = todos.filter((u) => u.id !== perfil.id && pessoaDoSistema(u, sistemas));
-  const emailsEquipe = mapaEmails(todos.flatMap((u) => (u.email ? [{ id: u.id, email: u.email }] : [])));
+  // Só para marcar "já cadastrado" nos pedidos de acesso: não manda os outros e-mails ao navegador.
+  const pedidos = new Set((solicitacoesRes.data ?? []).map((s) => s.email.trim().toLowerCase()));
+  const emailsEquipe = mapaEmails(
+    todos.flatMap((u) => (u.email && pedidos.has(u.email.trim().toLowerCase()) ? [{ id: u.id, email: u.email }] : [])),
+  );
 
   return (
     <PainelComAmbiente perfil={perfil}>

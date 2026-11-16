@@ -13,6 +13,15 @@ import {
   type Exige,
 } from "@/lib/checklist-regras";
 import { GRUPOS_ITEM, grupoDoTipo, tiposDoGrupo, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
+import {
+  CAMPOS_PLANO,
+  MODOS_CAMPO_PLANO,
+  camposDoPlano,
+  lerCamposPlano,
+  modoCampoPlano,
+  mudarCampoPlano,
+  type ConfigPlano,
+} from "@/lib/checklist-plano";
 import { Chave, btnPequeno, btnPequenoPerigo, inputCls } from "../../../ui";
 
 /** Alvo de uma condicional: outra pergunta ou uma seção inteira do mesmo checklist. */
@@ -66,6 +75,12 @@ export function EditorPergunta({
     p.permite_comentario === false && "Sem comentário",
     p.permite_foto === false && "Sem foto",
     tipo === "sim_nao" && p.plano_acao && "Plano de ação no “Não”",
+    tipo === "sim_nao" &&
+      p.plano_acao &&
+      camposDoPlano(lerCamposPlano(p.plano_campos)).length > 0 &&
+      `Plano pede ${camposDoPlano(lerCamposPlano(p.plano_campos))
+        .map((c) => c.rotulo.toLowerCase())
+        .join(", ")}`,
     tipo === "sim_nao" && Number(p.peso) !== 1 && `Peso ${p.peso}`,
     Object.keys(exige).length > 0 && "Exige foto/comentário",
     dependencias.length > 0 && `${dependencias.length} ${dependencias.length === 1 ? "condicional" : "condicionais"}`,
@@ -185,6 +200,15 @@ export function EditorPergunta({
             </div>
           </Bloco>
 
+          {tipo === "sim_nao" && p.plano_acao && (
+            <Bloco
+              titulo="Campos do plano de ação"
+              ajuda="Prioridade, o que fazer e quem vai fazer sempre aparecem. Escolha o que mais pedir quando a resposta for Não."
+            >
+              <CamposDoPlano config={lerCamposPlano(p.plano_campos)} onSalvar={(c) => onAtualizar({ plano_campos: c })} />
+            </Bloco>
+          )}
+
           {respostasPossiveis(tipo, p.opcoes).length > 0 && (
             <Bloco titulo="Obrigatório conforme a resposta" ajuda="Ex.: se a resposta for Não, exigir foto.">
               <ExigenciasPorResposta respostas={respostasPossiveis(tipo, p.opcoes)} exige={exige} onSalvar={(e) => onAtualizar({ exige: e })} />
@@ -263,6 +287,46 @@ export function EditorPergunta({
         </div>
       )}
     </li>
+  );
+}
+
+/** Cada campo extra do plano: não pede, opcional ou obrigatório. */
+function CamposDoPlano({ config, onSalvar }: { config: ConfigPlano; onSalvar: (config: ConfigPlano) => void }) {
+  return (
+    <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+      {CAMPOS_PLANO.map((c) => {
+        const atual = modoCampoPlano(config, c.campo);
+        return (
+          <div key={c.campo} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 text-sm">
+              <b className="font-medium text-slate-700">{c.rotulo}</b>
+              <span className="ml-1 text-xs text-slate-400">{c.dica}</span>
+            </span>
+            <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-slate-300 text-xs font-semibold">
+              {MODOS_CAMPO_PLANO.map((m) => (
+                <button
+                  key={m.valor}
+                  type="button"
+                  aria-pressed={atual === m.valor}
+                  onClick={() => atual !== m.valor && onSalvar(mudarCampoPlano(config, c.campo, m.valor))}
+                  className={`px-2.5 py-1.5 ${
+                    atual === m.valor
+                      ? m.valor === "obrigatorio"
+                        ? "bg-red-600 text-white"
+                        : m.valor === "opcional"
+                          ? "bg-brand-600 text-white"
+                          : "bg-slate-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

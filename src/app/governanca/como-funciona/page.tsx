@@ -107,6 +107,15 @@ const ETAPAS: Etapa[] = [
         Em <b>Editar dados</b>, a <b>pergunta que identifica</b> faz a resposta dela aparecer junto do
         nome do checklist nas listas (ex.: o nome do evento).
       </>,
+      <>
+        Também em <b>Editar dados</b>, <b>quem é avaliado</b>: o líder escolhe o colaborador da lista
+        (Governança), quem aplica é o avaliado, ou o checklist pergunta no começo &quot;para mim ou para outra
+        pessoa&quot; (Manutenção). &quot;Para mim&quot; usa a conta logada: ninguém aplica no nome de outro.
+      </>,
+      <>
+        Quando o &quot;Não&quot; abre plano de ação, dá para pedir também <b>prazo, onde, por quê, como e quanto
+        custa</b>, cada um opcional ou obrigatório. A pergunta também pode não aceitar comentário ou foto.
+      </>,
       "Um checklist sem perguntas ou marcado como Inativo não aparece para quem vai preencher.",
     ],
   },

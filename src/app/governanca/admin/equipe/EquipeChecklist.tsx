@@ -14,6 +14,7 @@ import {
   type MembroEquipe,
   type NovoMembro,
   type PerfilEquipeChecklist,
+  type QuemEdita,
 } from "@/lib/checklist-equipe";
 import { ListaCadastroControles, useListaCadastro } from "@/components/ListaCadastroControles";
 import { BtnAdd, CampoModal, CardCadastro, ErroMsg, JanelaCadastro, OkMsg } from "@/components/CadastroUi";
@@ -194,6 +195,7 @@ export function EquipeChecklist({
         <ModalEditarMembro
           membro={editando}
           ehAdmin={ehAdmin}
+          quem={{ ehAdmin, setores: meusSetores.map((s) => s.id) }}
           meusSetores={setoresAtivos}
           propriedades={propriedades}
           erro={erro}
@@ -316,6 +318,7 @@ function iniciais(nome: string) {
 function ModalEditarMembro({
   membro,
   ehAdmin,
+  quem,
   meusSetores,
   propriedades,
   erro,
@@ -325,6 +328,7 @@ function ModalEditarMembro({
 }: {
   membro: MembroEquipe;
   ehAdmin: boolean;
+  quem: QuemEdita;
   meusSetores: SetorChecklist[];
   propriedades: PropriedadeRef[];
   erro: string | null;
@@ -332,8 +336,8 @@ function ModalEditarMembro({
   onFechar: () => void;
   onSalvar: (dados: EdicaoMembro) => Promise<void>;
 }) {
-  const mudaLogin = podeMudarLogin(membro);
-  const mudaPerfil = podeMudarPerfil(membro, ehAdmin);
+  const mudaLogin = podeMudarLogin(membro, quem);
+  const mudaPerfil = podeMudarPerfil(membro, quem);
   const [dados, setDados] = useState<EdicaoMembro>({
     id: membro.id,
     perfil: membro.papel === "lider" ? "lider" : "camareira",
@@ -372,7 +376,7 @@ function ModalEditarMembro({
           <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
             {rotuloPapelEquipe(membro.papel)}
             {outros.length ? ` que também usa ${outros.join(" e ")}` : ""}: e-mail, senha e situação mudam em
-            Cadastros &gt; Equipe da {outros.join(" e ") || "Manutenção"}.{" "}
+            {outros.length ? `Cadastros > Equipe da ${outros.join(" e ")}` : "quem cuida de todos os setores dela"}.{" "}
             {mudaPerfil ? "Aqui você muda o perfil no checklist e os setores." : "Aqui você muda só os setores."}
           </p>
         )}

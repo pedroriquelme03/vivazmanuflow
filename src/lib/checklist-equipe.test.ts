@@ -56,14 +56,24 @@ describe("equipe", () => {
   });
 
   it("login só de quem é só do Checklist; perfil, o admin muda de todos menos admin", () => {
-    const soChecklist = { ambientes: ["checklist"], papel: "camareira" };
-    const daManutencao = { ambientes: ["checklist", "manutencao"], papel: "lider" };
+    const admin = { ehAdmin: true, setores: [] };
+    const soChecklist = { ambientes: ["checklist"], papel: "camareira", setores: ["gov"] };
+    const daManutencao = { ambientes: ["checklist", "manutencao"], papel: "lider", setores: ["gov"] };
     expect(soDoChecklist(soChecklist)).toBe(true);
-    expect(podeMudarLogin(soChecklist)).toBe(true);
-    expect(podeMudarLogin(daManutencao)).toBe(false);
-    expect(podeMudarPerfil(daManutencao, false)).toBe(false);
-    expect(podeMudarPerfil(daManutencao, true)).toBe(true);
-    expect(podeMudarPerfil({ ambientes: ["checklist"], papel: "admin" }, true)).toBe(false);
+    expect(podeMudarLogin(soChecklist, admin)).toBe(true);
+    expect(podeMudarLogin(daManutencao, admin)).toBe(false);
+    expect(podeMudarPerfil(daManutencao, admin)).toBe(true);
+    expect(podeMudarPerfil({ ambientes: ["checklist"], papel: "admin", setores: [] }, admin)).toBe(false);
+  });
+
+  it("líder só mexe em aplicador que está inteiro nos setores dele", () => {
+    const lider = { ehAdmin: false, setores: ["gov", "eventos"] };
+    expect(podeMudarLogin({ ambientes: ["checklist"], papel: "camareira", setores: ["gov"] }, lider)).toBe(true);
+    // Outro líder, alguém com setor que não é dele ou sem setor: não.
+    expect(podeMudarLogin({ ambientes: ["checklist"], papel: "lider", setores: ["gov"] }, lider)).toBe(false);
+    expect(podeMudarLogin({ ambientes: ["checklist"], papel: "camareira", setores: ["gov", "aq"] }, lider)).toBe(false);
+    expect(podeMudarLogin({ ambientes: ["checklist"], papel: "camareira", setores: [] }, lider)).toBe(false);
+    expect(podeMudarPerfil({ ambientes: ["checklist"], papel: "lider", setores: ["gov"] }, lider)).toBe(false);
   });
 
   it("setores: só mexe nos permitidos e mantém os outros", () => {

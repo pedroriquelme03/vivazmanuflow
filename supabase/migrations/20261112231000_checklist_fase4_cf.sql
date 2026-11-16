@@ -2491,8 +2491,9 @@ SELECT md5('gov-import:p:968170')::uuid, 'REVISÃO TÉCNICA GERAL DE JARDINAGEM 
 FROM public.gov_setores s
 JOIN public.propriedades p ON p.id = s.propriedade_id AND p.nome ILIKE '%vivaz%'
 WHERE s.nome ILIKE 'jardinagem'
+  AND NOT EXISTS (SELECT 1 FROM public.gov_processos x WHERE x.codigo_origem = '968170')
 LIMIT 1
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO public.gov_secoes (id, processo_id, nome, ordem)
 SELECT md5('gov-import:s:968170:' || v.ordem)::uuid, md5('gov-import:p:968170')::uuid, v.nome, v.ordem

@@ -1,3 +1,4 @@
+import { CAMPOS_PLANO, type CampoPlano } from "@/lib/checklist-plano";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
@@ -188,6 +189,7 @@ export default async function InspecaoDetalhePage({
                               <PrioridadeBadge prioridade={p.prioridade} />
                             </div>
                             <p className="text-slate-700">{p.o_que_fazer}</p>
+                            <ExtrasDoPlano plano={p} />
                             <p className="mt-1 text-xs text-slate-500">
                               {p.quem_vai_fazer && <>Responsável: {p.quem_vai_fazer}. </>}
                               {p.quem_pediu && <>Solicitante: {p.quem_pediu}.</>}
@@ -237,5 +239,29 @@ function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
       <dt className="text-xs text-slate-400">{rotulo}</dt>
       <dd className="font-medium text-slate-800">{valor}</dd>
     </div>
+  );
+}
+
+/** Prazo, onde, por quê, como e custo do plano, quando foram preenchidos. */
+function ExtrasDoPlano({ plano }: { plano: Partial<Record<CampoPlano, string | number | null>> }) {
+  const preenchidos = CAMPOS_PLANO.filter((c) => plano[c.campo] !== null && plano[c.campo] !== undefined && plano[c.campo] !== "");
+  if (preenchidos.length === 0) return null;
+  const mostrar = (campo: CampoPlano, valor: string | number) => {
+    if (campo === "prazo") {
+      const [a, m, d] = String(valor).slice(0, 10).split("-");
+      return `${d}/${m}/${a}`;
+    }
+    if (campo === "custo") return Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    return String(valor);
+  };
+  return (
+    <dl className="mt-1 grid gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-2">
+      {preenchidos.map((c) => (
+        <div key={c.campo} className="min-w-0 break-words">
+          <dt className="inline font-semibold">{c.rotulo}: </dt>
+          <dd className="inline">{mostrar(c.campo, plano[c.campo] as string | number)}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
