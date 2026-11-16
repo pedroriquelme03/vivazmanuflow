@@ -20,7 +20,7 @@ export function LinhaChecklist({
   escrita: { supabase, gravar },
   confirmar,
 }: {
-  processo: Processo & { perguntas: number };
+  processo: Processo & { perguntas: number; onde?: string };
   /** Setores para onde a pessoa pode mover (os dela). */
   setoresParaMover: SetorChecklist[];
   propriedades: PropriedadeRef[];
@@ -72,7 +72,7 @@ export function LinhaChecklist({
       <Link href={`/governanca/admin/processos/${p.id}`} className="min-w-0 flex-1 hover:underline">
         <p className="font-semibold text-slate-800">{p.nome}</p>
         <p className="text-xs text-slate-500">
-          {p.perguntas} {p.perguntas === 1 ? "pergunta" : "perguntas"} · {rotuloAplicacao(p)}
+          {p.perguntas} {p.perguntas === 1 ? "pergunta" : "perguntas"} · {p.onde ?? rotuloAplicacao(p)}
           {p.descricao ? ` · ${p.descricao}` : ""}
         </p>
       </Link>

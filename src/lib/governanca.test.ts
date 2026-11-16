@@ -133,6 +133,7 @@ const uh = (numero: string, tipo: string): Acomodacao => ({
   numero,
   tipo,
   propriedade_id: "p-vivaz",
+  lugar_id: null,
   categoria: null,
   acomodacao: null,
   permite_pet: false,

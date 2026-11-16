@@ -11,7 +11,6 @@ import {
   corNota,
   erroSchemaGov,
   filtrarAcomodacoes,
-  localServeAoChecklist,
   ordenarSecoes,
   rotuloTipo,
   secaoCompleta,
@@ -30,6 +29,7 @@ import { notaPonderada, ocultos, textoDaResposta, type Dependencia } from "@/lib
 import { previstoNoLocal, type ItemLocal, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import { compararNumeroUh } from "@/lib/mapa-uhs";
 import { passoAvaliado } from "@/lib/checklist-avaliado";
+import { caminhoLugar, localNoChecklist, rotuloOndeChecklist, type Lugar } from "@/lib/checklist-lugares";
 import { extrasDoBanco, extrasParaGravar, lerCamposPlano } from "@/lib/checklist-plano";
 import { EscolhaChecklist } from "./EscolhaChecklist";
 import { PassoDados } from "./PassoDados";
@@ -129,7 +129,12 @@ export function NovaInspecao({
   tiposItem,
   relatorioDoDia = [],
   dataRelatorio = null,
+  lugares = [],
+  ligacoes = {},
 }: {
+  /** Árvore de locais e onde cada checklist se aplica. */
+  lugares?: Lugar[];
+  ligacoes?: Record<string, string[]>;
   /** Hoje (aaaa-mm-dd, Brasília), calculado no servidor. */
   hoje: string;
   /** Tipos de item do patrimônio (TV, ar...), para conferir na UH. */
@@ -207,9 +212,18 @@ export function NovaInspecao({
   // Locais da propriedade do checklist: as áreas, ou as UHs do tipo dele.
   const propriedadeDoProcesso = setores.find((s) => s.id === processo?.setor_id)?.propriedade_id;
   const acomodacoesDoProcesso = processo
-    ? acomodacoes.filter((a) => a.propriedade_id === propriedadeDoProcesso && localServeAoChecklist(a, processo))
+    ? acomodacoes.filter(
+        (a) => a.propriedade_id === propriedadeDoProcesso && localNoChecklist(a, processo, ligacoes[processo.id] ?? [], lugares),
+      )
     : [];
-  const ehArea = processo?.tipo === "area";
+  // Sem nenhuma UH na lista: é local de outra categoria (casa de máquinas, piscina...).
+  const ehArea = processo ? !acomodacoesDoProcesso.some((a) => a.tipo === "suite" || a.tipo === "apartamento") : false;
+  // Locais que não são UH aparecem agrupados pelo caminho na árvore.
+  const gruposDeLocais = (lista: Acomodacao[]) =>
+    [...lista.reduce((mapa, a) => {
+      const chave = caminhoLugar(lugares, a.lugar_id) || "Outros locais";
+      return mapa.set(chave, [...(mapa.get(chave) ?? []), a]);
+    }, new Map<string, Acomodacao[]>())].sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
   const filtradas = filtrarAcomodacoes(acomodacoesDoProcesso, busca, ehArea ? null : prefixoAndar);
   // As do relatório de hoje vêm primeiro (do menor para o maior número); as outras continuam abaixo.
   const relatorioPorNumero = new Map(relatorioDoDia.map((u) => [u.numero, u]));
@@ -669,6 +683,7 @@ export function NovaInspecao({
             />
           ) : (
             <EscolhaChecklist
+            ondePorProcesso={Object.fromEntries(processos.map((p) => [p.id, rotuloOndeChecklist(p, ligacoes[p.id] ?? [], lugares)]))}
               processos={comItens}
               setores={setores}
               propriedades={propriedades}
@@ -682,11 +697,11 @@ export function NovaInspecao({
       {fase === "acomodacao" && (
         <>
           <h2 className="mb-3 text-lg font-semibold text-slate-800">
-            {ehArea ? "Escolha a área" : "Escolha a acomodação"}
+            {ehArea ? "Escolha o local" : "Escolha a acomodação"}
           </h2>
           {acomodacoesDoProcesso.length === 0 ? (
             <Vazio
-              texto={`Nenhum${ehArea ? "a área" : "a UH"} desta propriedade cadastrada. O administrador cadastra em Locais.`}
+              texto={`Nenhum ${ehArea ? "local" : "UH"} cadastrado para este checklist. O administrador cadastra em Locais e liga o checklist em “Onde se aplica”.`}
             />
           ) : (
             <>
@@ -711,7 +726,7 @@ export function NovaInspecao({
                 type="search"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder={ehArea ? "Buscar área…" : "Buscar por número ou tipo…"}
+                placeholder={ehArea ? "Buscar local…" : "Buscar por número ou tipo…"}
               />
               {filtradas.length === 0 ? (
                 <Vazio texto="Nenhuma acomodação encontrada." />
@@ -756,7 +771,28 @@ export function NovaInspecao({
                       </div>
                     </section>
                   )}
-                  {filtradasOutras.length > 0 && (
+                  {ehArea && filtradasOutras.length > 0 && (
+                    <div className="space-y-5">
+                      {gruposDeLocais(filtradasOutras).map(([caminho, locais]) => (
+                        <section key={caminho}>
+                          <h3 className="mb-2 break-words text-xs font-semibold uppercase tracking-wide text-slate-500">{caminho}</h3>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                            {locais.map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => escolherAcomodacao(a)}
+                                className="min-h-[3.5rem] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold leading-tight text-slate-800 shadow-sm transition hover:border-brand-400"
+                              >
+                                <span className="break-words">{a.numero}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  )}
+                  {!ehArea && filtradasOutras.length > 0 && (
                     <section>
                       {filtradasDoRelatorio.length > 0 && (
                         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">

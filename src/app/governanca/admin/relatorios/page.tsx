@@ -27,7 +27,8 @@ import {
   type LinhaResumo,
 } from "@/lib/checklist-relatorios";
 import { GovernancaShell } from "../../GovernancaShell";
-import { carregarSetores } from "../../setores-dados";
+import { carregarArvore, carregarSetores } from "../../setores-dados";
+import { FiltroCaminhoForm } from "../../Lugares";
 import { AbasRelatorios, Kpi, PrioridadeBadge, StatusBadge, Titulo, Vazio, btnPrimario, btnSecundario, inputCls } from "../../ui";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
       let query = supabase
         .from("gov_inspecoes")
         .select(
-          "id, status, criado_em, finalizada_em, data_referencia, processo_id, camareira_id, inspetor_id, gov_processos(nome, setor_id), gov_acomodacoes(numero), gov_camareiras(nome), usuarios(nome), gov_respostas(id, resposta, pergunta_texto, item_previsto, item_diferente, item_encontrado, gov_planos_acao(*))",
+          "id, status, criado_em, finalizada_em, data_referencia, processo_id, camareira_id, inspetor_id, gov_processos(nome, setor_id), gov_acomodacoes(numero, lugar_id), gov_camareiras(nome), usuarios(nome), gov_respostas(id, resposta, pergunta_texto, item_previsto, item_diferente, item_encontrado, gov_planos_acao(*))",
         )
         .order("criado_em", { ascending: false })
         .order("id")
@@ -63,13 +64,14 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
       if (!data || data.length < POR_PAGINA) return todas;
     }
   }
-  const [data, { setores, propriedades }, { data: processos }, { data: colaboradores }, { data: equipe }] =
+  const [data, { setores, propriedades }, { data: processos }, { data: colaboradores }, { data: equipe }, arvore] =
     await Promise.all([
       buscarInspecoes(),
       carregarSetores(supabase),
       supabase.from("gov_processos").select("id, nome, setor_id").order("nome"),
       supabase.from("gov_camareiras").select("id, nome, setor_id").order("nome"),
       supabase.rpc("checklist_equipe"),
+      carregarArvore(supabase),
     ]);
 
   const brutas = data;
@@ -82,6 +84,9 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
     checklistId: i.processo_id,
     checklist: i.gov_processos?.nome ?? "Checklist",
     setorId: i.gov_processos?.setor_id ?? null,
+    unidadeId: setores.find((s) => s.id === i.gov_processos?.setor_id)?.propriedade_id ?? null,
+    lugarLocal: i.gov_acomodacoes?.lugar_id ?? null,
+    ligados: arvore.ligacoes[i.processo_id] ?? [],
     colaboradorId: i.camareira_id,
     colaborador: i.gov_camareiras?.nome ?? null,
     aplicadorId: i.inspetor_id,
@@ -91,7 +96,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
     nao: i.gov_respostas.filter((r) => r.resposta === "nao").length,
     planos: i.gov_respostas.reduce((s, r) => s + r.gov_planos_acao.length, 0),
   }));
-  const filtradas = filtrarRelatorio(linhas, f);
+  const filtradas = filtrarRelatorio(linhas, f, arvore.lugares);
   const ids = new Set(filtradas.map((i) => i.id));
   const escolhidas = brutas.filter((i) => ids.has(i.id));
   const finalizadas = escolhidas.filter((i) => i.status === "finalizada");
@@ -123,7 +128,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const aplicadores = (equipe ?? []).length
     ? (equipe ?? []).map((p) => ({ id: p.id, nome: p.nome }))
     : [...new Map(linhas.map((i) => [i.aplicadorId, { id: i.aplicadorId, nome: i.aplicador ?? "Sem nome" }])).values()];
-  const algumFiltro = Boolean(f.setor || f.checklist || f.colaborador || f.aplicador || f.status);
+  const algumFiltro = Boolean(f.unidade || f.onde || f.setor || f.checklist || f.colaborador || f.aplicador || f.status);
   const periodoTexto =
     f.de && f.ate
       ? f.de === f.ate
@@ -164,6 +169,12 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
           <Campo rotulo="Até">
             <input className={inputCls} type="date" name="ate" defaultValue={f.ate} max={hoje} />
           </Campo>
+          <FiltroCaminhoForm
+            lugares={arvore.lugares}
+            unidades={propriedades.filter((p) => p.ativo)}
+            unidadeInicial={f.unidade}
+            ondeInicial={f.onde}
+          />
           <Campo rotulo="Setor">
             <select className={inputCls} name="setor" defaultValue={f.setor}>
               <option value="">Todos os setores</option>
@@ -227,7 +238,10 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
               Filtrar
             </button>
             {algumFiltro && (
-              <Link href={linkRelatorio({ ...f, setor: "", checklist: "", colaborador: "", aplicador: "", status: "" })} className={btnSecundario}>
+              <Link
+                href={linkRelatorio({ ...f, unidade: "", onde: "", setor: "", checklist: "", colaborador: "", aplicador: "", status: "" })}
+                className={btnSecundario}
+              >
                 Limpar
               </Link>
             )}

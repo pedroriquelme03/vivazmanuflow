@@ -84,6 +84,10 @@ export type LinhaInspecao = {
   colaboradorId: string | null;
   aplicador: string | null;
   aplicadorId: string;
+  /** Para o filtro pela árvore: unidade, lugar do local e pontos ligados ao checklist. */
+  unidadeId?: string | null;
+  lugarLocal?: string | null;
+  ligados?: string[];
 };
 
 export type FiltrosInspecao = {

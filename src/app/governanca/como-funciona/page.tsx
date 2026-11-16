@@ -53,10 +53,11 @@ const ETAPAS: Etapa[] = [
         quem acessa cada setor: o líder e o aplicador só veem os setores marcados para eles.
       </>,
       <>
-        Em <b>Locais</b>, cadastre onde o checklist é aplicado: UH (apartamento ou suíte) ou área, como
-        casa de máquinas ou bilheteria. Abra o local para editar a categoria, a acomodação e os itens
-        dele, separados em <b>Eletrônicos</b> (TV, ar-condicionado, cofre…) e <b>Mobília</b> (cama,
-        banheira…), cada um com marca, modelo e número de <b>patrimônio</b>.
+        Em <b>Locais</b>, cada local fica num ponto da árvore: <b>Unidade → Categoria → Tipo de espaço →
+        Classificação</b> (ex.: Vivaz → Hospedagem → UH Apartamento → Garden → UH 1000). Em{" "}
+        <b>Categorias e tipos</b> o administrador monta a árvore e escolhe o que a ficha de cada categoria
+        mostra: dados da UH, <b>Eletrônicos</b>, <b>Mobília</b> e <b>Equipamentos</b>, cada item com marca,
+        modelo e número de <b>patrimônio</b>. Quem cuida (Governança, Manutenção…) entra como etiqueta.
       </>,
       <>
         Em <b>Locais &gt; Tipos de item</b>, crie, renomeie, troque de seção ou remova os tipos (TV, Cama…).
@@ -81,8 +82,9 @@ const ETAPAS: Etapa[] = [
         setor. O líder cria e edita só os checklists dos setores dele.
       </>,
       <>
-        Marque <b>Pede o local</b> quando o checklist é feito em um lugar certo e escolha se é
-        em UH (apartamentos, suítes ou ambos) ou em uma <b>área</b>, como casa de máquinas.
+        Em <b>Onde se aplica</b>, ligue o checklist a pontos da árvore (ex.: Hospedagem › UH Suíte ou
+        Operacional › Casas de Máquinas): ele vale para tudo que está abaixo. Marque <b>Pede o local</b>{" "}
+        quando quem preenche escolhe o local certo (a UH, a casa de máquinas).
       </>,
       <>
         Monte as <b>seções</b> (cada seção vira uma tela no preenchimento) e adicione as{" "}

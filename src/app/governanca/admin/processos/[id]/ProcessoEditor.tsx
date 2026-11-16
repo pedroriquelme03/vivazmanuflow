@@ -8,7 +8,6 @@ import type { TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   proximaOrdem,
-  rotuloAplicacao,
   type Pergunta,
   type Processo,
   type Secao,
@@ -31,6 +30,8 @@ import {
 } from "../../../ui";
 import { useGravar } from "../../../useGravar";
 import { CampoLocal } from "../CampoLocal";
+import { OndeSeAplica } from "./OndeSeAplica";
+import { rotuloOndeChecklist, type Lugar } from "@/lib/checklist-lugares";
 import { EditorPergunta, type AlvoCondicional } from "./EditorPergunta";
 
 export function ProcessoEditor({
@@ -41,6 +42,8 @@ export function ProcessoEditor({
   meusSetores,
   dependencias,
   tiposItem,
+  lugares,
+  ligados,
 }: {
   processo: Processo;
   secoes: SecaoComPerguntas[];
@@ -52,11 +55,15 @@ export function ProcessoEditor({
   dependencias: Dependencia[];
   /** Tipos de item do patrimônio (TV, ar...), para conferir na UH. */
   tiposItem: TipoItemPatrimonio[];
+  /** Árvore de locais e os pontos a que este checklist está ligado. */
+  lugares: Lugar[];
+  ligados: string[];
 }) {
   const { supabase, erro, gravar } = useGravar();
   const [confirmar, janela] = useConfirmacao();
   const [novaSecao, setNovaSecao] = useState("");
   const perguntas = secoes.flatMap((s) => s.gov_perguntas);
+  const propriedadeDoChecklist = setores.find((s) => s.id === processo.setor_id)?.propriedade_id;
   const alvos = useMemo<AlvoCondicional[]>(
     () =>
       secoes.flatMap((s) => [
@@ -175,8 +182,20 @@ export function ProcessoEditor({
         setores={setores}
         propriedades={propriedades}
         meusSetores={meusSetores}
+        onde={rotuloOndeChecklist(processo, ligados, lugares)}
+        temLigacoes={ligados.length > 0}
         onSalvar={(patch) => gravar(supabase.from("gov_processos").update(patch).eq("id", processo.id))}
       />
+
+      {propriedadeDoChecklist && (
+        <OndeSeAplica
+          processoId={processo.id}
+          propriedadeId={propriedadeDoChecklist}
+          pedeLocal={processo.usa_acomodacao}
+          lugares={lugares}
+          ligados={ligados}
+        />
+      )}
 
       <Erro texto={erro} />
 
@@ -272,9 +291,13 @@ function DadosProcesso({
   setores,
   propriedades,
   meusSetores,
+  onde,
+  temLigacoes,
   onSalvar,
 }: {
   processo: Processo;
+  onde: string;
+  temLigacoes: boolean;
   total: number;
   perguntas: Pergunta[];
   setores: SetorChecklist[];
@@ -301,7 +324,7 @@ function DadosProcesso({
           </p>
           <h1 className="text-xl font-bold">{processo.nome}</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            {total} {total === 1 ? "pergunta" : "perguntas"} · {rotuloAplicacao(processo)}
+            {total} {total === 1 ? "pergunta" : "perguntas"} · {onde}
             {processo.descricao ? ` · ${processo.descricao}` : ""}
           </p>
           <p className="mt-0.5 text-xs text-slate-500">Avaliado: {rotuloModoAvaliado(processo.avaliado)}</p>
@@ -353,7 +376,7 @@ function DadosProcesso({
         <span className={labelCls}>Descrição</span>
         <input className={inputCls} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
       </label>
-      <CampoLocal usaLocal={usaAcomodacao} onUsaLocal={setUsaAcomodacao} tipo={tipo} onTipo={setTipo} />
+      <CampoLocal usaLocal={usaAcomodacao} onUsaLocal={setUsaAcomodacao} tipo={tipo} onTipo={setTipo} temLigacoes={temLigacoes} />
       <fieldset>
         <legend className={labelCls}>Quem é avaliado</legend>
         <div className="grid gap-2 lg:grid-cols-3">

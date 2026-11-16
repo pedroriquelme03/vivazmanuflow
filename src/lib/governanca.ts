@@ -4,7 +4,6 @@ import { complementosFaltando } from "@/lib/checklist-regras";
 
 export type GovPapel = "admin" | "lider" | "camareira";
 /** Tipo do local do checklist: UH (suíte ou apartamento) ou área (casa de máquinas, bilheteria…). */
-export type TipoAcomodacao = "suite" | "apartamento" | "area";
 /** Onde o checklist é aplicado: UH (suíte, apartamento ou ambos) ou área. */
 export type TipoProcesso = "suite" | "apartamento" | "ambos" | "area";
 export type Prioridade = "baixa" | "media" | "alta";
@@ -59,13 +58,6 @@ export function rotuloTipo(tipo: string, curto = false) {
   if (tipo === "suite") return "Suíte";
   if (tipo === "area") return "Área";
   return curto ? "Apto" : "Apartamento";
-}
-
-export const TIPOS_LOCAL: TipoAcomodacao[] = ["apartamento", "suite", "area"];
-
-/** "UH · Suíte", "UH · Apartamento" ou "Área". */
-export function rotuloTipoLocal(tipo: string) {
-  return tipo === "area" ? "Área" : `UH · ${rotuloTipo(tipo)}`;
 }
 
 export function rotuloTipoProcesso(tipo: string) {

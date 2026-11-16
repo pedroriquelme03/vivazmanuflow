@@ -4,6 +4,7 @@
  * checklist e por dia, além dos checklists em aberto e há quanto tempo.
  */
 import { conformidade, media, minutosEntre } from "./governanca";
+import { registroNoCaminho, textoParaCaminho, type LugarRef } from "./checklist-lugares";
 
 export type FiltrosRelatorio = {
   /** aaaa-mm-dd; vazio = sem limite. Filtra pela data do checklist. */
@@ -14,9 +15,12 @@ export type FiltrosRelatorio = {
   colaborador: string;
   aplicador: string;
   status: string;
+  /** Unidade (propriedade) e caminho na árvore ("Operacional › Casas de Máquinas"). */
+  unidade: string;
+  onde: string;
 };
 
-const CAMPOS: (keyof FiltrosRelatorio)[] = ["de", "ate", "setor", "checklist", "colaborador", "aplicador", "status"];
+const CAMPOS: (keyof FiltrosRelatorio)[] = ["de", "ate", "unidade", "onde", "setor", "checklist", "colaborador", "aplicador", "status"];
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 const STATUS = ["finalizada", "em_andamento", "pausada", "cancelada"];
 
@@ -56,6 +60,8 @@ export function lerFiltrosRelatorio(params: Partial<Record<string, string | unde
     colaborador: texto(params.colaborador),
     aplicador: texto(params.aplicador),
     status: STATUS.includes(status) ? status : "",
+    unidade: texto(params.unidade),
+    onde: textoParaCaminho(params.onde).join(" › "),
   };
 }
 
@@ -83,6 +89,10 @@ export type InspecaoRelatorio = {
   checklistId: string;
   checklist: string;
   setorId: string | null;
+  /** Unidade do checklist, lugar do local na árvore e pontos ligados ao checklist. */
+  unidadeId?: string | null;
+  lugarLocal?: string | null;
+  ligados?: string[];
   colaboradorId: string | null;
   colaborador: string | null;
   aplicadorId: string;
@@ -93,9 +103,12 @@ export type InspecaoRelatorio = {
   planos: number;
 };
 
-export function filtrarRelatorio(lista: readonly InspecaoRelatorio[], f: FiltrosRelatorio) {
+export function filtrarRelatorio(lista: readonly InspecaoRelatorio[], f: FiltrosRelatorio, lugares: readonly LugarRef[] = []) {
+  const caminho = textoParaCaminho(f.onde);
   return lista.filter(
     (i) =>
+      (!f.unidade || i.unidadeId === f.unidade) &&
+      registroNoCaminho(lugares, caminho, i.lugarLocal, i.ligados) &&
       (!f.de || i.dataReferencia >= f.de) &&
       (!f.ate || i.dataReferencia <= f.ate) &&
       (!f.setor || i.setorId === f.setor) &&

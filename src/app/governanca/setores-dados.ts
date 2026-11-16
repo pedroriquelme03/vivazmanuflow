@@ -14,6 +14,20 @@ export async function carregarSetores(supabase: Supabase) {
 }
 
 /**
+ * Árvore de locais (categorias, tipos, classificações) e onde cada checklist se
+ * aplica. Sem o SQL da árvore, volta vazio e tudo segue como antes.
+ */
+export async function carregarArvore(supabase: Supabase) {
+  const [{ data: lugares }, { data: ligacoes }] = await Promise.all([
+    supabase.from("gov_lugares").select("*").order("ordem"),
+    supabase.from("gov_processo_lugares").select("processo_id, lugar_id"),
+  ]);
+  const porProcesso: Record<string, string[]> = {};
+  for (const l of ligacoes ?? []) (porProcesso[l.processo_id] ??= []).push(l.lugar_id);
+  return { lugares: lugares ?? [], ligacoes: porProcesso };
+}
+
+/**
  * Além das propriedades e setores, os setores que a pessoa usa: o admin, todos;
  * líder e aplicador, os marcados para eles em Checklist > Setores.
  */

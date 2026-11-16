@@ -53,6 +53,7 @@ describe("filtros", () => {
     const f = lerFiltrosRelatorio({ colaborador: "ana" }, HOJE);
     expect(atalhoAtivo(f, HOJE)).toBe("30");
     expect(linkRelatorio(f, { de: "", ate: "" })).toBe("/governanca/admin/relatorios?de=&ate=&colaborador=ana");
+    expect(lerFiltrosRelatorio({ onde: " Operacional ›  Casas de Máquinas " }, HOJE).onde).toBe("Operacional › Casas de Máquinas");
   });
 
   it("filtra por período, setor, checklist, colaborador, aplicador e status", () => {
@@ -66,6 +67,7 @@ describe("filtros", () => {
     expect(ids({ colaborador: "joao" })).toEqual(["b"]);
     expect(ids({ aplicador: "u2" })).toEqual(["c"]);
     expect(ids({ setor: "gov", status: "finalizada" })).toEqual(["a", "b"]);
+    expect(ids({ unidade: "x" })).toEqual([]);
   });
 });
 

@@ -26,7 +26,10 @@ export function EscolhaChecklist<T extends ChecklistResumo>({
   propriedades,
   carregando,
   onEscolher,
+  ondePorProcesso = {},
 }: {
+  /** Onde cada checklist se aplica (pela árvore de locais). */
+  ondePorProcesso?: Record<string, string>;
   processos: T[];
   setores: SetorChecklist[];
   propriedades: PropriedadeRef[];
@@ -54,9 +57,9 @@ export function EscolhaChecklist<T extends ChecklistResumo>({
     >
       <span className="text-xl">📋</span>
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold text-slate-800">{p.nome}</span>
-        <span className="block text-xs text-slate-500">
-          {p.itens} itens · {rotuloAplicacao(p)}
+        <span className="block break-words font-semibold text-slate-800">{p.nome}</span>
+        <span className="block break-words text-xs text-slate-500">
+          {p.itens} itens · {ondePorProcesso[p.id] ?? rotuloAplicacao(p)}
           {p.descricao ? ` · ${p.descricao}` : ""}
         </span>
       </span>

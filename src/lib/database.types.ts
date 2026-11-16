@@ -1054,6 +1054,7 @@ export type Database = {
       }
       gov_acomodacoes: {
         Row: {
+          lugar_id: string | null
           id: string
           numero: string
           tipo: string
@@ -1065,6 +1066,7 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          lugar_id?: string | null
           id?: string
           numero: string
           tipo: string
@@ -1076,6 +1078,7 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          lugar_id?: string | null
           id?: string
           numero?: string
           tipo?: string
@@ -1124,6 +1127,98 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "gov_camareiras_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "gov_setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_lugares: {
+        Row: {
+          id: string
+          propriedade_id: string
+          parent_id: string | null
+          nivel: string
+          nome: string
+          ordem: number
+          ativo: boolean
+          ficha_uh: boolean
+          grupos: string[]
+          tipo_uh: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          propriedade_id: string
+          parent_id?: string | null
+          nivel: string
+          nome: string
+          ordem?: number
+          ativo?: boolean
+          ficha_uh?: boolean
+          grupos?: string[]
+          tipo_uh?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          propriedade_id?: string
+          parent_id?: string | null
+          nivel?: string
+          nome?: string
+          ordem?: number
+          ativo?: boolean
+          ficha_uh?: boolean
+          grupos?: string[]
+          tipo_uh?: string | null
+          criado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gov_lugares_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "gov_lugares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_processo_lugares: {
+        Row: { processo_id: string; lugar_id: string }
+        Insert: { processo_id: string; lugar_id: string }
+        Update: { processo_id?: string; lugar_id?: string }
+        Relationships: [
+          {
+            foreignKeyName: "gov_processo_lugares_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "gov_processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_processo_lugares_lugar_id_fkey"
+            columns: ["lugar_id"]
+            isOneToOne: false
+            referencedRelation: "gov_lugares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gov_local_setores: {
+        Row: { local_id: string; setor_id: string }
+        Insert: { local_id: string; setor_id: string }
+        Update: { local_id?: string; setor_id?: string }
+        Relationships: [
+          {
+            foreignKeyName: "gov_local_setores_local_id_fkey"
+            columns: ["local_id"]
+            isOneToOne: false
+            referencedRelation: "gov_acomodacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gov_local_setores_setor_id_fkey"
             columns: ["setor_id"]
             isOneToOne: false
             referencedRelation: "gov_setores"

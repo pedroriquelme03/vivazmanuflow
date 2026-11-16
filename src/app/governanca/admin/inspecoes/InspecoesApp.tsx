@@ -15,6 +15,8 @@ import {
   type LinhaInspecao,
 } from "@/lib/checklist-inspecao";
 import { GrupoFiltros } from "@/components/GrupoFiltros";
+import { registroNoCaminho, type CaminhoFiltro, type Lugar } from "@/lib/checklist-lugares";
+import { FiltroCaminho } from "../../Lugares";
 import { SelectSetor } from "../../Seletores";
 import { StatusBadge, Titulo, Vazio, inputCls } from "../../ui";
 
@@ -23,8 +25,11 @@ export function InspecoesApp({
   setores,
   meusSetores,
   propriedades,
+  lugares = [],
 }: {
   lista: LinhaInspecao[];
+  /** Árvore de locais, para filtrar por categoria/tipo/classificação. */
+  lugares?: Lugar[];
   /** Todos os setores, para mostrar o nome. */
   setores: SetorChecklist[];
   /** Setores da pessoa, para o filtro. */
@@ -34,7 +39,15 @@ export function InspecoesApp({
   const [filtros, setFiltros] = useState<FiltrosInspecao>(FILTROS_VAZIOS);
   const mudar = (campo: keyof FiltrosInspecao) => (valor: string) => setFiltros((f) => ({ ...f, [campo]: valor }));
 
-  const filtradas = useMemo(() => filtrarInspecoes(lista, filtros), [lista, filtros]);
+  const [unidade, setUnidade] = useState("");
+  const [caminho, setCaminho] = useState<CaminhoFiltro>([]);
+  const filtradas = useMemo(
+    () =>
+      filtrarInspecoes(lista, filtros).filter(
+        (i) => (!unidade || i.unidadeId === unidade) && registroNoCaminho(lugares, caminho, i.lugarLocal, i.ligados),
+      ),
+    [lista, filtros, unidade, caminho, lugares],
+  );
   const opcoes = useMemo(
     () => ({
       checklists: opcoesDistintas(lista, (i) => i.checklistId, (i) => i.checklist),
@@ -43,7 +56,8 @@ export function InspecoesApp({
     }),
     [lista],
   );
-  const algumFiltro = Object.entries(filtros).some(([campo, valor]) => campo !== "busca" && valor);
+  const algumFiltro =
+    Boolean(unidade || caminho.length) || Object.entries(filtros).some(([campo, valor]) => campo !== "busca" && valor);
 
   return (
     <>
@@ -59,6 +73,23 @@ export function InspecoesApp({
         />
         <GrupoFiltros ativo={algumFiltro}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <select
+              className={inputCls}
+              value={unidade}
+              onChange={(e) => {
+                setUnidade(e.target.value);
+                setCaminho([]);
+              }}
+              aria-label="Unidade"
+            >
+              <option value="">Todas as unidades</option>
+              {propriedades.filter((p) => p.ativo).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <FiltroCaminho lugares={lugares} unidadeId={unidade || null} caminho={caminho} onChange={setCaminho} />
             <select className={inputCls} value={filtros.status} onChange={(e) => mudar("status")(e.target.value)}>
               <option value="">Todos os status</option>
               {STATUS_INSPECAO.map((s) => (
@@ -89,7 +120,11 @@ export function InspecoesApp({
               <button
                 type="button"
                 className="text-left text-sm font-medium text-brand-700 hover:underline"
-                onClick={() => setFiltros({ ...FILTROS_VAZIOS, busca: filtros.busca })}
+                onClick={() => {
+                  setFiltros({ ...FILTROS_VAZIOS, busca: filtros.busca });
+                  setUnidade("");
+                  setCaminho([]);
+                }}
               >
                 Limpar filtros
               </button>

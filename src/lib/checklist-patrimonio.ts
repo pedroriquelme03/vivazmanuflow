@@ -8,15 +8,16 @@ export type TipoItemPatrimonio = Tables<"gov_tipos_item">;
 export type ItemLocal = Tables<"gov_local_itens">;
 
 /** Cada tipo é de um grupo, e cada grupo tem a sua seção na tela do local. */
-export type GrupoItem = "eletronico" | "mobilia";
+export type GrupoItem = "eletronico" | "mobilia" | "equipamento";
 export const GRUPOS_ITEM: { valor: GrupoItem; rotulo: string; exemplos: string; novoTipo: string }[] = [
   { valor: "eletronico", rotulo: "Eletrônicos", exemplos: "TV, ar-condicionado, frigobar, cofre…", novoTipo: "Ex.: Secador de cabelo" },
   { valor: "mobilia", rotulo: "Mobília", exemplos: "Cama, armário, banheira de hidromassagem…", novoTipo: "Ex.: Cama box" },
+  { valor: "equipamento", rotulo: "Equipamentos", exemplos: "Bomba, filtro, quadro elétrico, gerador…", novoTipo: "Ex.: Aquecedor" },
 ];
 
 /** Tipo sem grupo (ou com valor estranho) conta como eletrônico, que era o único antes. */
 export function grupoDoTipo(tipo: { grupo?: string | null } | undefined): GrupoItem {
-  return tipo?.grupo === "mobilia" ? "mobilia" : "eletronico";
+  return tipo?.grupo === "mobilia" || tipo?.grupo === "equipamento" ? tipo.grupo : "eletronico";
 }
 
 export function rotuloGrupoItem(grupo: string | null | undefined) {

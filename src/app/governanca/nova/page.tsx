@@ -3,7 +3,7 @@ import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { inspecionaEquipe } from "@/lib/governanca";
 import { hojeEmSaoPaulo } from "@/lib/checklist-inspecao";
 import { GovernancaShell } from "../GovernancaShell";
-import { carregarSetores } from "../setores-dados";
+import { carregarArvore, carregarSetores } from "../setores-dados";
 import { NovaInspecao, type RascunhoInspecao } from "./NovaInspecao";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ export default async function NovaInspecaoPage({
     { data: doRelatorio },
     { setores, propriedades },
     { data: tiposItem },
+    arvore,
   ] = await Promise.all([
     supabase.from("gov_acomodacoes").select("*").eq("ativo", true).order("numero"),
     supabase.from("gov_camareiras").select("*").eq("ativo", true).order("nome"),
@@ -54,6 +55,7 @@ export default async function NovaInspecaoPage({
       .maybeSingle(),
     carregarSetores(supabase),
     supabase.from("gov_tipos_item").select("*"),
+    carregarArvore(supabase),
   ]);
 
   const linha = rascunhoRes.data;
@@ -98,6 +100,8 @@ export default async function NovaInspecaoPage({
         rascunho={rascunho}
         hoje={hoje}
         tiposItem={tiposItem ?? []}
+        lugares={arvore.lugares}
+        ligacoes={arvore.ligacoes}
         dataRelatorio={doRelatorio && doRelatorio.data !== hoje ? doRelatorio.data : null}
         relatorioDoDia={(doRelatorio?.gov_relatorio_uhs ?? []).map((u) => ({
           numero: u.numero,
