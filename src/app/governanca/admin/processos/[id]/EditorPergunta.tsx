@@ -12,7 +12,7 @@ import {
   type Dependencia,
   type Exige,
 } from "@/lib/checklist-regras";
-import { GRUPOS_ITEM, grupoDoTipo, tiposDoGrupo, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
+import { GRUPOS_PADRAO, grupoDoTipo, tiposDoGrupo, type GrupoItem, type TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import {
   CAMPOS_PLANO,
   MODOS_CAMPO_PLANO,
@@ -40,6 +40,7 @@ export function EditorPergunta({
   dependencias,
   alvos,
   tiposItem,
+  gruposItem = GRUPOS_PADRAO,
   usaLocal,
   onAtualizar,
   onRemover,
@@ -55,6 +56,7 @@ export function EditorPergunta({
   /** Outras perguntas e seções do checklist que podem ser mostradas. */
   alvos: AlvoCondicional[];
   tiposItem: TipoItemPatrimonio[];
+  gruposItem?: GrupoItem[];
   /** O checklist pede o local (UH/área): dá para ligar a pergunta a um item dele. */
   usaLocal: boolean;
   onAtualizar: (patch: TablesUpdate<"gov_perguntas">) => void;
@@ -242,10 +244,10 @@ export function EditorPergunta({
                 aria-label="Item do local"
               >
                 <option value="">Não confere item</option>
-                {GRUPOS_ITEM.map((g) => (
-                  <optgroup key={g.valor} label={g.rotulo}>
-                    {tiposDoGrupo(tiposItem, g.valor, p.tipo_item_id ?? undefined)
-                      .filter((t) => grupoDoTipo(t) === g.valor)
+                {gruposItem.map((g) => (
+                  <optgroup key={g.codigo} label={g.nome}>
+                    {tiposDoGrupo(tiposItem, g.codigo, p.tipo_item_id ?? undefined, gruposItem)
+                      .filter((t) => grupoDoTipo(t, gruposItem) === g.codigo)
                       .map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.nome}

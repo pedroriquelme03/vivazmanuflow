@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { removerDoExige, renomearNoExige, serveDeIdentificador, type Dependencia } from "@/lib/checklist-regras";
 import { MODOS_AVALIADO, modoAvaliado, rotuloModoAvaliado, type ModoAvaliado } from "@/lib/checklist-avaliado";
-import type { TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
+import type { GrupoItem, TipoItemPatrimonio } from "@/lib/checklist-patrimonio";
 import type { TablesUpdate } from "@/lib/database.types";
 import {
   proximaOrdem,
@@ -42,6 +42,7 @@ export function ProcessoEditor({
   meusSetores,
   dependencias,
   tiposItem,
+  gruposItem,
   lugares,
   ligados,
 }: {
@@ -55,6 +56,8 @@ export function ProcessoEditor({
   dependencias: Dependencia[];
   /** Tipos de item do patrimônio (TV, ar...), para conferir na UH. */
   tiposItem: TipoItemPatrimonio[];
+  /** Grupos de itens do cadastro (para agrupar os tipos no select). */
+  gruposItem?: GrupoItem[];
   /** Árvore de locais e os pontos a que este checklist está ligado. */
   lugares: Lugar[];
   ligados: string[];
@@ -239,6 +242,7 @@ export function ProcessoEditor({
                   dependencias={dependencias.filter((d) => d.pergunta_id === p.id)}
                   alvos={alvos.filter((a) => a.id !== p.id && a.id !== s.id)}
                   tiposItem={tiposItem}
+                  gruposItem={gruposItem}
                   usaLocal={processo.usa_acomodacao}
                   onAtualizar={(patch) => atualizarPergunta(p, patch)}
                   onRemover={() => removerPergunta(p)}

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { GovernancaShell } from "../../../GovernancaShell";
-import { carregarSetores } from "../../../setores-dados";
+import { carregarGruposItem, carregarSetores } from "../../../setores-dados";
 import { Vazio } from "../../../ui";
 import { LocalEditor } from "./LocalEditor";
 
@@ -11,7 +11,7 @@ export default async function LocalEditorPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const { perfil, papel } = await exigirGovernanca(`/governanca/admin/locais/${id}`, true);
   const supabase = await createClient();
-  const [{ data: local }, { data: itens }, { data: tipos }, { setores, propriedades }, { data: lugares }, { data: etiquetas }] =
+  const [{ data: local }, { data: itens }, { data: tipos }, { setores, propriedades }, { data: lugares }, { data: etiquetas }, gruposItem] =
     await Promise.all([
       supabase.from("gov_acomodacoes").select("*").eq("id", id).maybeSingle(),
       supabase.from("gov_local_itens").select("*").eq("local_id", id).order("criado_em"),
@@ -19,6 +19,7 @@ export default async function LocalEditorPage({ params }: { params: Promise<{ id
       carregarSetores(supabase),
       supabase.from("gov_lugares").select("*").order("ordem"),
       supabase.from("gov_local_setores").select("setor_id").eq("local_id", id),
+      carregarGruposItem(supabase),
     ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function LocalEditorPage({ params }: { params: Promise<{ id
           lugares={lugares ?? []}
           setores={setores}
           etiquetas={(etiquetas ?? []).map((e) => e.setor_id)}
+          gruposItem={gruposItem}
         />
       )}
     </GovernancaShell>

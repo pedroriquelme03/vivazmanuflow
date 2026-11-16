@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { GovernancaShell } from "../../../GovernancaShell";
+import { carregarGruposItem } from "../../../setores-dados";
 import { EstruturaLocais } from "./EstruturaLocais";
 
 export const dynamic = "force-dynamic";
@@ -8,11 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function EstruturaPage() {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/locais/estrutura", true);
   const supabase = await createClient();
-  const [{ data: lugares, error }, { data: propriedades }, { data: locais }, { data: ligacoes }] = await Promise.all([
+  const [{ data: lugares, error }, { data: propriedades }, { data: locais }, { data: ligacoes }, grupos] = await Promise.all([
     supabase.from("gov_lugares").select("*").order("ordem"),
     supabase.from("propriedades").select("id, nome, ativo").order("nome"),
     supabase.from("gov_acomodacoes").select("lugar_id"),
     supabase.from("gov_processo_lugares").select("lugar_id"),
+    carregarGruposItem(supabase),
   ]);
 
   const contar = (linhas: { lugar_id: string | null }[] | null) => {
@@ -26,6 +28,7 @@ export default async function EstruturaPage() {
       <EstruturaLocais
         lugares={lugares ?? []}
         propriedades={(propriedades ?? []).filter((p) => p.ativo)}
+        grupos={grupos}
         locaisPorLugar={contar(locais)}
         checklistsPorLugar={contar(ligacoes)}
         faltaSql={Boolean(error)}

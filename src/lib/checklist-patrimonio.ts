@@ -7,40 +7,67 @@ import type { Tables } from "@/lib/database.types";
 export type TipoItemPatrimonio = Tables<"gov_tipos_item">;
 export type ItemLocal = Tables<"gov_local_itens">;
 
-/** Cada tipo é de um grupo, e cada grupo tem a sua seção na tela do local. */
-export type GrupoItem = "eletronico" | "mobilia" | "equipamento";
-export const GRUPOS_ITEM: { valor: GrupoItem; rotulo: string; exemplos: string; novoTipo: string }[] = [
-  { valor: "eletronico", rotulo: "Eletrônicos", exemplos: "TV, ar-condicionado, frigobar, cofre…", novoTipo: "Ex.: Secador de cabelo" },
-  { valor: "mobilia", rotulo: "Mobília", exemplos: "Cama, armário, banheira de hidromassagem…", novoTipo: "Ex.: Cama box" },
-  { valor: "equipamento", rotulo: "Equipamentos", exemplos: "Bomba, filtro, quadro elétrico, gerador…", novoTipo: "Ex.: Aquecedor" },
+/**
+ * Grupos de itens (Eletrônicos, Mobília, Equipamentos... e os que o admin criar).
+ * Cada tipo de item é de um grupo; cada grupo vira uma seção na ficha do local.
+ */
+export type GrupoItem = { codigo: string; nome: string; exemplos: string | null; ordem: number; ativo: boolean };
+
+/** Os grupos de antes do cadastro de grupos (enquanto o SQL não roda). */
+export const GRUPOS_PADRAO: GrupoItem[] = [
+  { codigo: "eletronico", nome: "Eletrônicos", exemplos: "TV, ar-condicionado, frigobar, cofre…", ordem: 1, ativo: true },
+  { codigo: "mobilia", nome: "Mobília", exemplos: "Cama, armário, banheira de hidromassagem…", ordem: 2, ativo: true },
+  { codigo: "equipamento", nome: "Equipamentos", exemplos: "Bomba, filtro, quadro elétrico, gerador…", ordem: 3, ativo: true },
 ];
 
-/** Tipo sem grupo (ou com valor estranho) conta como eletrônico, que era o único antes. */
-export function grupoDoTipo(tipo: { grupo?: string | null } | undefined): GrupoItem {
-  return tipo?.grupo === "mobilia" || tipo?.grupo === "equipamento" ? tipo.grupo : "eletronico";
+/** O grupo do tipo; sem grupo conhecido, eletrônicos (que era o único antes). */
+export function grupoDoTipo(
+  tipo: { grupo?: string | null } | undefined,
+  grupos: readonly { codigo: string }[] = GRUPOS_PADRAO,
+): string {
+  const g = tipo?.grupo;
+  if (g && grupos.some((x) => x.codigo === g)) return g;
+  return grupos.some((x) => x.codigo === "eletronico") ? "eletronico" : (grupos[0]?.codigo ?? "eletronico");
 }
 
-export function rotuloGrupoItem(grupo: string | null | undefined) {
-  return GRUPOS_ITEM.find((g) => g.valor === grupoDoTipo({ grupo }))!.rotulo;
+export function nomeDoGrupo(codigo: string | null | undefined, grupos: readonly GrupoItem[] = GRUPOS_PADRAO) {
+  return grupos.find((g) => g.codigo === grupoDoTipo({ grupo: codigo }, grupos))?.nome ?? "Itens";
 }
 
 /** Tipos ativos do grupo, mais o tipo atual do item (mesmo inativo) para não sumir do select. */
 export function tiposDoGrupo<T extends { id: string; ativo: boolean; grupo?: string | null }>(
   tipos: readonly T[],
-  grupo: GrupoItem,
+  grupo: string,
   atual?: string,
+  grupos: readonly { codigo: string }[] = GRUPOS_PADRAO,
 ) {
-  return tipos.filter((t) => t.id === atual || (t.ativo && grupoDoTipo(t) === grupo));
+  return tipos.filter((t) => t.id === atual || (t.ativo && grupoDoTipo(t, grupos) === grupo));
 }
 
 /** Itens do local que são do grupo, pelo tipo de cada um. */
 export function itensDoGrupo<I extends { tipo_item_id: string }>(
   itens: readonly I[],
   tipos: readonly { id: string; grupo?: string | null }[],
-  grupo: GrupoItem,
+  grupo: string,
+  grupos: readonly { codigo: string }[] = GRUPOS_PADRAO,
 ) {
-  const grupoPorTipo = new Map(tipos.map((t) => [t.id, grupoDoTipo(t)]));
-  return itens.filter((i) => (grupoPorTipo.get(i.tipo_item_id) ?? "eletronico") === grupo);
+  const grupoPorTipo = new Map(tipos.map((t) => [t.id, grupoDoTipo(t, grupos)]));
+  return itens.filter((i) => (grupoPorTipo.get(i.tipo_item_id) ?? grupoDoTipo(undefined, grupos)) === grupo);
+}
+
+/** Código fixo de um grupo novo a partir do nome ("Máquinas" → "maquinas"), sem repetir. */
+export function codigoDoGrupo(nome: string, existentes: readonly string[]) {
+  const base =
+    nome
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || "grupo";
+  let codigo = base;
+  for (let n = 2; existentes.includes(codigo); n++) codigo = `${base}_${n}`;
+  return codigo;
 }
 
 /** "SAMSUNG 50'" (marca e modelo); sem nenhum dos dois, o nome do tipo. */

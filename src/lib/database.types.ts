@@ -1134,6 +1134,12 @@ export type Database = {
           },
         ]
       }
+      gov_grupos_item: {
+        Row: { codigo: string; nome: string; exemplos: string | null; ordem: number; ativo: boolean; criado_em: string }
+        Insert: { codigo: string; nome: string; exemplos?: string | null; ordem?: number; ativo?: boolean; criado_em?: string }
+        Update: { codigo?: string; nome?: string; exemplos?: string | null; ordem?: number; ativo?: boolean; criado_em?: string }
+        Relationships: []
+      }
       gov_lugares: {
         Row: {
           id: string

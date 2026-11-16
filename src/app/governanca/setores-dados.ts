@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import { setoresDaPessoa } from "@/lib/checklist-setores";
+import { GRUPOS_PADRAO, type GrupoItem } from "@/lib/checklist-patrimonio";
 import type { GovPapel } from "@/lib/governanca";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -11,6 +12,12 @@ export async function carregarSetores(supabase: Supabase) {
     supabase.from("gov_setores").select("*").order("nome"),
   ]);
   return { propriedades: propriedades ?? [], setores: setores ?? [] };
+}
+
+/** Grupos de itens (Eletrônicos, Mobília...); sem o SQL dos grupos, os três de sempre. */
+export async function carregarGruposItem(supabase: Supabase): Promise<GrupoItem[]> {
+  const { data, error } = await supabase.from("gov_grupos_item").select("codigo, nome, exemplos, ordem, ativo").order("ordem");
+  return error || !data?.length ? GRUPOS_PADRAO : data;
 }
 
 /**

@@ -115,16 +115,12 @@ export function localNoChecklist(
   return ligados.some((alvo) => dentroDe(lugares, local.lugar_id, alvo));
 }
 
-export type GrupoLocal = "eletronico" | "mobilia" | "equipamento";
 
 /** O que a ficha do local mostra: dados da UH e os grupos de itens, conforme a categoria. */
 export function fichaDoLocal(lugares: readonly Lugar[], lugarId: string | null | undefined) {
   const categoria = categoriaDe(lugares, lugarId);
-  if (!categoria) return { fichaUh: false, grupos: [] as GrupoLocal[] };
-  return {
-    fichaUh: categoria.ficha_uh,
-    grupos: categoria.grupos.filter((g): g is GrupoLocal => ["eletronico", "mobilia", "equipamento"].includes(g)),
-  };
+  if (!categoria) return { fichaUh: false, grupos: [] as string[] };
+  return { fichaUh: categoria.ficha_uh, grupos: [...categoria.grupos] };
 }
 
 /** A UH herda suíte/apartamento do tipo dela; o resto é "área" (só para o legado). */

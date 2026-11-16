@@ -6,7 +6,8 @@ import {
   itensDoGrupo,
   previstoNoLocal,
   resumoPorModelo,
-  rotuloGrupoItem,
+  codigoDoGrupo,
+  nomeDoGrupo,
   tiposDoGrupo,
   type ItemLocal,
 } from "./checklist-patrimonio";
@@ -33,8 +34,13 @@ describe("grupos de item", () => {
     expect(grupoDoTipo({ grupo: "mobilia" })).toBe("mobilia");
     expect(grupoDoTipo({ grupo: null })).toBe("eletronico");
     expect(grupoDoTipo(undefined)).toBe("eletronico");
-    expect(rotuloGrupoItem("mobilia")).toBe("Mobília");
-    expect(rotuloGrupoItem("x")).toBe("Eletrônicos");
+    expect(nomeDoGrupo("mobilia")).toBe("Mobília");
+    expect(nomeDoGrupo("x")).toBe("Eletrônicos");
+    const maquinas = [{ codigo: "maquinas", nome: "Máquinas", exemplos: null, ordem: 1, ativo: true }];
+    expect(grupoDoTipo({ grupo: "maquinas" }, maquinas)).toBe("maquinas");
+    expect(grupoDoTipo({ grupo: "x" }, maquinas)).toBe("maquinas");
+    expect(codigoDoGrupo("Máquinas e Bombas!", [])).toBe("maquinas_e_bombas");
+    expect(codigoDoGrupo("Mobília", ["mobilia"])).toBe("mobilia_2");
   });
 
   it("tipos ativos do grupo, mantendo o atual do item", () => {

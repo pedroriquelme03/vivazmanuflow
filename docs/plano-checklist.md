@@ -22,7 +22,8 @@
 | `20261112231000_checklist_fase4_cf.sql` | Fase 4: pesos e comentário/foto dos 44 checklists do CF; cria o checklist 968170 (Jardinagem) | Rodado |
 | `20261112240000_checklist_plano_campos.sql` | Plano de ação configurável: prazo, onde, por quê, como e custo (opcional/obrigatório por pergunta) | Rodado |
 | `20261112250000_checklist_equipe_seguranca.sql` | Equipe: o líder vê só quem divide setor com ele (ou sem setor) e não vê administradores | Rodado |
-| `20261116120000_checklist_locais_arvore.sql` | Árvore de locais (Unidade → Categoria → Tipo → Classificação → Local), ficha por categoria, etiquetas de setor, checklist ligado à árvore; exemplos das duas unidades | **Falta rodar** |
+| `20261116120000_checklist_locais_arvore.sql` | Árvore de locais (Unidade → Categoria → Tipo → Classificação → Local), ficha por categoria, etiquetas de setor, checklist ligado à árvore; exemplos das duas unidades | Rodado |
+| `20261116130000_checklist_grupos_item.sql` | Grupos de itens editáveis (criar "Máquinas" etc.); tipo de item aponta para o grupo | **Falta rodar** |
 
 Sem SQL (só código): Cadastros da Manutenção/TI para o líder (cada um só o próprio sistema;
 Solicitações só para a TI), relatórios com filtros, telas novas de Equipe e Cadastros.

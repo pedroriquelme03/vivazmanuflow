@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import type { Acomodacao } from "@/lib/governanca";
 import { limparNome, type PropriedadeRef, type SetorChecklist } from "@/lib/checklist-setores";
 import {
-  GRUPOS_ITEM,
   itensDoGrupo,
   tiposDoGrupo,
+  type GrupoItem,
   type ItemLocal,
   type TipoItemPatrimonio,
 } from "@/lib/checklist-patrimonio";
@@ -41,7 +41,10 @@ export function LocalEditor({
   lugares,
   setores,
   etiquetas,
+  gruposItem,
 }: {
+  /** Grupos de itens do cadastro (Eletrônicos, Mobília, Máquinas...). */
+  gruposItem: GrupoItem[];
   local: Acomodacao;
   itens: ItemLocal[];
   tipos: TipoItemPatrimonio[];
@@ -56,8 +59,10 @@ export function LocalEditor({
   const [confirmar, janela] = useConfirmacao();
   const ficha = fichaDoLocal(lugares, local.lugar_id);
   // Grupos da categoria, mais os que já têm itens (para nada sumir da tela).
-  const grupos = GRUPOS_ITEM.filter(
-    (g) => ficha.grupos.includes(g.valor) || itensDoGrupo(itens, tipos, g.valor).length > 0 || !local.lugar_id,
+  const grupos = gruposItem.filter(
+    (g) =>
+      (g.ativo && (ficha.grupos.includes(g.codigo) || !local.lugar_id)) ||
+      itensDoGrupo(itens, tipos, g.codigo, gruposItem).length > 0,
   );
 
   async function mudarAtivo(ativo: boolean) {
@@ -128,10 +133,11 @@ export function LocalEditor({
 
       {grupos.map((grupo) => (
         <SecaoItens
-          key={grupo.valor}
+          key={grupo.codigo}
           grupo={grupo}
           localId={local.id}
-          itens={itensDoGrupo(itens, tipos, grupo.valor)}
+          itens={itensDoGrupo(itens, tipos, grupo.codigo, gruposItem)}
+          gruposItem={gruposItem}
           tipos={tipos}
           escrita={escrita}
           confirmar={confirmar}
@@ -311,13 +317,15 @@ function EtiquetasSetor({
  */
 function SecaoItens({
   grupo,
+  gruposItem,
   localId,
   itens,
   tipos,
   escrita: { supabase, gravar, setErro },
   confirmar,
 }: {
-  grupo: (typeof GRUPOS_ITEM)[number];
+  grupo: GrupoItem;
+  gruposItem: GrupoItem[];
   localId: string;
   itens: ItemLocal[];
   tipos: TipoItemPatrimonio[];
@@ -335,7 +343,7 @@ function SecaoItens({
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault();
-    if (!novoTipo) return setErro(`Escolha o tipo do item em ${grupo.rotulo}.`);
+    if (!novoTipo) return setErro(`Escolha o tipo do item em ${grupo.nome}.`);
     const numero = campoLivre(patrimonio);
     const ok = await gravar(
       supabase.from("gov_local_itens").insert({
@@ -372,7 +380,7 @@ function SecaoItens({
     e.preventDefault();
     const nome = limparNome(nomeTipo);
     if (!nome) return;
-    const ok = await gravar(supabase.from("gov_tipos_item").insert({ nome, grupo: grupo.valor }), {
+    const ok = await gravar(supabase.from("gov_tipos_item").insert({ nome, grupo: grupo.codigo }), {
       "23505": `O tipo "${nome}" já existe.`,
     });
     if (ok) setNomeTipo("");
@@ -383,10 +391,10 @@ function SecaoItens({
   return (
     <section className={`${cardCls} mt-6`}>
       <h2 className="text-base font-semibold text-slate-800">
-        {grupo.rotulo} · {itens.length}
+        {grupo.nome} · {itens.length}
       </h2>
       <p className="mt-0.5 text-sm text-slate-500">
-        {grupo.exemplos} Uma pergunta do checklist pode conferir um tipo: na hora de responder aparece o que está aqui.
+        {grupo.exemplos ? `${grupo.exemplos} ` : ""}Uma pergunta do checklist pode conferir um tipo: na hora de responder aparece o que está aqui.
       </p>
 
       <ul className="mt-4 space-y-2">
@@ -398,7 +406,7 @@ function SecaoItens({
               aria-label="Tipo do item"
               onChange={(e) => atualizar(item, { tipo_item_id: e.target.value })}
             >
-              {tiposDoGrupo(tipos, grupo.valor, item.tipo_item_id).map((t) => (
+              {tiposDoGrupo(tipos, grupo.codigo, item.tipo_item_id, gruposItem).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.nome}
                 </option>
@@ -422,7 +430,7 @@ function SecaoItens({
             </button>
           </li>
         ))}
-        {itens.length === 0 && <li className="text-sm text-slate-500">Nada cadastrado em {grupo.rotulo}.</li>}
+        {itens.length === 0 && <li className="text-sm text-slate-500">Nada cadastrado em {grupo.nome}.</li>}
       </ul>
 
       <form onSubmit={adicionar} className={`${colunas} mt-4 rounded-xl bg-slate-50 p-3`}>
@@ -430,10 +438,10 @@ function SecaoItens({
           className={inputCls}
           value={novoTipo}
           onChange={(e) => setNovoTipo(e.target.value)}
-          aria-label={`Tipo do novo item em ${grupo.rotulo}`}
+          aria-label={`Tipo do novo item em ${grupo.nome}`}
         >
           <option value="">Novo item…</option>
-          {tiposDoGrupo(tipos, grupo.valor).map((t) => (
+          {tiposDoGrupo(tipos, grupo.codigo, undefined, gruposItem).map((t) => (
             <option key={t.id} value={t.id}>
               {t.nome}
             </option>
@@ -454,13 +462,13 @@ function SecaoItens({
       </form>
 
       <form onSubmit={criarTipo} className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        Falta um tipo em {grupo.rotulo}?
+        Falta um tipo em {grupo.nome}?
         <input
           className={`${inputCls} max-w-xs`}
           value={nomeTipo}
           onChange={(e) => setNomeTipo(e.target.value)}
-          placeholder={grupo.novoTipo}
-          aria-label={`Nome do novo tipo em ${grupo.rotulo}`}
+          placeholder={`Ex.: novo tipo em ${grupo.nome}`}
+          aria-label={`Nome do novo tipo em ${grupo.nome}`}
         />
         <button type="submit" className={btnPequeno} disabled={!nomeTipo.trim()}>
           Criar tipo

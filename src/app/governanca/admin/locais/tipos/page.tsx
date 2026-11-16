@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { GovernancaShell } from "../../../GovernancaShell";
+import { carregarGruposItem } from "../../../setores-dados";
 import { TiposItem } from "./TiposItem";
 
 export const dynamic = "force-dynamic";
@@ -8,14 +9,17 @@ export const dynamic = "force-dynamic";
 export default async function TiposItemPage() {
   const { perfil, papel } = await exigirGovernanca("/governanca/admin/locais/tipos", true);
   const supabase = await createClient();
-  const { data: tipos } = await supabase
-    .from("gov_tipos_item")
-    .select("*, gov_local_itens(count), gov_perguntas(count)")
-    .order("nome");
+  const [{ data: tipos }, grupos, { error: semGrupos }] = await Promise.all([
+    supabase.from("gov_tipos_item").select("*, gov_local_itens(count), gov_perguntas(count)").order("nome"),
+    carregarGruposItem(supabase),
+    supabase.from("gov_grupos_item").select("codigo").limit(1),
+  ]);
 
   return (
     <GovernancaShell perfil={perfil} papel={papel}>
       <TiposItem
+        grupos={grupos}
+        faltaSqlGrupos={Boolean(semGrupos)}
         tipos={(tipos ?? []).map(({ gov_local_itens, gov_perguntas, ...t }) => ({
           ...t,
           itens: gov_local_itens[0]?.count ?? 0,
