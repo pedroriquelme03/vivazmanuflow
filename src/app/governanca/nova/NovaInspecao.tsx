@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { comprimirImagem } from "@/lib/comprimir-imagem";
+import { extensao, tipoAnexo } from "@/lib/checklist-anexo";
 import {
   BUCKET_GOVERNANCA,
   MIGRATION_HINT_GOV,
@@ -34,13 +35,30 @@ import { extrasDoBanco, extrasParaGravar, lerCamposPlano } from "@/lib/checklist
 import { EscolhaChecklist } from "./EscolhaChecklist";
 import { PassoDados } from "./PassoDados";
 import { PerguntaItem, respostaVazia, type RespostaLocal } from "./PerguntaItem";
-import { Erro, Vazio, btnPrimario, btnSecundario, cardCls, inputCls } from "../ui";
+import { Erro, PrioridadeBadge, Vazio, btnPrimario, btnSecundario, cardCls, inputCls } from "../ui";
 
 type Fase = "processo" | "acomodacao" | "dados" | "perguntas" | "salvando" | "concluido";
 type ProcessoResumo = Processo & { itens: number };
 type ProcessoCompleto = ProcessoResumo & { secoes: SecaoComPerguntas[]; dependencias: Dependencia[] };
 
 const NADA_ESCONDIDO = { perguntas: new Set<string>(), secoes: new Set<string>() };
+
+/** Nome do local como sai no chamado: "UH 1002" ou o nome da área. */
+function rotuloLocal(a: Acomodacao | null) {
+  if (!a) return null;
+  return a.tipo === "area" ? a.numero : `UH ${a.numero}`;
+}
+
+/** Chamado para manutenção aberto por um checklist e ainda sem devolutiva (não marcado como resolvido). */
+type ChamadoPendente = {
+  id: string;
+  oQueFazer: string;
+  prioridade: Prioridade;
+  token: string | null;
+  criadoEm: string;
+  inspecaoId: string;
+  acomodacaoId: string;
+};
 
 /** Pergunta → tipo e seção, para as condicionais. */
 function mapaPerguntas(secoes: SecaoComPerguntas[]) {
@@ -67,6 +85,7 @@ export type RascunhoInspecao = {
       o_que_fazer: string;
       quem_vai_fazer: string | null;
       quem_pediu: string | null;
+      observacao?: string | null;
       prazo?: string | null;
       onde?: string | null;
       por_que?: string | null;
@@ -110,6 +129,7 @@ function respostaDoRascunho(r: RascunhoInspecao["respostas"][number]): RespostaL
           o_que_fazer: r.plano.o_que_fazer,
           quem_vai_fazer: r.plano.quem_vai_fazer ?? "",
           quem_pediu: r.plano.quem_pediu ?? "",
+          detalhes: r.plano.observacao ?? "",
           extras: extrasDoBanco(r.plano),
         }
       : null,
@@ -181,6 +201,8 @@ export function NovaInspecao({
   const [inspecaoIdFinal, setInspecaoIdFinal] = useState<string | null>(null);
   const [chamadosAbertos, setChamadosAbertos] = useState<{ abertos: number; total: number } | null>(null);
   const [busca, setBusca] = useState("");
+  // Chamados para manutenção em aberto por local (UH), para avisar antes de aplicar.
+  const [pendentes, setPendentes] = useState<Map<string, ChamadoPendente[]>>(new Map());
   const [prefixoAndar, setPrefixoAndar] = useState<string | null>(null);
 
   const comItens = useMemo(() => processos.filter((p) => p.itens > 0), [processos]);
@@ -236,7 +258,6 @@ export function NovaInspecao({
   const colaboradores = camareiras.filter((c) => c.setor_id === processo?.setor_id);
   // Como o avaliado é escolhido neste checklist, para quem está preenchendo.
   const passo = passoAvaliado(processo?.avaliado, equipe);
-  const nomesCamareiras = colaboradores.map((c) => c.nome);
   const usaUh = processo?.usa_acomodacao ?? false;
 
   function subir() {
@@ -325,7 +346,45 @@ export function NovaInspecao({
     const inicio = ocultos(p.dependencias, init, mapaPerguntas(p.secoes));
     setSecaoIndex(Math.max(0, p.secoes.findIndex((s) => temItemVisivel(s, inicio))));
     setFase(p.usa_acomodacao ? "acomodacao" : "dados");
+    if (p.usa_acomodacao) void carregarPendentes();
     subir();
+  }
+
+  /** Chamados abertos pelos checklists finalizados que ainda não tiveram devolutiva, agrupados por local. */
+  async function carregarPendentes() {
+    const { data, error } = await supabase
+      .from("gov_planos_acao")
+      // "*": funciona antes e depois do SQL que cria chamado_token.
+      .select("*, gov_respostas!inner(gov_inspecoes!inner(id, acomodacao_id, status))")
+      .is("resolvido_em", null)
+      .eq("gov_respostas.gov_inspecoes.status", "finalizada");
+    // Sem o aviso o checklist continua funcionando.
+    if (error) return console.warn("Aviso de chamados abertos:", error.message);
+    type Linha = {
+      id: string;
+      o_que_fazer: string;
+      prioridade: Prioridade;
+      chamado_token?: string | null;
+      criado_em: string;
+      gov_respostas: { gov_inspecoes: { id: string; acomodacao_id: string | null } };
+    };
+    const mapa = new Map<string, ChamadoPendente[]>();
+    for (const l of (data ?? []) as unknown as Linha[]) {
+      const insp = l.gov_respostas?.gov_inspecoes;
+      if (!insp?.acomodacao_id) continue;
+      const lista = mapa.get(insp.acomodacao_id) ?? [];
+      lista.push({
+        id: l.id,
+        oQueFazer: l.o_que_fazer,
+        prioridade: l.prioridade,
+        token: l.chamado_token ?? null,
+        criadoEm: l.criado_em,
+        inspecaoId: insp.id,
+        acomodacaoId: insp.acomodacao_id,
+      });
+      mapa.set(insp.acomodacao_id, lista);
+    }
+    setPendentes(mapa);
   }
 
   async function carregarItens(localId: string | null) {
@@ -403,14 +462,16 @@ export function NovaInspecao({
     setFase("processo");
   }
 
-  async function enviarFoto(inspecaoId: string, perguntaId: string, arquivo: File) {
-    const foto = await comprimirImagem(arquivo);
-    const ext = foto.type === "image/jpeg" ? "jpg" : foto.name.split(".").pop() || "jpg";
+  /** Envia o anexo da pergunta. Foto é comprimida; vídeo e documento vão como vieram. */
+  async function enviarAnexo(inspecaoId: string, perguntaId: string, arquivo: File) {
+    const ehFoto = tipoAnexo(arquivo.name, arquivo.type) === "foto";
+    const final = ehFoto ? await comprimirImagem(arquivo) : arquivo;
+    const ext = final.type === "image/jpeg" ? "jpg" : extensao(final.name) || (ehFoto ? "jpg" : "bin");
     const caminho = `${inspecaoId}/${perguntaId}.${ext}`;
     const { error } = await supabase.storage
       .from(BUCKET_GOVERNANCA)
-      .upload(caminho, await foto.arrayBuffer(), {
-        contentType: foto.type || "image/jpeg",
+      .upload(caminho, await final.arrayBuffer(), {
+        contentType: final.type || (ehFoto ? "image/jpeg" : "application/octet-stream"),
         upsert: true,
       });
     if (error) return null;
@@ -498,7 +559,7 @@ export function NovaInspecao({
         const r = respostas[q.id] ?? respostaVazia();
         const tipo = tipoItem(q.tipo);
         const anexoUrl = r.anexoFile
-          ? await enviarFoto(id, q.id, r.anexoFile)
+          ? await enviarAnexo(id, q.id, r.anexoFile)
           : r.anexoPreview?.startsWith("http")
             ? r.anexoPreview
             : null;
@@ -559,8 +620,12 @@ export function NovaInspecao({
             prioridade: r.plano.prioridade,
             o_que_fazer: r.plano.o_que_fazer.trim(),
             quem_vai_fazer: r.plano.quem_vai_fazer.trim() || null,
-            quem_pediu: r.plano.quem_pediu.trim() || eu.nome,
+            // Quem abre o chamado é sempre quem está logado.
+            quem_pediu: eu.nome,
+            observacao: r.plano.detalhes.trim() || null,
             ...extrasParaGravar(lerCamposPlano(perguntaPorId.get(perguntaId)?.plano_campos), r.plano.extras),
+            // Local do chamado (vem da UH e pode ser detalhado).
+            onde: r.plano.extras.onde?.trim() || rotuloLocal(acomodacao),
           },
         ];
       });
@@ -760,6 +825,7 @@ export function NovaInspecao({
                                   ✓
                                 </span>
                               )}
+                              <SeloChamados total={pendentes.get(a.id)?.length ?? 0} />
                               <span className="text-[10px] font-medium uppercase text-brand-500">UH</span>
                               <span className="text-xl font-bold text-slate-800">{a.numero}</span>
                               <span className="mt-1 line-clamp-2 text-center text-[11px] leading-tight text-brand-700">
@@ -782,8 +848,9 @@ export function NovaInspecao({
                                 key={a.id}
                                 type="button"
                                 onClick={() => escolherAcomodacao(a)}
-                                className="min-h-[3.5rem] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold leading-tight text-slate-800 shadow-sm transition hover:border-brand-400"
+                                className="relative min-h-[3.5rem] rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold leading-tight text-slate-800 shadow-sm transition hover:border-brand-400"
                               >
+                                <SeloChamados total={pendentes.get(a.id)?.length ?? 0} />
                                 <span className="break-words">{a.numero}</span>
                               </button>
                             ))}
@@ -805,8 +872,9 @@ export function NovaInspecao({
                             key={a.id}
                             type="button"
                             onClick={() => escolherAcomodacao(a)}
-                            className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-2 py-4 shadow-sm transition hover:border-brand-400"
+                            className="relative flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-2 py-4 shadow-sm transition hover:border-brand-400"
                           >
+                            <SeloChamados total={pendentes.get(a.id)?.length ?? 0} />
                             <span className="text-[10px] font-medium uppercase text-slate-400">
                               {ehArea ? "Área" : "UH"}
                             </span>
@@ -826,6 +894,10 @@ export function NovaInspecao({
             </>
           )}
         </>
+      )}
+
+      {fase === "dados" && acomodacao && (pendentes.get(acomodacao.id)?.length ?? 0) > 0 && (
+        <AvisoChamados local={rotuloLocal(acomodacao) ?? ""} chamados={pendentes.get(acomodacao.id)!} />
       )}
 
       {fase === "dados" && (
@@ -881,9 +953,8 @@ export function NovaInspecao({
                     pergunta={q}
                     valor={respostas[q.id] ?? respostaVazia()}
                     onChange={(v) => setRespostas((prev) => ({ ...prev, [q.id]: v }))}
-                    responsaveis={nomesCamareiras}
-                    responsavelPadrao={camareira?.nome}
                     quemPediu={eu.nome}
+                    local={rotuloLocal(acomodacao)}
                     conferencia={conferenciaDe(q)}
                   />
                 ))}
@@ -913,7 +984,7 @@ export function NovaInspecao({
             </div>
             {!completa ? (
               <p className="pt-2 text-center text-xs text-slate-400">
-                Responda os itens obrigatórios (e o plano de ação dos &quot;Não&quot;) para continuar.
+                Responda os itens obrigatórios (e diga o que precisa ser feito nos chamados que abriu) para continuar.
               </p>
             ) : (
               <p className="pt-2 text-center text-xs text-slate-400">
@@ -987,5 +1058,53 @@ function Chip({ children }: { children: React.ReactNode }) {
     <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
       {children}
     </span>
+  );
+}
+
+/** Selo no canto do botão da UH: quantos chamados de manutenção estão em aberto ali. */
+function SeloChamados({ total }: { total: number }) {
+  if (total === 0) return null;
+  return (
+    <span
+      className="absolute left-1.5 top-1.5 rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white"
+      title={`${total} ${total === 1 ? "chamado aberto" : "chamados abertos"} para manutenção`}
+    >
+      🔧{total}
+    </span>
+  );
+}
+
+/** Antes de começar: chamados de manutenção que este local ainda tem em aberto. */
+function AvisoChamados({ local, chamados }: { local: string; chamados: ChamadoPendente[] }) {
+  return (
+    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-900">
+        {local} tem {chamados.length} {chamados.length === 1 ? "chamado aberto" : "chamados abertos"} para manutenção
+      </p>
+      <p className="mt-0.5 text-xs text-amber-800">
+        Confira se já foi resolvido. A devolutiva (resolvido ou não) é dada no checklist que abriu o chamado.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {chamados.map((c) => (
+          <li key={c.id} className="rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
+            <div className="flex items-center gap-2">
+              <PrioridadeBadge prioridade={c.prioridade} />
+              <span className="text-xs text-slate-500">{formatarDataCurta(c.criadoEm.slice(0, 10))}</span>
+            </div>
+            <p className="mt-1 text-slate-800">{c.oQueFazer}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+              {c.token && (
+                <Link href={`/acompanhar/${c.token}`} className="text-brand-700 hover:underline">
+                  🔧 Acompanhar chamado
+                </Link>
+              )}
+              <Link href={`/governanca/inspecao/${c.inspecaoId}`} className="text-brand-700 hover:underline">
+                Dar devolutiva no checklist
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

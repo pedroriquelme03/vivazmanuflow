@@ -1,4 +1,5 @@
 import { CAMPOS_PLANO, type CampoPlano } from "@/lib/checklist-plano";
+import { nomeDoAnexo, tipoAnexo } from "@/lib/checklist-anexo";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
@@ -172,20 +173,11 @@ export default async function InspecaoDetalhePage({
                             {r.item_diferente && <> · ⚠ encontrado: {r.item_encontrado ?? "—"}</>}
                           </p>
                         )}
-                        {r.anexo_url && (
-                          <a href={r.anexo_url} target="_blank" rel="noreferrer">
-                            {/* eslint-disable-next-line @next/next/no-img-element -- foto do Storage */}
-                            <img
-                              src={r.anexo_url}
-                              alt="Foto do item"
-                              className="mt-2 h-24 w-24 rounded-lg object-cover ring-1 ring-slate-200"
-                            />
-                          </a>
-                        )}
+                        {r.anexo_url && <AnexoDaResposta url={r.anexo_url} />}
                         {r.gov_planos_acao.map((p) => (
                           <div key={p.id} className="mt-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm">
                             <div className="mb-1 flex items-center gap-2">
-                              <span className="font-semibold text-red-800">Plano de ação</span>
+                              <span className="font-semibold text-red-800">Chamado para manutenção</span>
                               <PrioridadeBadge prioridade={p.prioridade} />
                             </div>
                             <p className="text-slate-700">{p.o_que_fazer}</p>
@@ -230,6 +222,32 @@ export default async function InspecaoDetalhePage({
         </>
       )}
     </GovernancaShell>
+  );
+}
+
+/** Anexo da pergunta: foto em miniatura, vídeo com player e documento como link. */
+function AnexoDaResposta({ url }: { url: string }) {
+  const tipo = tipoAnexo(url);
+  if (tipo === "video") {
+    return <video src={url} controls className="mt-2 max-h-48 w-full max-w-xs rounded-lg bg-black ring-1 ring-slate-200" />;
+  }
+  if (tipo === "documento") {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 inline-flex max-w-full items-center gap-1 truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-brand-700 hover:bg-slate-100"
+      >
+        📄 {nomeDoAnexo(url)}
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer">
+      {/* eslint-disable-next-line @next/next/no-img-element -- foto do Storage */}
+      <img src={url} alt="Foto do item" className="mt-2 h-24 w-24 rounded-lg object-cover ring-1 ring-slate-200" />
+    </a>
   );
 }
 

@@ -1555,8 +1555,42 @@ export type Database = {
           },
         ]
       }
+      gov_ocupacao_diaria: {
+        Row: {
+          data: string
+          adultos: number
+          criancas: number
+          criancas_faixas: Json
+          uhs_ocupadas: number | null
+          taxa_ocupacao: number | null
+          atualizado_no_painel: string | null
+          buscado_em: string
+        }
+        Insert: {
+          data: string
+          adultos?: number
+          criancas?: number
+          criancas_faixas?: Json
+          uhs_ocupadas?: number | null
+          taxa_ocupacao?: number | null
+          atualizado_no_painel?: string | null
+          buscado_em?: string
+        }
+        Update: {
+          data?: string
+          adultos?: number
+          criancas?: number
+          criancas_faixas?: Json
+          uhs_ocupadas?: number | null
+          taxa_ocupacao?: number | null
+          atualizado_no_painel?: string | null
+          buscado_em?: string
+        }
+        Relationships: []
+      }
       gov_perguntas: {
         Row: {
+          chave: string | null
           dica: string | null
           grupo: string | null
           plano_acao: boolean
@@ -1577,6 +1611,7 @@ export type Database = {
           criado_em: string
         }
         Insert: {
+          chave?: string | null
           dica?: string | null
           grupo?: string | null
           plano_acao?: boolean
@@ -1597,6 +1632,7 @@ export type Database = {
           criado_em?: string
         }
         Update: {
+          chave?: string | null
           dica?: string | null
           grupo?: string | null
           plano_acao?: boolean

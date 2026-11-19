@@ -23,6 +23,8 @@ import {
   resumoPorAplicador,
   secaoParaRetomar,
   tempoDesde,
+  LISTA_SUSPENSA_A_PARTIR,
+  usaListaSuspensa,
   type Acomodacao,
 } from "./governanca";
 
@@ -195,8 +197,9 @@ describe("secaoCompleta", () => {
     expect(secaoCompleta(perguntas, { a: { resposta: "sim", plano: null } })).toBe(false);
   });
 
-  it("Não precisa do que fazer", () => {
+  it("Não sem plano segue; plano aberto precisa do que fazer", () => {
     const base = { a: { resposta: "sim" as const, plano: null } };
+    expect(secaoCompleta(perguntas, { ...base, b: { resposta: "nao", plano: null } })).toBe(true);
     expect(
       secaoCompleta(perguntas, { ...base, b: { resposta: "nao", plano: { o_que_fazer: "  " } } }),
     ).toBe(false);
@@ -308,12 +311,15 @@ describe("itemRespondido", () => {
     expect(itemRespondido({ id: "a", tipo: "numero" }, { resposta: "na", plano: null })).toBe(true);
   });
 
-  it("Não sem plano de ação ativo não pede o que fazer", () => {
+  it("plano de ação é opcional no Não (como no Checklist Fácil)", () => {
     expect(
       itemRespondido({ id: "a", tipo: "sim_nao", plano_acao: false }, { resposta: "nao", plano: null }),
     ).toBe(true);
     expect(
       itemRespondido({ id: "a", tipo: "sim_nao", plano_acao: true }, { resposta: "nao", plano: null }),
+    ).toBe(true);
+    expect(
+      itemRespondido({ id: "a", tipo: "sim_nao", plano_acao: true }, { resposta: "nao", plano: { o_que_fazer: " " } }),
     ).toBe(false);
   });
 
@@ -387,5 +393,14 @@ describe("nota da vistoria e fechamento do mês", () => {
       { nome: "Ana", vistorias: 1, sim: 5, nao: 5, media: 50, produtividade: 200 },
       { nome: "Maria", vistorias: 2, sim: 18, nao: 2, media: 90, produtividade: 280 },
     ]);
+  });
+});
+
+describe("lista suspensa", () => {
+  it("lista de uma opção longa vira lista suspensa; curta e múltipla não", () => {
+    const muitas = Array.from({ length: LISTA_SUSPENSA_A_PARTIR }, (_, i) => `Op ${i}`);
+    expect(usaListaSuspensa("selecao_unica", muitas)).toBe(true);
+    expect(usaListaSuspensa("selecao_unica", ["Infantil", "Adulto", "Familiar"])).toBe(false);
+    expect(usaListaSuspensa("selecao_multipla", muitas)).toBe(false);
   });
 });

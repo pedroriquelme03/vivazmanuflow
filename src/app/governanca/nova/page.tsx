@@ -38,7 +38,7 @@ export default async function NovaInspecaoPage({
       ? supabase
           .from("gov_inspecoes")
           .select(
-            "id, processo_id, acomodacao_id, camareira_id, data_referencia, gov_respostas(pergunta_id, resposta, valor, comentario, anexo_url, item_diferente, item_encontrado, gov_planos_acao(prioridade, o_que_fazer, quem_vai_fazer, quem_pediu, prazo, onde, por_que, como, custo))",
+            "id, processo_id, acomodacao_id, camareira_id, data_referencia, gov_respostas(pergunta_id, resposta, valor, comentario, anexo_url, item_diferente, item_encontrado, gov_planos_acao(prioridade, o_que_fazer, quem_vai_fazer, quem_pediu, observacao, prazo, onde, por_que, como, custo))",
           )
           .eq("id", continuar)
           .in("status", ["em_andamento", "pausada"])

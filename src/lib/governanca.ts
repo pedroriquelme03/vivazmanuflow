@@ -169,6 +169,12 @@ export function tipoItem(valor: string | null | undefined): TipoItem {
   return (TIPOS_ITEM as readonly string[]).includes(valor ?? "") ? (valor as TipoItem) : "sim_nao";
 }
 
+/** Lista de uma opção com muitas opções vira lista suspensa (no celular, não ocupa a tela toda). */
+export const LISTA_SUSPENSA_A_PARTIR = 8;
+export function usaListaSuspensa(tipo: string, opcoes: readonly string[]) {
+  return tipo === "selecao_unica" && opcoes.length >= LISTA_SUSPENSA_A_PARTIR;
+}
+
 export function tipoTemOpcoes(tipo: string) {
   return tipo === "selecao_unica" || tipo === "selecao_multipla";
 }
@@ -197,7 +203,8 @@ type ItemRegra = {
 
 /**
  * Item pronto para seguir. Obrigatório precisa de resposta (ou N/A);
- * "Não" com plano de ação precisa do que fazer, mesmo se o item for opcional;
+ * o plano de ação é opcional (como no Checklist Fácil): quem aplica decide abrir,
+ * e só o plano aberto precisa do que fazer e dos campos obrigatórios dele;
  * e a resposta dada precisa dos complementos que ela exige (foto, comentário).
  */
 export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) {
@@ -208,7 +215,7 @@ export function itemRespondido(item: ItemRegra, r: RespostaParcial | undefined) 
   if (r?.itemDiferente && !r.itemEncontrado?.trim()) return false;
   if (tipo === "sim_nao") {
     if (!r || r.resposta === null) return !obrigatoria;
-    if (r.resposta === "nao" && (item.plano_acao ?? true) && !r.plano?.o_que_fazer.trim()) {
+    if (r.resposta === "nao" && r.plano && !r.plano.o_que_fazer.trim()) {
       return false;
     }
     // Campos do plano que a pergunta marcou como obrigatórios (prazo, onde...).

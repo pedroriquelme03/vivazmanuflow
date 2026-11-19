@@ -62,7 +62,7 @@ export function ResolverPlano({
               : "bg-brand-600 text-white hover:bg-brand-700"
           }`}
         >
-          {salvando ? "Salvando…" : resolvidoEm ? "Reabrir" : "Marcar plano como resolvido"}
+          {salvando ? "Salvando…" : resolvidoEm ? "Reabrir" : "Marcar como resolvido"}
         </button>
       )}
       {erro && <span className="text-xs text-red-700">{erro}</span>}

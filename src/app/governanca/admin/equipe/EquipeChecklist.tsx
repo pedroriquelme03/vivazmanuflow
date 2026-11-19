@@ -21,6 +21,7 @@ import { BtnAdd, CampoModal, CardCadastro, ErroMsg, JanelaCadastro, OkMsg } from
 import { SelectSetor } from "../../Seletores";
 import { Erro, Titulo, Voltar, inputCls } from "../../ui";
 import { criarMembroChecklist, salvarMembroChecklist, type ResultadoCadastro } from "./actions";
+import { abrirRascunhoEmail, empresaDosAcessos, rascunhoAcessoOutlook } from "@/lib/email-acesso";
 
 const NOVO_VAZIO: NovoMembro = { nome: "", email: "", senha: "", perfil: "camareira", setores: [] };
 
@@ -54,6 +55,8 @@ export function EquipeChecklist({
   });
   const [erro, setErro] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  // E-mail de acesso pronto para abrir no Outlook, igual ao cadastro da Manutenção e da TI.
+  const [conviteHref, setConviteHref] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
   const [editando, setEditando] = useState<MembroEquipe | null>(null);
   const [filtroPerfil, setFiltroPerfil] = useState("");
@@ -84,8 +87,25 @@ export function EquipeChecklist({
 
   function criar() {
     setOk(null);
+    setConviteHref(null);
+    const dados = novo;
     iniciar(async () => {
-      depois(await criarMembroChecklist(novo), () => setNovo({ ...NOVO_VAZIO, setores: novo.setores }));
+      const criou = depois(await criarMembroChecklist(dados), () => setNovo({ ...NOVO_VAZIO, setores: dados.setores }));
+      if (!criou) return;
+      // A empresa do e-mail sai das propriedades dos setores marcados (Vivaz, Aquamania...).
+      const nomesPropriedades = setores
+        .filter((s) => dados.setores.includes(s.id))
+        .map((s) => propriedades.find((p) => p.id === s.propriedade_id)?.nome ?? "");
+      setConviteHref(
+        rascunhoAcessoOutlook({
+          nome: dados.nome,
+          email: dados.email,
+          senha: dados.senha,
+          papel: PERFIS_EQUIPE.find((p) => p.valor === dados.perfil)?.rotulo,
+          sistema: "checklist",
+          empresa: empresaDosAcessos(nomesPropriedades),
+        }).href,
+      );
     });
   }
 
@@ -144,6 +164,15 @@ export function EquipeChecklist({
         </div>
         <ErroMsg erro={editando ? null : erro} />
         <OkMsg texto={ok} />
+        {ok && conviteHref && (
+          <button
+            type="button"
+            onClick={() => abrirRascunhoEmail(conviteHref)}
+            className="mt-2 cursor-pointer rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
+          >
+            Abrir e-mail no Outlook
+          </button>
+        )}
 
         <ListaCadastroControles
           {...lista}

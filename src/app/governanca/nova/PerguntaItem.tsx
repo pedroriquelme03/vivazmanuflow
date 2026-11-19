@@ -4,23 +4,24 @@ import { useState } from "react";
 import {
   CARINHAS,
   tipoItem,
+  usaListaSuspensa,
   type Pergunta,
   type Prioridade,
   type RespostaValor,
 } from "@/lib/governanca";
 import { complementosExigidos, complementosFaltando } from "@/lib/checklist-regras";
 import { camposDoPlano, lerCamposPlano, planoFaltando, type ExtrasPlano } from "@/lib/checklist-plano";
+import { ACEITA_ANEXO, MAX_ANEXO_BYTES, nomeDoAnexo, tipoAnexo } from "@/lib/checklist-anexo";
 import { inputCls, labelCls } from "../ui";
-
-const MAX_ANEXO_BYTES = 10 * 1024 * 1024;
-const EXTENSAO_IMAGEM = /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i;
 
 export type PlanoLocal = {
   prioridade: Prioridade;
   o_que_fazer: string;
   quem_vai_fazer: string;
   quem_pediu: string;
-  /** Prazo, onde, por quê, como e custo, conforme a pergunta pede. */
+  /** Detalhes opcionais do chamado (vão em "Observação"). */
+  detalhes: string;
+  /** Prazo, onde (o local do chamado), por quê, como e custo. */
   extras: ExtrasPlano;
 };
 
@@ -56,8 +57,12 @@ export function respostaVazia(): RespostaLocal {
 /** Item do local que a pergunta confere: o tipo (ex.: TV) e o que está cadastrado. */
 export type ConferenciaItem = { tipo: string; previsto: string | null };
 
-function planoVazio(quemPediu: string, quemVaiFazer = ""): PlanoLocal {
-  return { prioridade: "media", o_que_fazer: "", quem_vai_fazer: quemVaiFazer, quem_pediu: quemPediu, extras: {} };
+/**
+ * Chamado para manutenção, como na tela Abrir chamado: o local já vem da UH
+ * (dá para detalhar) e quem pede é sempre quem está aplicando.
+ */
+function planoVazio(quemPediu: string, local: string): PlanoLocal {
+  return { prioridade: "media", o_que_fazer: "", quem_vai_fazer: "", quem_pediu: quemPediu, detalhes: "", extras: { onde: local } };
 }
 
 const botao =
@@ -68,9 +73,8 @@ export function PerguntaItem({
   pergunta,
   valor,
   onChange,
-  responsaveis,
-  responsavelPadrao,
   quemPediu,
+  local,
   conferencia,
 }: {
   pergunta: Pergunta;
@@ -78,10 +82,10 @@ export function PerguntaItem({
   onChange: (v: RespostaLocal) => void;
   /** Pergunta ligada a um item do local: mostra o cadastrado e pede aviso se for diferente. */
   conferencia?: ConferenciaItem | null;
-  /** Nomes sugeridos em "Quem vai fazer?" (camareiras). */
-  responsaveis: string[];
-  responsavelPadrao?: string;
+  /** Quem está aplicando: vai como solicitante do chamado. */
   quemPediu: string;
+  /** Onde o chamado vai ser aberto (ex.: "UH 1002"). */
+  local?: string | null;
 }) {
   const [anexoErro, setAnexoErro] = useState<string | null>(null);
   const tipo = tipoItem(pergunta.tipo);
@@ -91,22 +95,24 @@ export function PerguntaItem({
   const faltando = complementosFaltando({ tipo, exige: pergunta.exige }, valor);
   const comentarioObrigatorio = exigidos.includes("comentario");
   const configPlano = lerCamposPlano(pergunta.plano_campos);
-  const camposPlano = camposDoPlano(configPlano);
+  // "Onde" já é o campo Local do chamado, sempre visível.
+  const camposPlano = camposDoPlano(configPlano).filter((c) => c.campo !== "onde");
   const faltandoPlano = valor.plano ? planoFaltando(configPlano, valor.plano.extras) : [];
   // Item que não aceita comentário/foto esconde o botão, a não ser que a resposta exija.
   const aceitaComentario = pergunta.permite_comentario !== false || comentarioObrigatorio || Boolean(valor.comentario);
   const aceitaFoto = pergunta.permite_foto !== false || exigidos.includes("foto") || Boolean(valor.anexoPreview);
+  // Arquivo novo: pelo próprio arquivo. Já salvo: pela extensão da URL.
+  const origemAnexo = valor.anexoFile?.name ?? valor.anexoPreview ?? "";
+  const tipoDoAnexo = valor.anexoPreview ? tipoAnexo(origemAnexo, valor.anexoFile?.type) : null;
+  const nomeAnexo = nomeDoAnexo(origemAnexo);
 
   function setSimNao(r: RespostaValor) {
-    if (r === "nao" && pergunta.plano_acao) {
-      onChange({
-        ...valor,
-        resposta: "nao",
-        plano: valor.plano ?? planoVazio(quemPediu, responsavelPadrao ?? ""),
-      });
-    } else {
-      onChange({ ...valor, resposta: r, plano: null });
-    }
+    onChange({ ...valor, resposta: r, plano: r === "nao" ? valor.plano : null });
+  }
+
+  // No "Não", quem aplica decide se abre chamado para a manutenção (gravado como plano de ação).
+  function abrirChamado(abrir: boolean) {
+    onChange({ ...valor, plano: abrir ? (valor.plano ?? planoVazio(quemPediu, local ?? "")) : null });
   }
 
   function alternarNa() {
@@ -133,7 +139,7 @@ export function PerguntaItem({
   function setPlano(patch: Partial<PlanoLocal>) {
     onChange({
       ...valor,
-      plano: { ...(valor.plano ?? planoVazio(quemPediu, responsavelPadrao ?? "")), ...patch },
+      plano: { ...(valor.plano ?? planoVazio(quemPediu, local ?? "")), ...patch },
     });
   }
 
@@ -142,9 +148,10 @@ export function PerguntaItem({
     e.target.value = "";
     if (!file) return;
 
-    const ehImagem = file.type.startsWith("image/") || EXTENSAO_IMAGEM.test(file.name);
-    if (!ehImagem) return setAnexoErro("Envie somente imagens (máx. 10 MB).");
-    if (file.size > MAX_ANEXO_BYTES) return setAnexoErro("A imagem deve ter no máximo 10 MB.");
+    if (!tipoAnexo(file.name, file.type)) {
+      return setAnexoErro("Envie foto, vídeo ou documento (PDF, Word, Excel...).");
+    }
+    if (file.size > MAX_ANEXO_BYTES) return setAnexoErro("O arquivo deve ter no máximo 50 MB.");
 
     setAnexoErro(null);
     if (valor.anexoPreview) URL.revokeObjectURL(valor.anexoPreview);
@@ -204,20 +211,21 @@ export function PerguntaItem({
 
       <div className="mt-3">
         {tipo === "sim_nao" && (
+          // Não à esquerda e Sim à direita, como no Checklist Fácil.
           <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSimNao("sim")}
-              className={`${botao} ${valor.resposta === "sim" ? "bg-brand-600 text-white" : botaoSolto}`}
-            >
-              ✓ Sim
-            </button>
             <button
               type="button"
               onClick={() => setSimNao("nao")}
               className={`${botao} ${valor.resposta === "nao" ? "bg-red-600 text-white" : botaoSolto}`}
             >
               ✕ Não
+            </button>
+            <button
+              type="button"
+              onClick={() => setSimNao("sim")}
+              className={`${botao} ${valor.resposta === "sim" ? "bg-brand-600 text-white" : botaoSolto}`}
+            >
+              ✓ Sim
             </button>
           </div>
         )}
@@ -278,7 +286,23 @@ export function PerguntaItem({
           />
         )}
 
-        {tipo === "selecao_unica" && (
+        {usaListaSuspensa(tipo, pergunta.opcoes) && (
+          <select
+            className={inputCls}
+            disabled={na}
+            value={valor.valor}
+            onChange={(e) => setValor(e.target.value)}
+          >
+            <option value="">Selecione…</option>
+            {pergunta.opcoes.map((op) => (
+              <option key={op} value={op}>
+                {op}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {tipo === "selecao_unica" && !usaListaSuspensa(tipo, pergunta.opcoes) && (
           <div className="space-y-1.5">
             {pergunta.opcoes.map((op) => (
               <label
@@ -349,18 +373,13 @@ export function PerguntaItem({
         )}
         {aceitaFoto && (
           <label className="cursor-pointer rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            📎 {valor.anexoFile ? "Trocar foto" : "Anexar foto"}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleAnexo}
-            />
+            📎 {valor.anexoPreview ? "Trocar anexo" : "Anexar"}
+            {/* Sem "capture": no celular deixa escolher câmera, galeria ou arquivos. */}
+            <input type="file" accept={ACEITA_ANEXO} className="hidden" onChange={handleAnexo} />
           </label>
         )}
       </div>
-      {anexoErro && <p className="mt-1 text-xs text-red-600">{anexoErro}</p>}
+      {anexoErro &&<p className="mt-1 text-xs text-red-600">{anexoErro}</p>}
       {faltando.length > 0 && (
         <p className="mt-2 text-xs font-medium text-red-600">
           Para esta resposta, {faltando.map((c) => (c === "foto" ? "a foto" : "o comentário")).join(" e ")}{" "}
@@ -380,25 +399,60 @@ export function PerguntaItem({
 
       {valor.anexoPreview && (
         <div className="mt-3 flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- prévia local (blob:) */}
-          <img
-            src={valor.anexoPreview}
-            alt="Foto anexada"
-            className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200"
-          />
+          {tipoDoAnexo === "video" ? (
+            <video src={valor.anexoPreview} className="h-16 w-24 rounded-lg bg-black object-cover ring-1 ring-slate-200" muted />
+          ) : tipoDoAnexo === "documento" ? (
+            <span className="max-w-[12rem] truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+              📄 {nomeAnexo}
+            </span>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- prévia local (blob:) ou do Storage
+            <img
+              src={valor.anexoPreview}
+              alt="Foto anexada"
+              className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200"
+            />
+          )}
           <button
             type="button"
             onClick={removerAnexo}
             className="text-xs font-medium text-red-600 hover:underline"
           >
-            Remover foto
+            Remover anexo
           </button>
         </div>
       )}
 
+      {/* Só nas perguntas marcadas com "abre chamado" (infraestrutura, conserto, pintura...). */}
+      {tipo === "sim_nao" && valor.resposta === "nao" && pergunta.plano_acao !== false && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-medium text-amber-900">Deseja abrir um chamado para manutenção?</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => abrirChamado(false)}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                !valor.plano ? "bg-slate-600 text-white" : "border border-slate-300 bg-white text-slate-700"
+              }`}
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => abrirChamado(true)}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                valor.plano ? "bg-amber-600 text-white" : "border border-slate-300 bg-white text-slate-700"
+              }`}
+            >
+              Sim, abrir chamado
+            </button>
+          </div>
+        </div>
+      )}
+
       {valor.resposta === "nao" && valor.plano && (
-        <div className="mt-4 space-y-3 rounded-xl border border-red-100 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-800">Plano de ação</p>
+        <div className="mt-3 space-y-3 rounded-xl border border-red-100 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-800">Chamado para manutenção</p>
 
           <div>
             <span className={labelCls}>Prioridade</span>
@@ -423,41 +477,53 @@ export function PerguntaItem({
           </div>
 
           <label className="block">
-            <span className={labelCls}>O que precisa ser feito?</span>
-            <textarea
+            <span className={labelCls}>Local</span>
+            <input
               className={inputCls}
-              rows={2}
+              value={valor.plano.extras?.onde ?? ""}
+              onChange={(e) => setPlano({ extras: { ...valor.plano!.extras, onde: e.target.value } })}
+              placeholder="Ex.: UH 1002 - banheiro"
+              maxLength={120}
+            />
+            <span className="mt-1 block text-xs text-slate-400">Já vem com o local do checklist. Detalhe se precisar.</span>
+          </label>
+
+          <div>
+            <span className={labelCls}>Quem está solicitando?</span>
+            <p className={`${inputCls} bg-slate-50 text-slate-800`}>{quemPediu}</p>
+            <span className="mt-1 block text-xs text-slate-400">
+              Logado: o chamado fica no seu nome e aparece em Meus chamados.
+            </span>
+          </div>
+
+          <label className="block">
+            <span className={labelCls}>O que precisa ser feito?</span>
+            <input
+              className={inputCls}
               value={valor.plano.o_que_fazer}
               onChange={(e) => setPlano({ o_que_fazer: e.target.value })}
-              placeholder="Descreva a ação necessária"
+              placeholder="Ex.: Pintar a parede, esconder os cabos da TV"
+              maxLength={120}
             />
           </label>
 
+          <label className="block">
+            <span className={labelCls}>
+              Detalhes <span className="font-normal text-slate-400">(opcional)</span>
+            </span>
+            <textarea
+              className={inputCls}
+              rows={2}
+              value={valor.plano.detalhes}
+              onChange={(e) => setPlano({ detalhes: e.target.value })}
+              placeholder="Qualquer informação que ajude a equipe."
+            />
+          </label>
+          {valor.anexoPreview && (
+            <p className="text-xs text-slate-500">📎 O anexo desta pergunta vai junto no chamado.</p>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelCls}>Quem vai fazer?</span>
-              <input
-                className={inputCls}
-                list={`responsaveis-${pergunta.id}`}
-                value={valor.plano.quem_vai_fazer}
-                onChange={(e) => setPlano({ quem_vai_fazer: e.target.value })}
-                placeholder="Nome do responsável"
-              />
-              <datalist id={`responsaveis-${pergunta.id}`}>
-                {responsaveis.map((nome) => (
-                  <option key={nome} value={nome} />
-                ))}
-              </datalist>
-            </label>
-            <label className="block">
-              <span className={labelCls}>Quem está pedindo?</span>
-              <input
-                className={`${inputCls} bg-slate-50 text-slate-600`}
-                value={valor.plano.quem_pediu || quemPediu}
-                readOnly
-                tabIndex={-1}
-              />
-            </label>
             {camposPlano.map((c) => (
               <label key={c.campo} className={`block ${c.campo === "como" || c.campo === "por_que" ? "sm:col-span-2" : ""}`}>
                 <span className={labelCls}>
@@ -476,7 +542,7 @@ export function PerguntaItem({
             ))}
           </div>
           {faltandoPlano.length > 0 && (
-            <p className="text-xs font-medium text-red-600">Falta no plano: {faltandoPlano.join(", ")}.</p>
+            <p className="text-xs font-medium text-red-600">Falta no chamado: {faltandoPlano.join(", ")}.</p>
           )}
         </div>
       )}

@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { acessosDoSetor } from "@/lib/checklist-acessos";
 import { exigirGovernanca } from "@/lib/governanca-acesso";
 import { MIGRATION_HINT_GOV, erroSchemaGov, inspecionaEquipe } from "@/lib/governanca";
 import { compararNumeroUh } from "@/lib/mapa-uhs";
@@ -15,6 +17,9 @@ function hojeIso() {
 export default async function RelatorioDiarioPage() {
   const { perfil, papel } = await exigirGovernanca("/governanca/relatorio-diario");
   const supabase = await createClient();
+  // É a lista diária das UHs da Governança: os outros setores não veem (o banco também barra).
+  const { governanca } = await acessosDoSetor(supabase, perfil.id, papel);
+  if (!governanca) redirect("/governanca");
   const hoje = hojeIso();
 
   // Relatório de hoje; sem ele, o último enviado (com aviso de que é de outro dia).

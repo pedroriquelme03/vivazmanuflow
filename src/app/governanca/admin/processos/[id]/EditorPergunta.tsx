@@ -76,11 +76,11 @@ export function EditorPergunta({
     p.permite_na && "Aceita N/A",
     p.permite_comentario === false && "Sem comentário",
     p.permite_foto === false && "Sem foto",
-    tipo === "sim_nao" && p.plano_acao && "Plano de ação no “Não”",
+    tipo === "sim_nao" && p.plano_acao && "Chamado p/ manutenção no “Não”",
     tipo === "sim_nao" &&
       p.plano_acao &&
       camposDoPlano(lerCamposPlano(p.plano_campos)).length > 0 &&
-      `Plano pede ${camposDoPlano(lerCamposPlano(p.plano_campos))
+      `Chamado pede ${camposDoPlano(lerCamposPlano(p.plano_campos))
         .map((c) => c.rotulo.toLowerCase())
         .join(", ")}`,
     tipo === "sim_nao" && Number(p.peso) !== 1 && `Peso ${p.peso}`,
@@ -166,17 +166,17 @@ export function EditorPergunta({
               <Chave
                 ligado={p.permite_foto !== false}
                 onChange={(v) => onAtualizar({ permite_foto: v })}
-                ajuda="Mostra o botão Anexar foto. Se uma resposta exige foto, aparece mesmo assim."
+                ajuda="Mostra o botão Anexar (foto, vídeo ou documento). Se uma resposta exige anexo, aparece mesmo assim."
               >
-                Aceita foto
+                Aceita anexo
               </Chave>
               {tipo === "sim_nao" && (
                 <Chave
                   ligado={p.plano_acao}
                   onChange={(v) => onAtualizar({ plano_acao: v })}
-                  ajuda="Ao responder Não, pede o que fazer (vira chamado na Manutenção)."
+                  ajuda="Ao responder Não, pergunta se quer abrir chamado na Manutenção (quem aplica decide)."
                 >
-                  “Não” abre plano de ação
+                  “Não” oferece chamado p/ manutenção
                 </Chave>
               )}
               {tipo === "sim_nao" && (
@@ -204,8 +204,8 @@ export function EditorPergunta({
 
           {tipo === "sim_nao" && p.plano_acao && (
             <Bloco
-              titulo="Campos do plano de ação"
-              ajuda="Prioridade, o que fazer e quem vai fazer sempre aparecem. Escolha o que mais pedir quando a resposta for Não."
+              titulo="Campos do chamado para manutenção"
+              ajuda="Prioridade, o que fazer e o local sempre aparecem. Escolha o que mais pedir quando abrir o chamado."
             >
               <CamposDoPlano config={lerCamposPlano(p.plano_campos)} onSalvar={(c) => onAtualizar({ plano_campos: c })} />
             </Bloco>

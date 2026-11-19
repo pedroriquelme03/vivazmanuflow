@@ -14,7 +14,7 @@ import {
   type PainelEquipe,
 } from "@/lib/ambiente-equipe";
 import { PAPEL_GOV_LABEL, papelGovernanca } from "@/lib/governanca";
-import { itemChecklistAtivo, menuChecklist } from "@/lib/menu-checklist";
+import { hrefRelatorios, itemChecklistAtivo, menuChecklist, type AcessosSetor } from "@/lib/menu-checklist";
 
 const ROLE_BADGE: Record<Perfil["role"], string> = {
   admin: "ADMIN",
@@ -254,12 +254,14 @@ export function AdminSidebar({
   perfil,
   ambiente = "manutencao",
   mostraTroca = false,
+  acessos,
   onFechar,
   className = "",
 }: {
   perfil: Perfil;
   ambiente?: PainelEquipe;
   mostraTroca?: boolean;
+  acessos?: AcessosSetor;
   /** No menu do celular: botão de fechar e fecha ao escolher um item. */
   onFechar?: () => void;
   className?: string;
@@ -267,7 +269,7 @@ export function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const ti = ambiente === "ti";
-  const itens = itensDoMenu(perfil, ambiente);
+  const itens = itensDoMenu(perfil, ambiente, acessos);
   const claro = ti;
   const destaque = claro ? "text-white" : "text-brand-500";
   const ponto = claro ? "bg-white" : "bg-brand-500";
@@ -392,11 +394,13 @@ export function PainelShell({
   perfil,
   ambiente = "manutencao",
   mostraTroca = false,
+  acessos,
   children,
 }: {
   perfil: Perfil;
   ambiente?: PainelEquipe;
   mostraTroca?: boolean;
+  acessos?: AcessosSetor;
   children: React.ReactNode;
 }) {
   return (
@@ -411,6 +415,7 @@ export function PainelShell({
           perfil={perfil}
           ambiente={ambiente}
           mostraTroca={mostraTroca}
+          acessos={acessos}
         />
       </div>
 
@@ -420,6 +425,7 @@ export function PainelShell({
           perfil={perfil}
           ambiente={ambiente}
           mostraTroca={mostraTroca}
+          acessos={acessos}
         />
         <AvisoPush />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -430,11 +436,11 @@ export function PainelShell({
   );
 }
 
-function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe): NavItem[] {
+function itensDoMenu(perfil: Perfil, ambiente: PainelEquipe, acessos?: AcessosSetor): NavItem[] {
   if (ambiente === "checklist") {
     const papel = papelGovernanca(perfil.role, perfil.governanca_papel, perfil.ambientes);
-    const checklist: NavItem[] = menuChecklist(papel).map((item) => ({
-      href: item.href,
+    const checklist: NavItem[] = menuChecklist(papel, acessos).map((item) => ({
+      href: item.href === "/governanca/admin/relatorios" ? hrefRelatorios(papel) : item.href,
       rotulo: item.rotulo,
       match: (p: string) => itemChecklistAtivo(item, p),
       icone: ICONE_CHECKLIST[item.href],
@@ -465,14 +471,16 @@ function MobileBar({
   perfil,
   ambiente,
   mostraTroca,
+  acessos,
 }: {
   perfil: Perfil;
   ambiente: PainelEquipe;
   mostraTroca: boolean;
+  acessos?: AcessosSetor;
 }) {
   const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
-  const atual = itensDoMenu(perfil, ambiente).find((item) => item.match(pathname));
+  const atual = itensDoMenu(perfil, ambiente, acessos).find((item) => item.match(pathname));
 
   useEffect(() => {
     if (!aberto) return;
@@ -525,6 +533,7 @@ function MobileBar({
             perfil={perfil}
             ambiente={ambiente}
             mostraTroca={mostraTroca}
+            acessos={acessos}
             onFechar={() => setAberto(false)}
             className="relative h-full max-w-[85vw] overflow-y-auto shadow-2xl"
           />

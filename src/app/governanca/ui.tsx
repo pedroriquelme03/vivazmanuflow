@@ -17,20 +17,32 @@ export const btnSecundario = `${btnBase} border border-slate-300 bg-white text-s
 export const cardCls = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 const ABAS_RELATORIOS = [
-  { valor: "indicadores", rotulo: "Indicadores", href: "/governanca/admin/relatorios" },
-  { valor: "fechamento", rotulo: "Fechamento do mês", href: "/governanca/admin/fechamento" },
+  { valor: "indicadores", rotulo: "Indicadores", href: "/governanca/admin/relatorios", soAdmin: true },
+  { valor: "fechamento", rotulo: "Fechamento do mês", href: "/governanca/admin/fechamento", soAdmin: true },
+  { valor: "recreacao", rotulo: "Recreação", href: "/governanca/recreacao", soAdmin: false },
 ] as const;
 
-/** Relatórios e Fechamento do mês ficam juntos no menu: as abas trocam entre os dois. */
-export function AbasRelatorios({ atual }: { atual: (typeof ABAS_RELATORIOS)[number]["valor"] }) {
+/**
+ * Abas de Relatórios: Indicadores e Fechamento do mês são do admin; Recreação,
+ * do admin e do líder da Recreação. Com uma aba só, a barra nem aparece.
+ */
+export function AbasRelatorios({
+  atual,
+  admin = true,
+}: {
+  atual: (typeof ABAS_RELATORIOS)[number]["valor"];
+  admin?: boolean;
+}) {
+  const abas = ABAS_RELATORIOS.filter((a) => admin || !a.soAdmin);
+  if (abas.length < 2) return null;
   return (
-    <nav className="mb-5 flex gap-1 border-b border-slate-200" aria-label="Relatórios">
-      {ABAS_RELATORIOS.map((a) => (
+    <nav className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200 print:hidden" aria-label="Relatórios">
+      {abas.map((a) => (
         <Link
           key={a.valor}
           href={a.href}
           aria-current={a.valor === atual ? "page" : undefined}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${
+          className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${
             a.valor === atual
               ? "border-brand-600 text-brand-700"
               : "border-transparent text-slate-500 hover:text-slate-800"
